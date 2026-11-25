@@ -104,14 +104,14 @@ FEATURES: dict[str, dict[str, str]] = {
         ),
     },
     "inbox": {
-        "title": "Inbox, board and hand-overs",
-        "where": "Inbox > Inbox, Board, Hand-overs, Tasks",
+        "title": "Inbox and hand-overs",
+        "where": "Start > Inbox, Hand-overs, Tasks",
         "text": (
             "What happened and wants to be read: answers of hand-overs, finished background tasks,"
-            " proposals waiting for a click, failures. Reading an item files it in the corner of "
-            "its program unless it is pinned (the board) or urgent and not settled. Comments, "
-            "Post-Its, stickers and highlights can be stuck on an item; a pinned answer is checked"
-            " again every day and marked still correct or outdated."
+            " proposals waiting for a click, failures. One list in three groups: decide, errors, "
+            "results. Reading an item takes it out of the inbox unless it is urgent and not "
+            "settled; the thing it is about stays in its program. There is no board, no pinning, "
+            "no filing and no marks on items."
         ),
     },
     "chat": {

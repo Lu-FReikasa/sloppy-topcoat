@@ -62,11 +62,8 @@ import type {
   InboxItem,
   InboxListing,
   Handover,
-  ItemMark,
-  MarkKind,
   IncognitoMessage,
   IncognitoTab,
-  InboxView,
   MemorySortSuggestion,
   MemoryTagTree,
   MemoryReport,
@@ -1783,10 +1780,10 @@ export class ApiClient {
 
   // --- the inbox (docs/PLATFORM.md, 3.7) -----------------------------------------------------------
 
-  inbox(view: InboxView = "inbox", application?: string): Promise<InboxListing> {
-    const q = new URLSearchParams({ view });
-    if (application) q.set("application", application);
-    return this.request<InboxListing>("GET", `/api/inbox?${q.toString()}`);
+  /** Unread items and urgent ones that are not settled, in their groups (D111). */
+  inbox(application?: string): Promise<InboxListing> {
+    const q = application ? `?application=${encodeURIComponent(application)}` : "";
+    return this.request<InboxListing>("GET", `/api/inbox${q}`);
   }
 
   inboxCounts(): Promise<InboxCounts> {
@@ -1820,39 +1817,14 @@ export class ApiClient {
     return this.request<{ stopped: boolean }>("POST", `/api/research/runs/${encodeURIComponent(id)}/stop`);
   }
 
-  /** Everything read and filed (of one application, if named); what waits for an action stays. */
-  readAllInbox(application?: string): Promise<{ filed: number }> {
+  /** Everything read (of one application, if named); what waits for an action stays. */
+  readAllInbox(application?: string): Promise<{ read: number }> {
     const q = application ? `?application=${encodeURIComponent(application)}` : "";
-    return this.request<{ filed: number }>("POST", `/api/inbox/read-all${q}`);
-  }
-
-  pinInboxItem(id: string, pinned: boolean): Promise<InboxItem> {
-    return this.request<InboxItem>("POST", `/api/inbox/${encodeURIComponent(id)}/pin`, { pinned });
+    return this.request<{ read: number }>("POST", `/api/inbox/read-all${q}`);
   }
 
   resolveInboxItem(id: string): Promise<InboxItem> {
     return this.request<InboxItem>("POST", `/api/inbox/${encodeURIComponent(id)}/resolve`);
-  }
-
-  itemMarks(id: string): Promise<{ marks: ItemMark[] }> {
-    return this.request("GET", `/api/inbox/${encodeURIComponent(id)}/marks`);
-  }
-
-  addItemMark(id: string, kind: MarkKind, text: string, line?: number): Promise<ItemMark> {
-    return this.request("POST", `/api/inbox/${encodeURIComponent(id)}/marks`, {
-      kind,
-      text,
-      ...(line === undefined ? {} : { line }),
-    });
-  }
-
-  resolveItemMark(id: string, resolved: boolean): Promise<ItemMark> {
-    const q = resolved ? "" : "?resolved=false";
-    return this.request("POST", `/api/inbox/marks/${encodeURIComponent(id)}/resolve${q}`);
-  }
-
-  deleteItemMark(id: string): Promise<void> {
-    return this.request<void>("DELETE", `/api/inbox/marks/${encodeURIComponent(id)}`);
   }
 
   deleteInboxItem(id: string): Promise<void> {
@@ -2716,8 +2688,10 @@ export class ApiClient {
     return this.request("DELETE", `/api/ui/themes/${encodeURIComponent(key)}`);
   }
 
+  /** `language` (de/en): the language of the contract; without it, the person's stored one. */
   uiWorkspaceAgent(
     key: string,
+    language?: "de" | "en",
   ): Promise<
     UiAgentDefaults & {
       workspace: string;
@@ -2726,7 +2700,8 @@ export class ApiClient {
       contract?: import("../layout/types").AgentContractView | null;
     }
   > {
-    return this.request("GET", `/api/ui/workspaces/${encodeURIComponent(key)}/agent`);
+    const query = language ? `?language=${language}` : "";
+    return this.request("GET", `/api/ui/workspaces/${encodeURIComponent(key)}/agent${query}`);
   }
 
   uiTemplates(): Promise<{ templates: UiTemplateView[] }> {

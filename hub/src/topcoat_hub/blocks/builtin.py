@@ -794,7 +794,8 @@ ISSUE_AREA: dict[str, Any] = {
             ),
             "prompt": (
                 "The problem:\n<<<\n{{question}}\n>>>\n\nWhat was found so far (search hits, the "
-                "wiki):\n<<<\n{{findings}}\n>>>\n\n"
+                "wiki, the outline of the files found: their names with their lines):\n<<<\n"
+                "{{findings}}\n>>>\n\n"
                 "The parts of the repository: hub/ (the server: Python, its programs, the "
                 "assistant, the API), web/src/ (the GUI in the browser and in the desktop overlay: "
                 "React; windows, pages, Clipper's bubble), proto/ (schemas), docs/, desktop/ (only "
@@ -933,7 +934,10 @@ def _probe(name: str, app: str, who: str) -> dict[str, Any]:
                     "You answer ONE question of an investigation of a problem in Topcoat."
                     + (
                         f" The code is {LIVE_REPO}, branch topcoat/live (what the hub runs): "
-                        "repo.search for names, then repo.read of the lines around a hit. When "
+                        "repo.search for names, then repo.read of the lines around a hit. "
+                        "repo.outline (path: a folder or a file) maps a part of the code first: "
+                        "each file with its classes, functions and components and their lines, "
+                        "so you read the right lines at once. When "
                         "you do not know yet what a part of the code is for, wiki.list and "
                         "wiki.read of its page first: the wiki describes the code page by page "
                         "(which state is what, which component gets which data)."

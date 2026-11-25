@@ -130,6 +130,28 @@ describe("Desktop", () => {
     await waitFor(() => expect(screen.queryByTestId("clipper-dock")).toBeNull());
   });
 
+  it("hears AltGr+C as soon as the window in front is on screen, not only a moment later (#73)", async () => {
+    const h = hub(desk(["settings", "archive"]));
+    // press the key the instant the windows are drawn: a MutationObserver runs right after React
+    // has put them on the page, before anything React schedules for later
+    let pressed = false;
+    const seen = new MutationObserver(() => {
+      if (pressed || !screen.queryByRole("region", { name: "Archive" })) return;
+      pressed = true;
+      fireEvent.keyDown(window, { key: "c", code: "KeyC", ctrlKey: true, altKey: true });
+    });
+    seen.observe(document.body, { childList: true, subtree: true });
+    render(
+      <Desktop api={h.api} ctx={ctx(h.api)} uiTick={0} status="live" onSaveLanguage={() => undefined} onLogout={() => undefined} />,
+    );
+    try {
+      await waitFor(() => expect(pressed).toBe(true));
+      expect((await screen.findByTestId("clipper-dock")).getAttribute("aria-label")).toBe("Clipper an Archive");
+    } finally {
+      seen.disconnect();
+    }
+  });
+
   it("shows the open programs side by side and every program on the taskbar", async () => {
     show(desk(["settings", "archive"]));
     const settings = await screen.findByRole("region", { name: "Settings" });
@@ -579,5 +601,27 @@ describe("the overlay of the desktop client (?overlay=1)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Settings an den Desktop heften" }));
     await waitFor(() => expect(screen.queryByRole("region", { name: "Settings" })).toBeNull());
     expect(screen.getByRole("region", { name: "Archive" })).toBeTruthy();
+  });
+
+  it("keeps Start's open conversations out of its row of views, so the row stays one line high (#77)", async () => {
+    const b = bootstrap([workspace("chat", ["page.library", "page.chat"], { icon: "tc", title: "Start" })]);
+    const h = hub(
+      { ...b, prefs: { hue: 140, look: "terminal", desktop: { open: ["chat"], minimised: [], focus: "chat", maximised: null, views: {} } } },
+      undefined,
+      {
+        "GET /api/conversations": [
+          { id: "c1", title: "Why does the container restart at night?", application: "chat", open: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+        ],
+      },
+    );
+    render(<Desktop api={h.api} ctx={ctx(h.api)} uiTick={0} status="live" onSaveLanguage={() => undefined} onLogout={() => undefined} />);
+    const start = await screen.findByRole("region", { name: "Start" });
+    await within(start).findByRole("button", { name: "Why does the container restart at night?" });
+    const open = within(start).getByRole("group", { name: "Offen" });
+    const views = within(start).getByRole("navigation");
+    // the views are buttons of their own row; the list is a row (or the rail's lower part) of its own
+    expect(views.contains(open)).toBe(false);
+    expect(open.parentElement).toBe(views.parentElement);
+    expect(within(views).getAllByRole("button").map((x) => x.textContent)).toHaveLength(2);
   });
 });

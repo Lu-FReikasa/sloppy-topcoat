@@ -562,7 +562,16 @@ A dev node is a tool node for the dev workshop: `topcoat-node install --role dev
 "capability.execute", "workshop.manage"]` and the `repo.*` and `workshop.*` capabilities. It holds clones of
 registered repositories and offers only named, schema-checked operations (no shell).
 
-- **Capabilities.** Read-only: `repo.status`, `repo.list`, `repo.read`, `repo.search`, `repo.diff`.
+- **Capabilities.** Read-only: `repo.status`, `repo.list`, `repo.read`, `repo.search`, `repo.outline`, `repo.diff`.
+  `repo.outline` (plan step 1.11) is a map of the worktree: `{repo, path?, kinds?, limit?, max_symbols?, after?}`
+  → `{repo, files: [{path, kind, lines, bytes, symbols: [{name, kind, start, end}], symbols_left?, skipped?}],
+  total_after, next_after?, masked}`. `start`/`end` are 1-based lines for `repo.read`. Kinds: `py` (def/class by
+  their indentation, module-level assignments), `ts` (TS/TSX/JS declaration lines and class methods), `go`
+  (functions, `Receiver.method`, types), `json` (key paths), `md` (headings outside code fences), `css` (rule
+  heads); the names follow the hub's `code_symbols.py`, without its `imports`. Files of other kinds and files
+  that may hold credentials are left out; links are not followed. A page holds at most `limit` files (default
+  50, at most 200) and about 40 KB; a file with more than `max_symbols` names (default 40, at most 200) keeps
+  the outer ones (a class before its methods). Older nodes do not offer it: the hub then goes on without the map.
   Changing the scratch worktree: `repo.sync` (clone/fetch), `repo.start` (branch `topcoat/<topic>`),
   `repo.edit` (replace one exact text), `repo.write`, `repo.apply_patch`, `repo.reset`, and
   `repo.test` (the repository's test template in a throw-away container; offered only where

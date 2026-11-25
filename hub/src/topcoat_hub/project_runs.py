@@ -1380,6 +1380,9 @@ class RunService:
         async def read(paths: list[str]) -> dict[str, str | None]:
             return await self.fixes.read_live(user_id, paths)
 
+        async def outline(path: str) -> list[dict[str, Any]]:
+            return await self.fixes.outline_live(user_id, path)
+
         # tries only under the person's probe mandate (issue_probes.py, D83); the runner checks it
         # again on every try, so a revoked mandate stops the next one
         from topcoat_hub.issue_probes import ProbeRunner
@@ -1393,7 +1396,7 @@ class RunService:
                 return await runner.run(user_id, node.project_id, node.number, n, content)
 
         inv = await issue_investigation.investigate(
-            ask, read, question, start, try_run, review=True
+            ask, read, question, start, try_run, review=True, outline=outline
         )
         if inv.title or inv.checks:
             await self._brief_issue(user_id, node.id, inv.title, inv.checks)

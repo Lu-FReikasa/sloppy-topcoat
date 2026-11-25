@@ -154,6 +154,27 @@ def test_the_admin_api_is_for_the_admin_and_not_for_a_key(client: TestClient, us
 # --- the agent of a workspace --------------------------------------------------------------------
 
 
+def test_the_contract_of_a_workspace_is_in_the_persons_language(client: TestClient) -> None:
+    """Issue #6: the stored language of the person, English without one; the language the GUI
+    shows (``?language=``) wins, since the GUI switches before the hub has stored it."""
+
+    def contract(query: str = "") -> dict[str, Any]:
+        r = client.get(f"/api/ui/workspaces/dev/agent{query}", headers=AUTH)
+        assert r.status_code == 200, r.text
+        return r.json()["contract"]
+
+    en = contract()
+    assert en["language"] == "en" and en["title"] == "Development"
+    assert "push to main or merge" in en["never"]
+    assert {"to": "Administration", "for": en["talks_to"][0]["for"]} == en["talks_to"][0]
+    assert contract("?language=xx")["language"] == "en"  # an unknown one: the stored one
+    de = contract("?language=de")
+    assert de["title"] == "Entwicklung" and "auf main pushen oder mergen" in de["never"]
+    assert client.put("/api/me/language", headers=AUTH, json={"language": "de"}).is_success
+    assert contract() == de
+    assert contract("?language=en") == en
+
+
 def test_the_agent_defaults_of_a_workspace_are_narrowed_by_the_profile(
     client: TestClient, user_b: dict
 ) -> None:

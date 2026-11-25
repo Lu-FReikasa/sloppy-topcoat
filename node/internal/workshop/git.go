@@ -25,7 +25,7 @@ func (w *Workshop) git(ctx context.Context, dir string, auth *authHeader, stdin 
 	}
 	ctx, cancel := context.WithTimeout(ctx, gitTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, w.o.GitBin, args...)
+	cmd := exec.CommandContext(ctx, w.o.GitBin, args...) //nolint:gosec // G204: the git binary from the node's config, argument lists built in this package, no shell
 	cmd.Dir = dir
 	protocols := "https"
 	if w.o.allowFileURLs || localCall(ctx) {

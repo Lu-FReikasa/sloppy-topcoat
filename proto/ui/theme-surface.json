@@ -31,7 +31,16 @@
     "--ok": "a good state",
     "--warn": "a warning",
     "--bad": "an error",
-    "--radius": "the corner radius of the pages' controls"
+    "--radius": "the corner radius of the pages' controls",
+    "--on-ok": "text on a badge filled with --ok",
+    "--on-warn": "text on a badge filled with --warn",
+    "--on-off": "text on a grey badge (offline, not yet indexed)",
+    "--app-chat": "the colour of the chat application (its inbox tag, rule and task badge)",
+    "--app-research": "the colour of the research application",
+    "--app-dev": "the colour of the development application",
+    "--app-admin": "the colour of the administration application",
+    "--app-project": "the colour of the projects application",
+    "--on-app": "text on an application colour used as a fill (a task that may propose changes)"
   },
   "set_by_desktop": ["--ws-hue", "--ws-sat", "--pg-hue", "--dt-ms", "--rot", "--tape"],
   "base_variables": {

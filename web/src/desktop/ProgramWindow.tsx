@@ -210,15 +210,16 @@ function ProgramWindowView({
                 {viewTitle(id, t)}
               </button>
             ))}
-            {program.modules.includes("page.chat") && (
-              <OpenChatsList
-                api={ctx.api}
-                program={program.key}
-                current={view.module === "page.chat" && typeof view.props.id === "string" ? view.props.id : undefined}
-                tick={ctx.tick}
-              />
-            )}
           </nav>
+        )}
+        {views.length > 1 && program.modules.includes("page.chat") && (
+          // beside the views, not among them: in a tab row it stretched the row to its own height
+          <OpenChatsList
+            api={ctx.api}
+            program={program.key}
+            current={view.module === "page.chat" && typeof view.props.id === "string" ? view.props.id : undefined}
+            tick={ctx.tick}
+          />
         )}
         <div className="dt-view">
           <ModuleView

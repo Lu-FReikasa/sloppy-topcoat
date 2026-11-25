@@ -36,7 +36,7 @@ const (
 	MaxKeys = 2
 )
 
-// Manifest describes one build. It is signed exactly as written: nobody re-serialises it.
+// Manifest describes one build. It is signed exactly as written: nobody re-serializes it.
 type Manifest struct {
 	Format  int    `json:"format"`
 	Product string `json:"product"`

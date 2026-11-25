@@ -49,6 +49,9 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
   const [unread, setUnread] = useState<{ n: number; urgent: boolean }>({ n: 0, urgent: false });
   // the address that opened the view was not known: a note above it, until the person moves on
   const [moved, setMoved] = useState(false);
+  const burgerRef = useRef<HTMLButtonElement>(null);
+  const meRef = useRef<HTMLDivElement>(null);
+  const meButtonRef = useRef<HTMLButtonElement>(null);
 
   const programs = ui.workspaces;
   const offered = ui.boot?.modules;
@@ -154,6 +157,35 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // the drawer and the user menu close on Escape and on a tap outside; the focus goes back to the
+  // button that opened them, unless the tap gave it to something else
+  const closeSide = useCallback(() => {
+    setSideOpen(false);
+    burgerRef.current?.focus();
+  }, []);
+  useEffect(() => {
+    if (!menu && !sideOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (menu) {
+        setMenu(false);
+        meButtonRef.current?.focus();
+      } else closeSide();
+    };
+    const onClick = (e: MouseEvent) => {
+      if (!menu || meRef.current?.contains(e.target as Node)) return;
+      setMenu(false);
+      const at = document.activeElement;
+      if (!at || at === document.body || meRef.current?.contains(at)) meButtonRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("click", onClick);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("click", onClick);
+    };
+  }, [menu, sideOpen, closeSide]);
 
   const openSettings = useCallback(
     (props: ProgramView["props"] = {}) => open("settings", { module: "page.settings", props }),
@@ -272,6 +304,7 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
         <header className="ws-top">
           {narrow && (
             <button
+              ref={burgerRef}
               type="button"
               className="ws-burger"
               aria-expanded={sideOpen}
@@ -282,16 +315,35 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
             </button>
           )}
           <span className="ws-logo">topcoat</span>
-          <button type="button" className="ws-search" onClick={() => setPalette(true)}>
-            ⌕ {t("desktop.paletteSearch")} <kbd>Ctrl+K</kbd>
+          <button
+            type="button"
+            className="ws-search"
+            aria-label={t("desktop.paletteSearch")}
+            onClick={() => setPalette(true)}
+          >
+            <span className="ws-search-label">
+              <span className="ws-search-icon" aria-hidden="true">
+                ⌕
+              </span>{" "}
+              <span className="ws-search-text">{t("desktop.paletteSearch")}</span>
+            </span>
+            <kbd aria-hidden="true">Ctrl+K</kbd>
           </button>
           <span className={`conn conn-${status}`} role="status">
             <span className="conn-dot" aria-hidden="true" />
             <span className="conn-text">{t(`connection.${status}`)}</span>
           </span>
-          <div className="ws-me">
-            <button type="button" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
-              {ctx.me?.name ?? t("desktop.me")} ▾
+          <div className="ws-me" ref={meRef}>
+            <button
+              ref={meButtonRef}
+              type="button"
+              className="ws-me-button"
+              aria-haspopup="menu"
+              aria-expanded={menu}
+              onClick={() => setMenu((m) => !m)}
+            >
+              <span className="ws-me-name">{ctx.me?.name ?? t("desktop.me")}</span>
+              <span aria-hidden="true">▾</span>
             </button>
             {menu && (
               <div className="dt-me-menu ws-me-menu" role="menu" aria-label={t("desktop.me")}>
@@ -325,6 +377,7 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
         )}
         <PersonaPrompt api={api} quiet />
         <div className="ws-body">
+          {narrow && sideOpen && <div className="ws-backdrop" aria-hidden="true" onClick={closeSide} />}
           <nav
             className={`ws-side${narrow && !sideOpen ? " ws-side-closed" : ""}`}
             aria-label={t("webShell.navigation")}

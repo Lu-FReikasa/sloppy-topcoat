@@ -484,6 +484,20 @@ cd web && npm run build && npm run layout                      # all 160 combina
 WIDTHS=360,1280 HEIGHTS=600 SHOTS=/tmp/shots npm run layout    # a few, with screenshots
 ```
 
+## Layout check of the navigation shell
+
+`web/scripts/shell-check.mjs` checks the navigation shell (`webshell/WebShell.tsx`) the same way, against
+the faked hub: the shell fills the window and a chat's message box stays inside it, the header never
+scrolls sideways or cuts text (320 px up, English and German, a long user name), the phone drawer opens
+below the header and the drawer and the user menu close on Escape and on a tap outside, with the focus
+back on the button that opened them. All three looks, seven sizes from 320x640 to 1366x768. A manual
+check like the one above, not a CI job:
+
+```
+cd web && npm run build && npm run shell-layout                     # all 216 checks
+SIZES=320x640,1280x800 LANGS=de LOOKS=terminal SHOTS=/tmp/shots npm run shell-layout
+```
+
 
 ## Your own checks
 

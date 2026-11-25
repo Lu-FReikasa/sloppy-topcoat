@@ -30,12 +30,13 @@ import (
 //   - The node reads as its own service account. If that account cannot read a file, the answer
 //     says so; nothing is escalated.
 //
-// UNVERIFIED on real hardware: the Windows behaviour (junctions, short names, case, streams) is
+// UNVERIFIED on real hardware: the Windows behavior (junctions, short names, case, streams) is
 // written against the Go standard library and tested on Linux with the string rules only.
 
 const (
-	// FilesPageBytes is the default size of one files.read page and FilesMaxPageBytes its ceiling.
-	FilesPageBytes    = 24 << 10
+	// FilesPageBytes is the default size of one files.read page.
+	FilesPageBytes = 24 << 10
+	// FilesMaxPageBytes is the ceiling of one files.read page.
 	FilesMaxPageBytes = 48 << 10
 	// FilesScanBytes is how much of a file a grep or a tail looks at in one call.
 	FilesScanBytes = 256 << 10
@@ -326,7 +327,7 @@ func filesListCap(o Options) capability.Capability {
 							continue
 						}
 						ti, terr := os.Stat(target)
-						if terr != nil || !(ti.IsDir() || ti.Mode().IsRegular()) {
+						if terr != nil || (!ti.IsDir() && !ti.Mode().IsRegular()) {
 							skipped++
 							continue
 						}

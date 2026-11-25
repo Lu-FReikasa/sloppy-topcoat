@@ -7,6 +7,7 @@ import (
 	"errors"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -290,5 +291,19 @@ func TestWindowsEventsTreatsAnUnknownProviderAsNoEvents(t *testing.T) {
 	}
 	if ps.env["TC_PROVIDER"] != "audio" {
 		t.Errorf("provider not passed as environment: %v", ps.env)
+	}
+}
+
+// PowerShell never prompts and loads no profile: a prompt would hang until the timeout, a profile
+// would run code the scripts did not bring.
+func TestPowerShellRunsNonInteractiveWithoutProfile(t *testing.T) {
+	args := psArgs("Get-Date")
+	for _, want := range []string{"-NoProfile", "-NonInteractive", "-NoLogo"} {
+		if !slices.Contains(args, want) {
+			t.Errorf("%s missing in %q", want, args)
+		}
+	}
+	if n := len(args); n < 2 || args[n-2] != "-EncodedCommand" || args[n-1] != encodePS(psPrelude+"Get-Date") {
+		t.Errorf("the script is not the encoded last argument: %q", args)
 	}
 }

@@ -96,7 +96,6 @@ from topcoat_hub.project_tools import ProjectTools
 from topcoat_hub.proposals import ProposalService
 from topcoat_hub.protocol import PROTOCOL_VERSION, load_schema_sets
 from topcoat_hub.queue_watch import QueueWatch
-from topcoat_hub.recheck import Rechecker
 from topcoat_hub.releases import ReleaseService
 from topcoat_hub.report_knowledge import ReportIndex
 from topcoat_hub.resume_stuck import StuckTaskResumer
@@ -397,10 +396,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.handovers.knowledge = app.state.knowledge
             app.state.handovers.start()
             handovers = app.state.handovers
-        recheck_scheduler = None
-        if handovers is not None and settings.recheck_enabled:
-            app.state.rechecker = Rechecker(app.state.sessionmaker, handovers, settings)
-            recheck_scheduler = asyncio.create_task(app.state.rechecker.scheduler())
         project_tick_scheduler = None
         if settings.project_reminder_tick_seconds > 0:
             app.state.project_tick = ReminderTick(app.state.sessionmaker, settings)
@@ -474,9 +469,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await asyncio.gather(retention_scheduler, return_exceptions=True)
             if stuck_resumer is not None:
                 await stuck_resumer.stop()
-            if recheck_scheduler is not None:
-                recheck_scheduler.cancel()
-                await asyncio.gather(recheck_scheduler, return_exceptions=True)
             if handovers is not None:
                 await handovers.stop()
             queue_watch_task.cancel()

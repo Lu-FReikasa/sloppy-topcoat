@@ -3211,7 +3211,10 @@ async def _plan_check(
         return None, None  # no model can answer at all: the normal path says why
     if tools == "on":
         return "forced", None
-    own = agent_contract.long(turn.application)
+    # the contract in the language of the question (else the person's own, D118 / issue #6)
+    own = agent_contract.long(
+        turn.application, chat.hub_language(turn.language, turn.last_user_text)
+    )
     if own and chat_tools.asks_about_abilities(turn.last_user_text):
         # "what can you do": the contract answers it, in words, without a check (1.9)
         turn.accepted_hint = chat_tools.abilities_hint(own)
@@ -3512,7 +3515,8 @@ async def _local_result(
     """What one of the hub's own reads says (T3.6, T3.8): read only, no agent loop. A refusal or a
     missing machine is a sentence, so the answer can say what could not be read."""
     if name == local_tools.ABOUT:  # the application's contract, in words (1.9)
-        return agent_contract.long(turn.application) or "this application has no contract"
+        language = hub_language(turn.language, turn.last_user_text)
+        return agent_contract.long(turn.application, language) or "this application has no contract"
     if name == local_tools.RECORD:
         try:
             tid = uuid.UUID(str(args.get("task_id") or ""))

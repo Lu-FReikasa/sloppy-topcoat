@@ -173,7 +173,7 @@ type World struct {
 	// top of the profile's ram_used_mb.
 	others       []Other
 	ramForeignMB int64
-	// cpuPercent is the CPU utilisation the fake system reports (zero = cannot be measured).
+	// cpuPercent is the CPU utilization the fake system reports (zero = cannot be measured).
 	cpuPercent float64
 	// DownloadStep / BenchDelay slow down simulated downloads and benchmark
 	// runs so the GUI can show progress (tests set them to 0).
@@ -266,7 +266,7 @@ func (w *World) SetOther(idx int, o Other) error {
 	return nil
 }
 
-// SetCPU sets the CPU utilisation (percent) the fake system reports; zero means the system cannot
+// SetCPU sets the CPU utilization (percent) the fake system reports; zero means the system cannot
 // measure it (the default).
 func (w *World) SetCPU(percent float64) {
 	w.mu.Lock()

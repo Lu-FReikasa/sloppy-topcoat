@@ -17,7 +17,7 @@ from tests.test_memory import chat_once
 from topcoat_hub import tool_groups, trace_tool
 from topcoat_hub.secretbox import SecretBox
 from topcoat_hub.tools import Caller, ToolError
-from topcoat_hub.ui.seeds import BUILTIN_TEMPLATES
+from topcoat_hub.ui.seeds import builtin_templates
 
 A_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
 QUESTION = "Welcher Dienst läuft auf dem Rechner mit dem Namen Geheim-Host?"
@@ -94,7 +94,7 @@ def test_a_title_loses_the_machine_and_a_step_knows_where_it_lives() -> None:
 def test_the_trace_group_belongs_to_development_and_to_nobody_else() -> None:
     assert "trace" in tool_groups.KEYS and "trace" in tool_groups.HUB_VIEWS
     groups = {
-        t["key"]: (t["agent"].get("tool_scope") or {}).get("groups") for t in BUILTIN_TEMPLATES
+        t["key"]: (t["agent"].get("tool_scope") or {}).get("groups") for t in builtin_templates()
     }
     assert "trace" in groups["dev"]
     assert all("trace" not in (g or []) for key, g in groups.items() if key != "dev")
