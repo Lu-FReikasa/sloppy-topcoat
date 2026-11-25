@@ -97,10 +97,11 @@ what replaces or amends it; the text below the status is kept as it was decided.
 | Replaced / Replaced in part | history; follow the link in the file |
 | Removed | the feature is gone |
 | Decided, not built | decided, waiting for its plan step |
+| Shelved | decided not to pursue for now; kept for later |
 | Under review / Open question | conflicts with the current state or goal; the maintainer decides |
 
-D109, D110 and D112 to D114 are reserved for the open decisions of the plan of 2026-11-24 (decomposition into
-tasks, workshop scope, secretary, Theme v2, theme images). D115 and D116 restore two decisions of 2026-11-04 whose
+D109, D110, D113 and D114 are reserved for the open decisions of the plan of 2026-11-24 (decomposition into
+tasks, workshop scope, Theme v2, theme images). D115 and D116 restore two decisions of 2026-11-04 whose
 numbers were reused by mistake on 2026-11-17.
 
 ### Foundations and security
@@ -113,7 +114,7 @@ What Topcoat is built on and what it never does. These rules are the baseline of
 | [D2](decisions/D02.md) | Hub in Python, node in Go | Current |
 | [D5](decisions/D05.md) | Postgres + pgvector instead of SQLite | Current |
 | [D6](decisions/D06.md) | Hub is a container | Amended |
-| [D7](decisions/D07.md) | No inference on the hub host | Open question |
+| [D7](decisions/D07.md) | No inference on the hub host | Amended |
 | [D8](decisions/D08.md) | Multi-user data model from day one, single-admin GUI first | Current |
 | [D9](decisions/D09.md) | Self-contained | Current |
 | [D3](decisions/D03.md) | Nodes connect outbound over WebSocket | Current |
@@ -136,7 +137,7 @@ How a machine joins, protects its owner's use of it and updates itself.
 
 | # | Decision | Status |
 |---|---|---|
-| [D80](decisions/D80.md) | A node is a machine | Open question |
+| [D80](decisions/D80.md) | A node is a machine | Amended |
 | [D14](decisions/D14.md) | When a hub version adds default permissions | Current |
 | [D16](decisions/D16.md) | Nodes give GPU memory back on their own when other programs need it | Current |
 | [D17](decisions/D17.md) | The Windows service runs as a virtual account | Current |
@@ -144,7 +145,7 @@ How a machine joins, protects its owner's use of it and updates itself.
 | [D27](decisions/D27.md) | Node resource guards and prompt order | Current |
 | [D28](decisions/D28.md) | Energy | Current |
 | [D79](decisions/D79.md) | The context of a load is the smallest the work needs; growth is a node's cap | Current |
-| [D50](decisions/D50.md) | A signed update channel for the nodes | Open question |
+| [D50](decisions/D50.md) | A signed update channel for the nodes | Amended |
 | [D51](decisions/D51.md) | Models move directly from node to node | Current |
 | [D64](decisions/D64.md) | A node comes online | Current |
 
@@ -168,8 +169,8 @@ Which model and which node do a piece of work, in which order, and who checks it
 | [D87](decisions/D87.md) | A check needs a fresh context, not a second node | Amended |
 | [D121](decisions/D121.md) | A check comes from another model family where there is one | Current |
 | [D88](decisions/D88.md) | One machine is a full setup | Current |
-| [D90](decisions/D90.md) | Speed decides on its own, quality only suggests | Under review |
-| [D92](decisions/D92.md) | Model quality is rated continuously from the second look, with a floor as default | Under review |
+| [D90](decisions/D90.md) | Speed decides on its own, quality only suggests | Shelved |
+| [D92](decisions/D92.md) | Model quality is rated continuously from the second look, with a floor as default | Shelved |
 
 ### Applications and how they work together
 
@@ -181,7 +182,8 @@ The programs (Chat, Research, Development, Administration, Projects), their righ
 | [D69](decisions/D69.md) | The tools of an application are a ceiling | Amended |
 | [D116](decisions/D116.md) | One application profile: run, prompt and rights of a program in one place | Current |
 | [D118](decisions/D118.md) | Each application has a contract | Current |
-| [D105](decisions/D105.md) | Applications as plug-ins: data in the hub, code only as a node of its own | Under review |
+| [D112](decisions/D112.md) | A secretary is the first contact; reading tasks go out without a click | Decided, not built |
+| [D105](decisions/D105.md) | Applications as plug-ins: data in the hub, code only as a node of its own | Current |
 | [D59](decisions/D59.md) | Flows | Removed |
 | [D66](decisions/D66.md) | Effort is a variable of the run | Amended |
 | [D67](decisions/D67.md) | The chat policy | Replaced |
@@ -190,7 +192,7 @@ The programs (Chat, Research, Development, Administration, Projects), their righ
 | [D81](decisions/D81.md) | Applications talk to each other in typed messages | Current |
 | [D82](decisions/D82.md) | A reviewed result becomes part of the Project's Akte | Current |
 | [D84](decisions/D84.md) | The review loop has no hard limit, and its load is observed | Current |
-| [D65](decisions/D65.md) | Hand-over between applications | Under review |
+| [D65](decisions/D65.md) | Hand-over between applications | Amended |
 | [D72](decisions/D72.md) | The chat model may propose a hand-over | Current |
 | [D63](decisions/D63.md) | The incognito folder | Current |
 | [D111](decisions/D111.md) | The inbox has no marks, no board and no re-check | Decided, not built |
@@ -223,7 +225,7 @@ Read-only looks at the servers, the evidence behind a finding, and the one-click
 |---|---|---|
 | [D29](decisions/D29.md) | Tool nodes | Current |
 | [D30](decisions/D30.md) | The agent loop | Amended |
-| [D31](decisions/D31.md) | The chat uses the agent loop | Under review |
+| [D31](decisions/D31.md) | The chat uses the agent loop | Replaced |
 | [D44](decisions/D44.md) | The coordinator | Current |
 | [D45](decisions/D45.md) | The inventory | Current |
 | [D46](decisions/D46.md) | Stacks and the inventory's buttons | Current |
@@ -240,9 +242,10 @@ What the assistant keeps about a person and what it reads from notes, reports an
 
 | # | Decision | Status |
 |---|---|---|
-| [D19](decisions/D19.md) | The assistant keeps its own memory | Under review |
-| [D22](decisions/D22.md) | Memory notes | Under review |
-| [D37](decisions/D37.md) | The assistant tends its own memory | Under review |
+| [D19](decisions/D19.md) | The assistant keeps its own memory | Amended |
+| [D22](decisions/D22.md) | Memory notes | Amended |
+| [D37](decisions/D37.md) | The assistant tends its own memory | Replaced in part |
+| [D124](decisions/D124.md) | The memory is simplified | Decided, not built |
 | [D38](decisions/D38.md) | One memory place with a core that stands first | Amended |
 | [D48](decisions/D48.md) | The assistant may learn rules and styles itself, in a narrow way | Current |
 | [D62](decisions/D62.md) | Memory belongs to an application or is shared | Replaced |
@@ -265,7 +268,7 @@ How the GUI is drawn: the desktop, the desktop client and themes as data.
 
 | # | Decision | Status |
 |---|---|---|
-| [D60](decisions/D60.md) | The interface is data drawn by a shell | Under review |
+| [D60](decisions/D60.md) | The interface is data drawn by a shell | Replaced in part |
 | [D70](decisions/D70.md) | The desktop replaces the shells and the looks | Replaced |
 | [D73](decisions/D73.md) | A second look | Replaced |
 | [D106](decisions/D106.md) | A desktop client with free windows; themes decide behaviour as data | Current |
@@ -287,8 +290,9 @@ How code changes are made, confirmed, tested and rolled out, and how releases ar
 | [D120](decisions/D120.md) | The same failure twice stops the automatic drafts | Current |
 | [D104](decisions/D104.md) | A tested fix reaches the hub through a spool on the hub host, not through the hub | Amended |
 | [D98](decisions/D98.md) | Development may go live through an overlay; a release is an image | Current |
+| [D123](decisions/D123.md) | The CI builds; the maintainer signs and rolls out | Decided, not built |
 | [D58](decisions/D58.md) | Parameters an admin changes while the hub runs | Current |
-| [D13](decisions/D13.md) | Release channels | Under review |
+| [D13](decisions/D13.md) | Release channels | Replaced |
 
 ## Failure behaviour
 - Hub down: nodes keep their cached config, keep idle-unload, game watcher and pressure
