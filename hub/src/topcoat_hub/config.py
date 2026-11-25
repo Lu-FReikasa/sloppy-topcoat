@@ -277,9 +277,13 @@ class Settings(BaseSettings):
     agent_tools_wait_seconds: float = 60.0  # after a restart the tool nodes reconnect first
     # a chat check is offered only the tool groups its question names (shorter tool definitions)
     agent_auto_tool_groups: bool = True
-    # Wake-on-LAN (E2-05 E): the LAN's broadcast address the magic packet goes to, and the port
+    # Wake-on-LAN (E2-05 E): the broadcast address(es, comma-separated: the directed broadcast of
+    # each LAN when the hub sits in another subnet) the magic packet goes to, and the port
     wol_broadcast: str = "255.255.255.255"
     wol_port: int = 9
+    # a request whose model only a sleeping node has as its house model wakes that node and waits
+    # this long for it to connect (1.7, E2); 0 = never wake on demand
+    wake_timeout_seconds: float = 240.0
     # A request that waits in a node's queue counts one place better for every this many seconds
     # (0 = off), so background work cannot starve behind a steady stream of chat requests.
     gateway_queue_aging_seconds: float = 0.0

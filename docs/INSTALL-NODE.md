@@ -941,13 +941,19 @@ first); the hub keeps them while the node is off. **Aufwecken** on the node page
 3. Linux: `sudo ethtool -s <eth0> wol g` (persistent: NetworkManager
    `nmcli connection modify <connection> 802-3-ethernet.wake-on-lan magic`).
 4. The hub must get the packet into the LAN: in Docker use `network_mode: host` or
-   `TOPCOAT_WOL_BROADCAST=<the LAN's broadcast address>` (default 255.255.255.255).
+   `TOPCOAT_WOL_BROADCAST=<the LAN's broadcast address>` (default 255.255.255.255). A hub in a
+   bridged Docker network or in another subnet than the node reaches it only with the node LAN's
+   **directed broadcast** (e.g. `10.0.1.255`; several addresses comma-separated), and only if the
+   router between them forwards directed broadcasts to UDP port 9 (often off by default; on
+   OPNsense/pfSense a firewall rule plus a static ARP entry, or the router's own WoL service).
+   Test it: put the node to sleep and run `POST /api/nodes/<id>/wake`.
 
 **Sleep.** The action `node.sleep` is not among the default permissions: add it to
 `allowed_actions` in the config (then **In den Ruhezustand versetzen** appears on the node page),
 or set `power.sleep_after_idle_seconds` so that the machine puts itself to sleep after that long
-without work (nothing loaded, no resident, nobody at the machine). The node unloads its models
-first. The service account needs the right to suspend — both **unverified** on real hardware:
+without work (no model used, nothing loading, nobody at the machine; a loaded house model does
+not keep it awake). The node unloads its models first. A request that needs the node's house model
+wakes it again (Wake-on-LAN, see below); the house model loads again after the wake. The service account needs the right to suspend — both **unverified** on real hardware:
 - Linux: a polkit rule, e.g. `/etc/polkit-1/rules.d/50-topcoat-suspend.rules`:
   `polkit.addRule(function(a, s) { if (a.id == "org.freedesktop.login1.suspend" && s.user == "topcoat-node") { return polkit.Result.YES; } });`
 - Windows: the service account needs `SeShutdownPrivilege`; otherwise the error is in the node log

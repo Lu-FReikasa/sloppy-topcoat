@@ -550,10 +550,19 @@ A node that is only needed now and then should cost little while it waits.
   Windows `SetSuspendState(hibernate=false)`), event `sleeping {reason: "action"}`. It refuses
   (`busy`) while a game runs, a model loads, a benchmark or download runs or an answer is being
   generated. `config.power.sleep_after_idle_seconds` [0 = never] lets the node do the same by
-  itself after that long without any of that, without a resident to keep, and with nobody at the
-  machine (input younger than that time); event `sleeping {reason: "idle"}`. Both need
+  itself after that long without any of that, without a loaded model being used (a loaded
+  resident such as the house model does not keep it awake; models are unloaded before the sleep
+  and residents load again after the wake), and with nobody at the machine (input younger than
+  that time); event `sleeping {reason: "idle"}`. Both need
   Wake-on-LAN to come back, which is a BIOS/UEFI and network card setting (docs/INSTALL-NODE.md
-  "Energy"). UNVERIFIED on real hardware: `systemctl suspend` / `SetSuspendState` from the
+  "Energy").
+- **Waking on demand (plan step 1.7).** When a request finds no connected node for its model and
+  the model is the **house model** of an offline node (pinned or allowed by its row), the hub
+  sends the magic packet to that node's wired addresses (event `wake_sent {reason: "demand",
+  model, addresses}`), lists the wait as activity `waking` and retries every second until the node
+  serves or `TOPCOAT_WAKE_TIMEOUT_SECONDS` (default 240, 0 = off) ends it with `503 wake_timeout`.
+  `TOPCOAT_WOL_BROADCAST` may name several addresses (comma-separated), e.g. the directed broadcast
+  of the node's LAN when the hub sits in another subnet. UNVERIFIED on real hardware: `systemctl suspend` / `SetSuspendState` from the
   service account, and the magic packet reaching a sleeping machine.
 
 ### Dev nodes (E6-01 S1, ARCHITECTURE D52)

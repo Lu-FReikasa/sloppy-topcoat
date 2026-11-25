@@ -115,20 +115,36 @@ func TestTheMachineSleepsByItselfAfterTheIdleTime(t *testing.T) {
 	waitSlept(t, h, 1)
 }
 
-func TestTheMachineDoesNotSleepWhileSomeoneIsThereOrAModelIsLoaded(t *testing.T) {
-	h, hc := energySetup(t, sleepConfig(`{"sleep_after_idle_seconds":1}`))
+func TestTheMachineDoesNotSleepWhileSomeoneIsThere(t *testing.T) {
+	h, _ := energySetup(t, sleepConfig(`{"sleep_after_idle_seconds":1}`))
 	h.world.SetInputIdle(0, true) // someone types
 	time.Sleep(1500 * time.Millisecond)
 	if h.world.Slept() != 0 {
 		t.Fatal("slept while somebody was at the machine")
 	}
+}
+
+// A loaded model keeps the machine awake only while it is used (plan step 1.7): a house model is
+// a resident that is never unloaded for idleness, so "nothing loaded" would never come.
+func TestALoadedResidentUnusedForTheIdleTimeLetsTheMachineSleep(t *testing.T) {
+	cfg := strings.Replace(sleepConfig(`{"sleep_after_idle_seconds":2}`), `"capabilities":[]`,
+		`"residents":[{"model":"fake-llm-3b-q8","priority":50,"auto_reload":true}],"capabilities":[]`, 1)
+	h, hc := energySetup(t, cfg)
 	h.world.SetInputIdle(time.Hour, true)
 	if res := hc.action(t, "models.load", `{"model":"fake-llm-3b-q8"}`); !res.OK {
 		t.Fatalf("load: %+v", res.Error)
 	}
-	time.Sleep(1500 * time.Millisecond)
+	time.Sleep(1200 * time.Millisecond) // just loaded = just used: not yet
 	if h.world.Slept() != 0 {
-		t.Fatal("slept with a model loaded")
+		t.Fatal("slept right after a load")
+	}
+	d := hc.waitEvent(t, protocol.EventSleeping)
+	if d["reason"] != "idle" {
+		t.Fatalf("%v", d)
+	}
+	waitSlept(t, h, 1)
+	if loaded, _ := h.world.Runner().Loaded(t.Context()); len(loaded) != 0 {
+		t.Fatalf("models must be unloaded before the sleep: %v", loaded)
 	}
 }
 

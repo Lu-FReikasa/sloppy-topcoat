@@ -6,6 +6,7 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -112,7 +113,7 @@ from topcoat_hub.trace_tool import TraceService
 from topcoat_hub.ui.runtime import build_runtime
 from topcoat_hub.ui.seeds import ensure_builtin as ensure_ui_builtin
 from topcoat_hub.updates import UpdateStore, parse_keys
-from topcoat_hub.wake import UdpWakeSender
+from topcoat_hub.wake import UdpWakeSender, demand_waker
 from topcoat_hub.wiki_tools import WikiTools
 
 log = logging.getLogger(__name__)
@@ -188,6 +189,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             settings.rollout_node,
         )
         app.state.wake = UdpWakeSender()
+        # a request for the house model of a sleeping node wakes it (plan step 1.7); the sender is
+        # looked up on each wake, so a test can swap it
+        app.state.gateway.waker = demand_waker(
+            app.state.sessionmaker, app.state.nodes, _LateSender(app), settings
+        )
         app.state.embedder = make_embedder(
             app.state.gateway, settings.embedding_model, settings.embedding_auto
         )
@@ -550,3 +556,13 @@ def app() -> FastAPI:
     """Factory for ``uvicorn --factory topcoat_hub.main:app``."""
     logging.basicConfig(level=logging.INFO)
     return create_app()
+
+
+class _LateSender:
+    """Forwards to ``app.state.wake`` at send time (tests replace it with a fake)."""
+
+    def __init__(self, app: Any) -> None:
+        self._app = app
+
+    async def send(self, mac: str, broadcast: str, port: int) -> None:
+        await self._app.state.wake.send(mac, broadcast, port)
