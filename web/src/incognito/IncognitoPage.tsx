@@ -12,6 +12,7 @@ import { requestOpen } from "../layout/intent";
 import type { IncognitoMessage, IncognitoTab } from "../types";
 import { reducedMotion } from "../motion";
 import { Burning } from "./Burning";
+import { MIN_LINES, useGrowingTextarea } from "../talk/growTextarea";
 
 interface Props {
   api: ApiClient;
@@ -30,6 +31,8 @@ export function IncognitoPage({ api }: Props) {
   const [burning, setBurning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+  useGrowingTextarea(box, draft);
 
   function choose(id: string | null) {
     setMessages([]);
@@ -213,7 +216,8 @@ export function IncognitoPage({ api }: Props) {
           )}
           <form className="talk-composer" onSubmit={(e) => void send(e)}>
             <textarea
-              rows={1}
+              ref={box}
+              rows={MIN_LINES}
               value={draft}
               aria-label={t("incognito.placeholder")}
               placeholder={t("incognito.placeholder")}

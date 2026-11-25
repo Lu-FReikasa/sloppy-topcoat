@@ -182,6 +182,7 @@ input {
   gap: 0.35rem;
   font-size: 0.85rem;
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .conn-dot {
@@ -195,8 +196,16 @@ input {
   background: var(--ok);
 }
 
-.conn-reconnecting .conn-dot {
-  background: var(--warn);
+/* the hub went away (no byte for LOST_AFTER_MS, api/sse.ts): the one state that needs a look */
+.conn-lost {
+  color: var(--bad);
+}
+
+/* a ring, not a filled dot: on a phone the dot is all there is, and red and green alone are lost on
+   colour-blind eyes */
+.conn-lost .conn-dot {
+  background: transparent;
+  border: 2px solid var(--bad);
 }
 
 /* Overview */
@@ -581,20 +590,104 @@ label.check input[type="checkbox"] {
   gap: 0.5rem;
 }
 
-/* Login */
+/* The trusted shell's own pages: sign-in, loading, failure (components/ShellPage.tsx, D113).
+   A fixed dark style, not a look's: no look is loaded yet, and themes cannot reach it. */
 
-.login {
-  display: flex;
-  justify-content: center;
-  padding: 4rem 1rem;
-}
-
-.login form {
-  width: 100%;
-  max-width: 360px;
+.shell-page {
+  --bg: #15171b; /* the page ground */
+  --surface: #1e2127; /* the one card */
+  --text: #e6e8eb; /* 13:1 on the card */
+  --muted: #a3aab5; /* hints and details: 6.9:1 on the card */
+  --border: #3a404a; /* the card's edge */
+  --field-edge: #666e7a; /* where you can type or choose: 3.1:1 on the card */
+  --accent: #6c9af2; /* what you can do: the one main button */
+  --accent-text: #0b1220; /* text on the main button: 6.7:1 */
+  --bad: #ff8080; /* a refused sign-in: 6.6:1 on the card */
+  color-scheme: dark;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  align-items: center;
+  padding: max(3rem, 12vh) 1rem 2rem;
+  gap: 1.25rem;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* no light page around or under it (overscroll, the first frame) */
+:root:has(.shell-page),
+:root:has(.shell-page) body {
+  color-scheme: dark;
+  background: #15171b;
+}
+
+.shell-mark {
+  color: var(--muted);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+}
+
+.shell-card {
+  width: 100%;
+  max-width: 24rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.5rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.shell-card h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.3rem;
+  line-height: 1.3;
+}
+
+.shell-card p {
+  margin: 0;
+}
+
+.shell-card button,
+.shell-card input,
+.shell-card .language-switch {
+  min-height: 44px;
+  /* in px: the root is 15 px, and a field under 16 px makes a phone zoom in */
+  font-size: 16px;
+}
+
+.shell-card input,
+.shell-card .language-switch {
+  border-color: var(--field-edge);
+}
+
+.shell-card button.primary {
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+
+/* not dimmed (opacity takes the label's contrast): an outline until it can be used */
+.shell-card button.primary:disabled {
+  opacity: 1;
+  background: transparent;
+  border-color: var(--field-edge);
+  color: var(--muted);
+}
+
+.shell-card .error {
+  color: var(--bad);
+}
+
+.shell-detail {
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.shell-loading {
+  color: var(--muted);
 }
 
 /* Dialog */
@@ -791,6 +884,7 @@ td.resident input.priority {
 
 .login .language-switch {
   margin-top: 0.75rem;
+  align-self: flex-start;
 }
 
 /* API access (E1-05) */
@@ -2135,6 +2229,7 @@ table.grants td.model-name {
 /* E3-07 D2: time on every message, a line between messages of different days */
 .message-time {
   font-variant-numeric: tabular-nums;
+  white-space: nowrap; /* "1:56 PM" on one line, also at phone width (#77) */
   cursor: help;
 }
 
@@ -3945,11 +4040,9 @@ pre.diff {
   color: hsl(var(--pg-hue, 140) 60% 65%);
 }
 
-/* Start's open conversations in its side rail, by application (2026-11-13) */
+/* Start's open conversations, by application (2026-11-13): below its views in the rail, or a row of
+   their own above the view when the window is narrow (#77; placed in desktop/desktop.css) */
 .open-chats {
-  margin-top: 0.8rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--line, #333);
   min-width: 0;
 }
 .open-chats-head {
@@ -3978,11 +4071,20 @@ pre.diff {
   gap: 0.15rem;
   min-width: 0;
 }
+.open-chats button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.open-chats button:hover,
 .open-chats-group li[aria-current="page"] .open-chats-title {
   color: var(--text);
+}
+.open-chats-group li[aria-current="page"] .open-chats-title {
   font-weight: 600;
 }
-.dt-nav .open-chats-title {
+.open-chats .open-chats-title {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -3991,15 +4093,37 @@ pre.diff {
   text-align: left;
   padding: 0.15rem 0.2rem;
 }
-.dt-nav .open-chats-act {
+.open-chats .open-chats-act {
   flex: none;
   padding: 0 0.2rem;
   opacity: 0.45;
   font-size: 0.8em;
 }
-.dt-nav .open-chats-act:hover,
-.dt-nav .open-chats-act[aria-pressed="true"] {
+.open-chats .open-chats-act:hover,
+.open-chats .open-chats-act:focus-visible,
+.open-chats .open-chats-act[aria-pressed="true"] {
   opacity: 1;
+}
+/* the row of a narrow window: every group and conversation on one line */
+@container program (max-width: 640px) {
+  .open-chats-head,
+  .open-chats-app {
+    margin: 0;
+  }
+  .open-chats-group,
+  .open-chats-group ul {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex: none;
+    margin: 0;
+  }
+  .open-chats-group li {
+    flex: none;
+  }
+  .open-chats .open-chats-title {
+    max-width: 12rem;
+  }
 }
 .open-chats-run {
   display: inline-block;

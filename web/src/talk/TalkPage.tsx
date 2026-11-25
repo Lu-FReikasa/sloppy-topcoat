@@ -38,6 +38,7 @@ import { EvidenceMark } from "./EvidenceMark";
 import { IdleArt } from "./IdleArt";
 import { Clipper, moodOf, useClipperActive } from "../persona/Clipper";
 import { MessageLine } from "./MessageLine";
+import { MIN_LINES, useGrowingTextarea } from "./growTextarea";
 
 /** What the user sees of the history: what was said, an emoji answer, the card of a request that
  *  was handed to the queue, and the result cards of checks (folded), not the run behind it. */
@@ -147,6 +148,8 @@ export function TalkPage({
   // the window shows the open chat only; the chats before it are one click away
   const [showEarlier, setShowEarlier] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
+  const room = useRef<HTMLElement>(null);
+  useGrowingTextarea(input, draft, room);
   const creating = useRef(false);
   // a text another window handed over ("Look at this in Development") goes into the draft
   useEffect(() => {
@@ -365,7 +368,7 @@ export function TalkPage({
   const cutOff =
     lastAnswer?.status === "truncated" || lastAnswer?.status === "interrupted";
   return (
-    <section className="talk" aria-label={t("talk.label")}>
+    <section ref={room} className="talk" aria-label={t("talk.label")}>
       <div
         className="talk-stream"
         ref={ref}
@@ -495,7 +498,24 @@ export function TalkPage({
                 </div>
               )}
               {id && m.id > 0 && (
-                <MessageLine api={api} conversationId={id} message={m} />
+                <MessageLine api={api} conversationId={id} message={m}>
+                  {m.role === "assistant" &&
+                    m.status === "complete" &&
+                    (m.kind ?? "say") === "say" &&
+                    (reviews[m.id]?.reviewer_model ?? "hub") === "hub" && (
+                      // in the answer's footer, a small button: as a bar of its own it read as a
+                      // separator between messages (#77)
+                      <button
+                        type="button"
+                        className="talk-review-ask"
+                        disabled={asked.has(m.id)}
+                        onClick={() => reviewAnswer(m.id)}
+                        title={t("talk.reviewAskHint")}
+                      >
+                        {asked.has(m.id) ? t("talk.reviewAsked") : t("talk.reviewAsk")}
+                      </button>
+                    )}
+                </MessageLine>
               )}
               {m.role === "assistant" && notes?.[m.id] && id && (
                 <RememberedNotes
@@ -515,22 +535,6 @@ export function TalkPage({
               {m.role === "assistant" && (
                 <EvidenceMark message={m} light={lights[m.id] ?? null} />
               )}
-              {m.role === "assistant" &&
-                api &&
-                m.id > 0 &&
-                m.status === "complete" &&
-                (m.kind ?? "say") === "say" &&
-                (reviews[m.id]?.reviewer_model ?? "hub") === "hub" && (
-                  <button
-                    type="button"
-                    className="talk-review-ask small"
-                    disabled={asked.has(m.id)}
-                    onClick={() => reviewAnswer(m.id)}
-                    title={t("talk.reviewAskHint")}
-                  >
-                    {asked.has(m.id) ? t("talk.reviewAsked") : t("talk.reviewAsk")}
-                  </button>
-                )}
             </div>
           );
         })}
@@ -726,7 +730,7 @@ export function TalkPage({
       >
         <textarea
           ref={input}
-          rows={1}
+          rows={MIN_LINES}
           value={draft}
           placeholder={t("talk.placeholder")}
           aria-label={t("talk.placeholder")}

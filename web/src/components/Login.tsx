@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitch } from "./LanguageSwitch";
+import { ShellPage } from "./ShellPage";
 
 interface Props {
   onLogin: (token: string) => void;
@@ -18,8 +19,8 @@ export function Login({ onLogin, invalid = false }: Props) {
   }
 
   return (
-    <main className="login">
-      <form className="card" onSubmit={submit}>
+    <ShellPage>
+      <form className="shell-card login" onSubmit={submit}>
         <h1>{t("login.heading")}</h1>
         {invalid && (
           <p className="error" role="alert">
@@ -35,11 +36,11 @@ export function Login({ onLogin, invalid = false }: Props) {
           onChange={(e) => setToken(e.target.value)}
         />
         <p className="muted small">{t("login.hint")}</p>
-        <button type="submit" disabled={!token.trim()}>
+        <button type="submit" className="primary" disabled={!token.trim()}>
           {t("login.submit")}
         </button>
         <LanguageSwitch />
       </form>
-    </main>
+    </ShellPage>
   );
 }
