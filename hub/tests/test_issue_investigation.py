@@ -467,3 +467,88 @@ async def test_a_desktop_guess_against_hub_hits_is_dropped() -> None:
     assert ii.inside_paths("a hub/x.py b web/src/a/B.tsx desktop/c.rs hub/x.py") == [
         "hub/x.py", "web/src/a/B.tsx",
     ]  # fmt: skip
+
+
+# --- the map of the files found (repo.outline, plan step 1.11) ------------------------------------
+
+WEB = "web/src/project/ListView.tsx"
+# what a dev node's repo.outline answers for a file of the fixture repository
+OUTLINE: dict[str, list[dict[str, Any]]] = {
+    PATH: [
+        {
+            "path": PATH,
+            "kind": "py",
+            "lines": 2,
+            "symbols": [{"name": "parse", "kind": "function", "start": 1, "end": 2}],
+        }
+    ],
+    WEB: [
+        {
+            "path": WEB,
+            "kind": "ts",
+            "lines": 120,
+            "symbols": [
+                {"name": "ListView", "kind": "component", "start": 10, "end": 118},
+                {"name": "ListView.visibleNodes", "kind": "const", "start": 14, "end": 30},
+            ],
+            "symbols_left": 7,
+        }
+    ],
+}
+
+
+class FakeOutline:
+    def __init__(self, fail: bool = False) -> None:
+        self.asked: list[str] = []
+        self.fail = fail
+
+    async def __call__(self, path: str) -> list[dict[str, Any]]:
+        self.asked.append(path)
+        if self.fail:
+            raise RuntimeError("capability repo.outline is not offered by this node version")
+        return OUTLINE.get(path, [])
+
+
+@pytest.mark.asyncio
+async def test_round_0_reads_the_map_of_the_files_the_start_found() -> None:
+    start = f"### {WEB}:14: const visibleNodes\n### {PATH}:1: def parse\n{WEB}:40: found(x)"
+    outline = FakeOutline()
+    asker = Asker({"issue_area": [area("web", [WEB])], "investigate_round": [report()]})
+    inv = await ii.investigate(asker, read, "Leere Texte", start, outline=outline)
+    assert inv.failed == "" and inv.plan is not None
+    assert outline.asked == [WEB, PATH]  # the most named first
+    area_findings = asker.calls[0][1]["findings"]
+    assert "## Übersicht der gefundenen Dateien" in area_findings
+    assert (
+        f"- `{WEB}` (120 Zeilen): ListView [10-118], ListView.visibleNodes [14-30], … 7 weitere"
+        in (area_findings)
+    )
+    assert f"- `{PATH}` (2 Zeilen): parse [1-2]" in area_findings
+    # the rounds after round 0 keep the map
+    assert "ListView.visibleNodes [14-30]" in asker.calls[1][1]["findings"]
+    assert inv.log[0] == "Runde 0: Übersicht der gefundenen Dateien gelesen"
+
+
+@pytest.mark.asyncio
+async def test_without_the_capability_or_files_the_investigation_goes_on_without_a_map() -> None:
+    start = f"### {PATH}:1: def parse"
+    for outline, begin in ((FakeOutline(fail=True), start), (FakeOutline(), "### nichts gefunden")):
+        asker = Asker({"issue_area": [area("hub", [PATH])], "investigate_round": [report()]})
+        inv = await ii.investigate(asker, read, "Leere Texte", begin, outline=outline)
+        assert inv.failed == "" and inv.plan is not None
+        assert "Übersicht" not in asker.calls[0][1]["findings"]
+        assert not inv.log[0].startswith("Runde 0: Übersicht")
+
+
+def test_the_map_text_is_cut_and_names_the_files_in_order() -> None:
+    one = {"name": "f", "start": 1, "end": 9}
+    files = [{"path": f"hub/m{i}.py", "lines": 9, "symbols": [one]} for i in range(50)]
+    text = ii.outline_text(files, limit=200)
+    assert text.endswith("- …") and len(text) < 260
+    assert (
+        ii.outline_text([{"path": "docs/A.md", "lines": 0, "symbols": []}])
+        == "- `docs/A.md` (0 Zeilen): -"
+    )
+    assert ii.named_files("a node/x.go b hub/y.py hub/y.py c hub/y.py:3 web/src/z.tsx", 2) == [
+        "hub/y.py", "node/x.go",
+    ]  # fmt: skip

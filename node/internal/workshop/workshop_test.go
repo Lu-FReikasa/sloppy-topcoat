@@ -519,7 +519,7 @@ func TestWhatRunsWithoutAConfirmation(t *testing.T) {
 		o.Runner = &fakeRunner{}
 		o.RunnerConfig.Images = map[string]string{"build-node": "golang:1.27"}
 	})
-	readOnly := map[string]bool{"repo.status": true, "repo.list": true, "repo.read": true, "repo.search": true, "repo.diff": true, "repo.build_list": true, "repo.test_status": true, "repo.branches": true}
+	readOnly := map[string]bool{"repo.status": true, "repo.list": true, "repo.read": true, "repo.search": true, "repo.outline": true, "repo.diff": true, "repo.build_list": true, "repo.test_status": true, "repo.branches": true}
 	scratch := map[string]bool{"repo.sync": true, "repo.start": true, "repo.edit": true, "repo.write": true, "repo.apply_patch": true, "repo.reset": true, "repo.test": true, "repo.test_start": true, "repo.test_cancel": true, "repo.build_node": true, "repo.commit": true}
 	// the person's own steps on local repositories (D76): never read-only, never scratch
 	manage := map[string]bool{"workshop.create": true, "workshop.clone": true, "workshop.branch": true, "workshop.merge": true, "workshop.publish": true, "workshop.pull": true, "workshop.remove": true}
