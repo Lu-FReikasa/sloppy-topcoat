@@ -325,6 +325,17 @@ the prerequisite of the OpenAI-compatible `tools` / `tool_calls`; b11223 has it 
 node passes it explicitly). llama-server's own agent tools (`--tools`, `--agent`, `--mcp-…`: shell
 and files) are never enabled. Both keys are additive in v1.
 
+### Vision models and their projector (D125)
+A model that can see is two GGUF files: the language model and its projector (architecture
+`clip`, by convention `mmproj` in the name). The node never lists a projector as a model; it
+loads a model together with its projector (`llama-server --mmproj <file>`) and reports the file
+name as `models[].projector` in the inventory. The projector is looked for in the model's own
+directory only: `config.runner.projectors[<model>]` (a file name, or `"none"`) wins; else by name
+(`mmproj-<model>.gguf`, `<model>.mmproj.gguf`, `<model>-mmproj*.gguf`); else the only projector of
+a subfolder below a models directory (a downloaded repository; with several, F16 before BF16
+before Q8_0, then by name), never a lone projector in the top of a models directory. The hub's
+model facts count a model with a projector as `vision`. Both keys are additive in v1.
+
 **Tool mode of the agent (hub).** How the agent talks to a model is set per model — hub setting
 `agent_tool_modes`, `GET/PUT /api/agent/settings` (PUT admin) — to `native` (one function per
 capability plus `finish`, `tool_choice: required`, results as `tool` messages), `json` (the
@@ -1121,6 +1132,7 @@ Additive changes in v1 (no version bump):
   `hardware.disk_total_mb` / `disk_free_mb`, error codes `insufficient_memory` /
   `insufficient_disk`, event `benchmark_error`, `benchmark_finished.failed_runs`.
 - E3-01c: `config.runner.jinja`, `config.runner.model_jinja`; hub `GET/PUT /api/agent/settings`.
+- D125 (#50): inventory `models[].projector`, `config.runner.projectors`.
 - E3-05 (hub only): memory notes `kind`, `stage`, `expires_at`, `verify_with`, usage and feedback
   counters, status `archived`; `POST /api/memory/{id}/feedback`, `/archive`, `/api/memory/care`;
   runs of kind `care`; agent task origin `care`.

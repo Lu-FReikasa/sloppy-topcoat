@@ -215,6 +215,9 @@ type Model struct {
 	Own *bool `json:"own,omitempty"`
 	// GGUF: what the file states about itself in its header (R8); nil = not read or not a GGUF file.
 	GGUF *ModelGGUF `json:"gguf,omitempty"`
+	// Projector is the file name of the vision projector loaded with the model (--mmproj, D125);
+	// empty = none, the model cannot see.
+	Projector string `json:"projector,omitempty"`
 }
 
 // LoadedModel is a model currently loaded by the runner.

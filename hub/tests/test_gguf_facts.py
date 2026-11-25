@@ -61,6 +61,14 @@ def test_the_pools_page_takes_the_kind_from_the_files_the_node_reports(
             {"name": "mystery-model", "size_bytes": 600, "format": "gguf", "gguf": EMBEDDER},
             {"name": "plain-model", "size_bytes": 900, "format": "gguf", "gguf": CHATTER},
             {"name": "no-header", "size_bytes": 900, "format": "gguf"},
+            # D125: the node loads a projector with it, so it can see whatever its name says
+            {
+                "name": "gemma-q4",
+                "size_bytes": 900,
+                "format": "gguf",
+                "gguf": CHATTER,
+                "projector": "mmproj-F16.gguf",
+            },
         ],
     }
     node.handshake()
@@ -70,7 +78,7 @@ def test_the_pools_page_takes_the_kind_from_the_files_the_node_reports(
     def seen() -> dict:
         pools = client.get("/api/scheduling/pools", headers=AUTH).json()
         models = {m["name"]: m for n in pools["nodes"] for m in n["models"]}
-        assert {"mystery-model", "plain-model", "no-header"} <= set(models)
+        assert {"mystery-model", "plain-model", "no-header", "gemma-q4"} <= set(models)
         return models
 
     models = eventually(seen)
@@ -83,3 +91,18 @@ def test_the_pools_page_takes_the_kind_from_the_files_the_node_reports(
         ["chat"],
         "detected",
     )
+    assert (models["gemma-q4"]["kinds"], models["gemma-q4"]["kinds_source"]) == (
+        ["chat", "vision"],
+        "gguf",
+    )
+
+
+def test_a_model_with_a_projector_can_see() -> None:
+    assert kinds_of("gemma-q4", gguf={**CHATTER, "projector": "mmproj-F16.gguf"}) == (
+        "chat",
+        "vision",
+    )
+    assert kinds_of("some-vl-model", gguf={"projector": "mmproj.gguf"}) == ("chat", "vision")
+    assert source_of("gemma-q4", gguf={"projector": "mmproj.gguf"}) == "gguf"
+    # the admin's setting still wins
+    assert kinds_of("gemma-q4", {"gemma-q4": ["chat"]}, gguf={"projector": "m.gguf"}) == ("chat",)
