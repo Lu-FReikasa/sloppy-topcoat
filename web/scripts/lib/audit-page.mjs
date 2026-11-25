@@ -109,17 +109,19 @@ export function auditInPage({ checks, opts }) {
   if (run.has("target_size") || run.has("overlap")) {
     const items = interactive();
     if (run.has("target_size")) {
-      // a checkbox or a radio is hit through its label too: the larger of the two is its target
+      // a checkbox or a radio is hit through its labels too: it passes when one of them (or the box
+      // itself) is large enough; otherwise the largest of them is reported
+      const big = (r) => r.width >= minTarget && r.height >= minTarget;
       const targetBox = (el) => {
         const boxes = [el, ...(["checkbox", "radio"].includes(el.type) ? [...(el.labels ?? [])] : [])].map((x) => x.getBoundingClientRect());
-        return boxes.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
+        return boxes.find(big) ?? boxes.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
       };
       // a link inside a sentence may keep the height of the line (WCAG 2.5.8, "inline")
       const inSentence = (el) => el.tagName === "A" && !!el.parentElement && hasText(el.parentElement);
       for (const el of items) {
         if (inSentence(el)) continue;
         const r = targetBox(el);
-        if (r.width < minTarget || r.height < minTarget) {
+        if (!big(r)) {
           add("target_size", el, { width: round(r.width), height: round(r.height), min: minTarget });
         }
       }

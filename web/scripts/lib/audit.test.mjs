@@ -72,6 +72,14 @@ describe("the measurements", () => {
     expect(violations.map((v) => [v.width, v.height])).toEqual([[30, 20], [16, 16]]);
   });
 
+  it("passes a checkbox that is large enough itself, even beside a wide, low label", () => {
+    const { violations } = audit(
+      ["target_size"],
+      `<input type="checkbox" id="c" data-box="0,0,44,44"><label for="c" data-box="50,12,200,20">a long label</label>`,
+    );
+    expect(violations).toEqual([]);
+  });
+
   it("lets a link inside a sentence keep the line's height, but not a link on its own", () => {
     const { violations } = audit(
       ["target_size"],
