@@ -1040,7 +1040,7 @@
         "check": "The general state of this machine in one call: failed units, troubled containers, full disks, RAM, load and recent errors."
       },
       "logs": {
-        "search": "Search a text in the logs of all containers and the journal at once."
+        "search": "Search for a text in the logs of all containers and the journal at once."
       },
       "certs": {
         "expiry": "TLS certificates of the configured services: issuer, expiry date, days left and whether the chain is valid."
@@ -1081,7 +1081,7 @@
       "web": {
         "search": "Search the web through the operator's own search engine (SearXNG).",
         "fetch": "Read one public web page as text.",
-        "images": "Search pictures through the operator's own search engine (SearXNG).",
+        "images": "Search for pictures through the operator's own search engine (SearXNG).",
         "image": "Fetch one public picture so the hub can keep it with a report."
       },
       "windows": {
@@ -3285,7 +3285,7 @@
       "review_plan": "Second look at an issue's plan: right places for what the checks want?",
       "probe_dev": "Answer one question of an issue's investigation in Development",
       "probe_admin": "Answer one question of an issue's investigation in Administration",
-      "probe_read": "Find the code a try of an investigation must call",
+      "probe_read": "Find the code an investigation's test must call",
       "probe_test": "Write one small test that tries a guess of an investigation",
       "issue_plan": "Carry out an issue's settled plan step by step",
       "checklist_check": "Work through a task's checklist, one item per fresh run"

@@ -1014,10 +1014,10 @@
         "memory": "Wofür der RAM verbraucht wird: Programme, Cache, Kernel, Swap, ZFS-ARC und die Prozesse, die am meisten belegen."
       },
       "disk": {
-        "usage": "Belegung jedes eingehängten Datendateisystems (Größe, belegt, frei, Inodes), das vollste zuerst."
+        "usage": "Belegung jedes eingehängten Dateisystems mit Daten (Größe, belegt, frei, Inodes), das vollste zuerst."
       },
       "docker": {
-        "ps": "Container dieses Docker-Hosts mit Zustand, Health, Neustarts und Startzeit.",
+        "ps": "Container dieses Docker-Hosts mit Zustand, Health-Status, Neustarts und Startzeit.",
         "inspect": "Zustandsdetails eines Containers: Zustand, Exit-Code, Neustarts, Health-Checks, Mounts, Netzwerke. Nie seine Umgebungsvariablen.",
         "logs": "Die letzten Log-Zeilen eines Containers, Geheimnisse maskiert.",
         "restart": "Einen Container neu starten, den die Konfiguration des Nodes nennt; sein Dienst ist ein paar Sekunden weg."
@@ -1087,7 +1087,7 @@
       "windows": {
         "system": "Windows-Version und Build, Laufzeit, Modell, RAM, CPU, BIOS, Zeitzone und die neuesten Updates.",
         "services": "Windows-Dienste mit Anzeigename, Zustand und Starttyp.",
-        "events": "Einträge des System- oder Anwendungsprotokolls (nie Sicherheit), die neuesten zuerst.",
+        "events": "Einträge des System- oder Anwendungsprotokolls (nie des Sicherheitsprotokolls), die neuesten zuerst.",
         "storage": "Volumes und physische Datenträger mit Größe, freiem Platz und Zustand.",
         "network": "Netzwerkadapter, IPv4-Adressen, DNS-Server, Routen und das Netzwerkprofil.",
         "processes": "Die Prozesse mit der meisten CPU-Zeit oder dem meisten Speicher.",
@@ -1095,7 +1095,7 @@
         "startup": "Was von selbst startet: Autostart-Befehle und geplante Aufgaben.",
         "defender": "Status von Microsoft Defender und die registrierten Virenschutzprodukte.",
         "devices": "Geräte mit einem Problem im Geräte-Manager und die Grafikkarten mit ihren Treibern.",
-        "power": "Energieeinstellungen: aktiver Plan, unterstützte Ruhezustände, letzte Weckquelle und Geräte, die den PC wecken dürfen."
+        "power": "Energieoptionen: aktiver Energiesparplan, unterstützte Ruhezustände, letzte Weckquelle und Geräte, die den PC wecken dürfen."
       },
       "repo": {
         "sync": "Das Repository in die Werkstatt klonen oder seinen Standardbranch holen.",
@@ -1133,7 +1133,7 @@
         "open": "Einen Browser ohne Fenster auf der GUI des Repositorys öffnen, mit einem nachgebildeten Hub, in einem Container ohne Netz.",
         "close": "Die Browsersitzung beenden und ihren Container entfernen.",
         "snapshot": "Die Seite als kompakter Baum dessen, was ein Mensch sehen und bedienen kann.",
-        "act": "Die Seite bedienen: klicken, tippen, zeigen, scrollen oder eine Taste drücken.",
+        "act": "Die Seite bedienen: klicken, tippen, mit der Maus darüberfahren, scrollen oder eine Taste drücken.",
         "shot": "Ein kleines Bild der Seite oder eines Bereichs.",
         "console": "Konsolenmeldungen, Seitenfehler und fehlgeschlagene Anfragen.",
         "audit": "Die Seite durch Messen prüfen und nur die Verstöße zurückgeben.",
@@ -3285,7 +3285,7 @@
       "review_plan": "Zweiter Blick auf den Plan eines Issues: die richtigen Stellen für das, was die Prüfungen verlangen?",
       "probe_dev": "Eine Frage einer Issue-Untersuchung in Entwicklung beantworten",
       "probe_admin": "Eine Frage einer Issue-Untersuchung in Verwaltung beantworten",
-      "probe_read": "Den Code finden, den ein Versuch einer Untersuchung aufrufen muss",
+      "probe_read": "Den Code finden, den der Test einer Untersuchung aufrufen muss",
       "probe_test": "Einen kleinen Test schreiben, der eine Vermutung einer Untersuchung ausprobiert",
       "issue_plan": "Den beschlossenen Plan eines Issues Schritt für Schritt ausführen",
       "checklist_check": "Die Checkliste einer Aufgabe abarbeiten, ein Punkt pro neuem Lauf"
