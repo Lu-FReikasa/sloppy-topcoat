@@ -729,8 +729,11 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
     if (top) setStack((s) => [...s.filter((k) => k !== top), top]);
   }
 
-  // the keys of the desktop
-  useEffect(() => {
+  // The keys of the desktop. Attached while the drawing is committed (layout effect), not after
+  // it: a passive effect can run a moment after the windows are already on screen, and a key
+  // pressed in that gap reached a listener that still knew the earlier state (no window in front
+  // while loading, or the window that was in front before), so AltGr+C was lost (#73).
+  useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (mod && !e.altKey && (e.key === "k" || e.key === "K")) {
