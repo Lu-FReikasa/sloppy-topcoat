@@ -120,7 +120,7 @@ func TestSecretNamesAreMatchedIgnoringCaseOnEverySegment(t *testing.T) {
 		`C:\ProgramData\x\ID_RSA`,
 	} {
 		if !win(p) {
-			t.Errorf("%s is not recognised as a secret", p)
+			t.Errorf("%s is not recognized as a secret", p)
 		}
 	}
 	for _, p := range []string{`C:\ProgramData\Topcoat\logs\node.log`, `C:\ProgramData\Docker\service.log`} {

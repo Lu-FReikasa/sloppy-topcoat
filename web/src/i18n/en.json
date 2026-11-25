@@ -2327,42 +2327,16 @@
       "people": "People"
     }
   },
-  "marks": {
-    "kindLabel": "Kind of mark",
-    "kind": {
-      "comment": "Comment",
-      "postit": "Post-It",
-      "sticker": "Sticker",
-      "highlight": "Highlight"
-    },
-    "author": {
-      "recheck": "re-check",
-      "chat": "Chat",
-      "research": "Research",
-      "dev": "Dev",
-      "admin": "Admin"
-    },
-    "text": "Write on it …",
-    "add": "Stick on",
-    "done": "Done",
-    "reopen": "Open again",
-    "remove": "Remove",
-    "failed": "The marks could not be loaded or saved."
-  },
   "inbox": {
     "title": "Inbox",
     "tabInbox": "Inbox",
-    "tabFiled": "Filed",
     "all": "All",
     "empty": "Nothing waits for you.",
-    "filedEmpty": "Nothing filed here yet.",
     "loadFailed": "The inbox could not be loaded.",
     "retry": "Try again",
     "urgent": "urgent",
     "unresolved": "needs your attention",
     "show": "Show",
-    "pin": "Pin to the board",
-    "unpin": "Take off the board",
     "resolve": "Mark as settled",
     "close": "Close",
     "delete": "Delete",
@@ -2384,16 +2358,23 @@
       "tasks_resumed": "Tasks continue because a machine came online",
       "project_reminder": "A reminder of a task is due",
       "project_digest": "Your overdue tasks",
-      "fix_blocked": "A fix waits for you: its drafts keep failing"
+      "fix_blocked": "A fix waits for you: its drafts keep failing",
+      "handover_result": "An answer came back",
+      "handover_failed": "A hand-over failed"
     },
     "bundle": {
       "title": "{{count}} notes of the second look",
       "errors": "{{count}} with a mistake",
-      "settle": "File them all",
-      "settling": "Filing …"
+      "settle": "Mark them all read",
+      "settling": "Marking …"
     },
     "readAll": "Mark all as read",
-    "readAllHint": "Files everything. What still waits for an action of yours stays."
+    "readAllHint": "Marks everything read. What still waits for an action of yours stays.",
+    "group": {
+      "decide": "Decide",
+      "errors": "Errors",
+      "results": "Results"
+    }
   },
   "handover": {
     "class": {

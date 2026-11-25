@@ -82,7 +82,7 @@ const repoProp = `"repo":{"type":"string","maxLength":63,"description":"the repo
 
 func (w *Workshop) capabilities() []capability.Capability {
 	caps := []capability.Capability{
-		w.capSync(), w.capStatus(), w.capList(), w.capRead(), w.capSearch(), w.capDiff(),
+		w.capSync(), w.capStatus(), w.capList(), w.capRead(), w.capSearch(), w.capOutline(), w.capDiff(),
 		w.capStart(), w.capEdit(), w.capWrite(), w.capApplyPatch(), w.capReset(), w.capPush(),
 		w.capBranches(), w.capCommit(),
 	}
@@ -411,7 +411,7 @@ func (w *Workshop) capSearch() capability.Capability {
 			}
 			out, err := w.git(ctx, dir, nil, "", args...)
 			var ge *gitError
-			if err != nil && !(errors.As(err, &ge) && ge.exit == 1) {
+			if err != nil && (!errors.As(err, &ge) || ge.exit != 1) {
 				return nil, inputErr("search failed: %v", err)
 			}
 			var hits []string
@@ -640,7 +640,7 @@ func (w *Workshop) capEdit() capability.Capability {
 			if len(updated) > maxFileBytes {
 				return nil, inputErr("the file would become larger than %d bytes", maxFileBytes)
 			}
-			if err := os.WriteFile(abs, []byte(updated), 0o644); err != nil {
+			if err := os.WriteFile(abs, []byte(updated), 0o644); err != nil { //nolint:gosec // G306: a source file in the clone, as git checks it out (the mode only applies to a new file)
 				return nil, inputErr("%s cannot be written", rel)
 			}
 			return map[string]any{"repo": in.Repo, "path": rel, "bytes": len(updated)}, nil
@@ -679,14 +679,14 @@ func (w *Workshop) capWrite() capability.Capability {
 			if err := w.ensureWorkBranch(ctx, dir); err != nil {
 				return nil, err
 			}
-			if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil { //nolint:gosec // G301: a folder in the clone, as git makes it
 				return nil, inputErr("%s cannot be created", rel)
 			}
 			// the directories may have been made just now: confine again on the real path
 			if _, _, err := confine(dir, in.Path, true); err != nil {
 				return nil, err
 			}
-			if err := os.WriteFile(abs, []byte(in.Content), 0o644); err != nil {
+			if err := os.WriteFile(abs, []byte(in.Content), 0o644); err != nil { //nolint:gosec // G306: a source file in the clone, as git checks it out
 				return nil, inputErr("%s cannot be written", rel)
 			}
 			return map[string]any{"repo": in.Repo, "path": rel, "bytes": len(in.Content)}, nil

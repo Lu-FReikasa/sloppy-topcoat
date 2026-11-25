@@ -195,7 +195,7 @@ type GPUUsage struct {
 	Index        int   `json:"index"`
 	VRAMUsedMB   int64 `json:"vram_used_mb"`
 	SharedUsedMB int64 `json:"shared_used_mb,omitempty"`
-	// GPUUtil: utilisation of the whole GPU in percent (all programs), when known.
+	// GPUUtil: utilization of the whole GPU in percent (all programs), when known.
 	GPUUtil *float64 `json:"gpu_util,omitempty"`
 	// ForeignVRAMUsedMB / ForeignGPUUtil: other programs, when known (E1-06).
 	ForeignVRAMUsedMB *int64   `json:"foreign_vram_used_mb,omitempty"`
@@ -314,7 +314,7 @@ type CapabilityInfo struct {
 type Heartbeat struct {
 	State     string `json:"state"`
 	RAMUsedMB int64  `json:"ram_used_mb"`
-	// CPUUtil is the utilisation of all logical processors together in percent since the previous
+	// CPUUtil is the utilization of all logical processors together in percent since the previous
 	// heartbeat; absent where it cannot be measured (and on the first beat, which has no delta).
 	CPUUtil *float64      `json:"cpu_util,omitempty"`
 	GPUs    []GPUUsage    `json:"gpus"`

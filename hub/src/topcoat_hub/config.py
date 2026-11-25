@@ -177,9 +177,6 @@ class Settings(BaseSettings):
     resume_stuck_enabled: bool = True
     resume_stuck_hours: float = 72.0  # how long a task that stopped for lack of a node waits
     resume_stuck_max: int = 5  # tasks continued per person and arrival
-    # the regular re-check of pinned answers (recheck.py): an answer that was handed back is
-    # asked for again, compared, and marked still correct or outdated
-    recheck_enabled: bool = True
     # Gründlich: a small model on the checking node looks at each tool step while the run goes on
     # (step_check.py, the plan section 7); the chat's answer is still checked before it is shown
     step_check_enabled: bool = False  # off unless an admin switches it on (PRG-00 R5)
@@ -189,8 +186,6 @@ class Settings(BaseSettings):
     # a finished hand-over's file (the request, the report with its sources) goes into the
     # person's knowledge base, in the private source "Akten"
     handover_to_knowledge: bool = True
-    recheck_interval_hours: float = 24.0
-    recheck_max: int = 5  # pinned answers re-checked per round
     resume_stuck_attempts: int = 3  # a task is started this many times at most this way
     agent_max_turns: int = 30  # model calls per run
     agent_max_tool_calls: int = 20
