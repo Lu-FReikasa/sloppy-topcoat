@@ -225,6 +225,9 @@
   gap: 0.25rem 0.5rem;
   font-size: 0.75rem;
   color: var(--muted); /* not opacity: the buttons in the line keep their full contrast */
+  /* as high as one of its buttons (line, padding, border), so showing them on hover does not push
+     the messages below down */
+  min-height: calc(1lh + 0.2rem + 2px);
 }
 
 .message-line button {

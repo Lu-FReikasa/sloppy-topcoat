@@ -143,7 +143,9 @@
   border-color: var(--border);
 }
 
-.dt-look-schreibtisch .dt-nav button {
+/* Start's open conversations keep the rail's lettering now that they sit beside it, not in it (#77) */
+.dt-look-schreibtisch .dt-nav button,
+.dt-look-schreibtisch .open-chats button {
   color: var(--muted);
   font-family: var(--type);
 }
