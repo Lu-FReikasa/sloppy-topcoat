@@ -14,7 +14,7 @@ from topcoat_hub.models import DEV_ADMIN_ID
 from topcoat_hub.project_store import ProjectStore
 from topcoat_hub.tool_groups import group_of
 from topcoat_hub.tools import Caller, ToolError
-from topcoat_hub.ui.seeds import BUILTIN_TEMPLATES
+from topcoat_hub.ui.seeds import builtin_templates
 from topcoat_hub.wiki_store import OTHER, WikiStore, made, page_title, section_of
 from topcoat_hub.wiki_tools import WIKI_NODE_ID
 
@@ -207,7 +207,7 @@ def test_projekte_verwaltung_chat_and_entwicklung_read_the_wiki_in_its_current_v
 
 
 def test_the_seeds_give_the_wiki_group_to_projekte_verwaltung_chat_and_entwicklung() -> None:
-    groups = {t["key"]: t["agent"]["tool_scope"]["groups"] for t in BUILTIN_TEMPLATES}
+    groups = {t["key"]: t["agent"]["tool_scope"]["groups"] for t in builtin_templates()}
     # Chat since 2026-11-12: Clipper at the Wiki window talks in Chat and reads its page
     # Entwicklung since 2026-11-17: its task runs survey the code the wiki describes
     # Research since 2026-11-18: a research about Topcoat reads its documentation

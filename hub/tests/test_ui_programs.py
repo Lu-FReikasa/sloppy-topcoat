@@ -8,7 +8,7 @@ from topcoat_hub.config import REPO_ROOT
 from topcoat_hub.ui import prefs
 from topcoat_hub.ui.access import EVERYONE, PLANNED_GROUPS
 from topcoat_hub.ui.runtime import build_runtime
-from topcoat_hub.ui.seeds import BUILTIN_PROFILES, BUILTIN_TEMPLATES
+from topcoat_hub.ui.seeds import BUILTIN_PROFILES, builtin_templates
 from topcoat_hub.ui.store import MAX_MODULES
 
 RUNTIME = build_runtime(REPO_ROOT / "proto")
@@ -27,10 +27,10 @@ def test_the_manifest_is_consistent() -> None:
 
 
 def test_every_builtin_program_names_known_views_and_groups() -> None:
-    keys = [t["key"] for t in BUILTIN_TEMPLATES]
+    keys = [t["key"] for t in builtin_templates()]
     assert len(keys) == len(set(keys))
     assert set(EVERYONE) <= set(keys)
-    for t in BUILTIN_TEMPLATES:
+    for t in builtin_templates():
         assert 1 <= len(t["modules"]) <= MAX_MODULES
         assert t["open"] == t["modules"][:1]  # a program starts with its first view
         for m in t["modules"]:
@@ -44,7 +44,7 @@ def test_every_builtin_program_names_known_views_and_groups() -> None:
 
 
 def test_the_programs_everybody_has_need_no_admin_and_have_no_tools() -> None:
-    by_key = {t["key"]: t for t in BUILTIN_TEMPLATES}
+    by_key = {t["key"]: t for t in builtin_templates()}
     for key in EVERYONE:
         t = by_key[key]
         assert t["requires_role"] is None
