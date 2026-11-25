@@ -237,7 +237,8 @@
 .dt-look-leitstand .dt-task {
   justify-content: center;
   padding: 0.35rem 0.6rem;
-  color: #4c585d;
+  /* a closed program: the key stays dark and unlit, its legend readable grey (#75) */
+  color: #737f84;
   background: #0a0e10;
   border: 1px solid #000;
   box-shadow: inset 0 0 0 1px #262f33;

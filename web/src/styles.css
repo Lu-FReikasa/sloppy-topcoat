@@ -62,7 +62,7 @@
 
 .app-badge.is-write {
   background: var(--app-color);
-  color: #fff;
+  color: var(--on-app, #fff);
 }
 
 .app-badge.app-research {
@@ -229,8 +229,10 @@ input {
   margin: 0.4rem 0;
 }
 
+/* an offline machine's row is muted by its text colour, not by opacity: opacity fades the
+   "Offline" badge with it, fill and text, to about 3.3:1 (#75) */
 .state-offline {
-  opacity: 0.75;
+  color: var(--muted);
 }
 
 .card-head,
@@ -272,14 +274,17 @@ input {
 
 .badge-available {
   background: var(--ok);
+  color: var(--on-ok, #fff);
 }
 
 .badge-busy_gaming {
   background: var(--accent);
+  color: var(--accent-text);
 }
 
 .badge-degraded {
   background: var(--warn);
+  color: var(--on-warn, #fff);
 }
 
 .badge-yielded {
@@ -292,22 +297,27 @@ input {
 
 .badge-offline {
   background: var(--off);
+  color: var(--on-off, #fff);
 }
 
 .badge-knowledge-ready {
   background: var(--ok);
+  color: var(--on-ok, #fff);
 }
 
 .badge-knowledge-indexing {
   background: var(--accent);
+  color: var(--accent-text);
 }
 
 .badge-knowledge-new {
   background: var(--off);
+  color: var(--on-off, #fff);
 }
 
 .badge-knowledge-error {
   background: var(--warn);
+  color: var(--on-warn, #fff);
 }
 
 /* Usage bars */
@@ -1516,22 +1526,22 @@ td.resident input.priority {
 
 .badge-stage-sure {
   background: var(--ok);
-  color: #fff;
+  color: var(--on-ok, #fff);
 }
 
 .badge-stage-older {
   background: var(--off);
-  color: #fff;
+  color: var(--on-off, #fff);
 }
 
 .badge-stage-stale {
   background: var(--warn);
-  color: #fff;
+  color: var(--on-warn, #fff);
 }
 
 .badge-memory-archived {
   background: var(--off);
-  color: #fff;
+  color: var(--on-off, #fff);
 }
 
 .memory-item.memory-archived {
@@ -1613,18 +1623,18 @@ td.resident input.priority {
 
 .badge-memory-active {
   background: var(--ok);
-  color: #fff;
+  color: var(--on-ok, #fff);
 }
 
 .badge-memory-disputed {
   background: var(--warn);
-  color: #fff;
+  color: var(--on-warn, #fff);
 }
 
 .badge-memory-superseded,
 .badge-memory-deleted {
   background: var(--off);
-  color: #fff;
+  color: var(--on-off, #fff);
 }
 
 .memory-used {
@@ -1706,7 +1716,7 @@ button.link {
   padding: 0 0.35rem;
   border-radius: 999px;
   background: var(--warn);
-  color: #fff;
+  color: var(--on-warn, #fff);
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.25rem;

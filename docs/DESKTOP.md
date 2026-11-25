@@ -77,8 +77,9 @@ to both.
   normal, cyan is the selection and advice, amber wants attention, red is a warning; everything
   else is grey legends on dark glass. A program is a display in a bezel with a legend plate (its
   three-letter page code, e.g. `ADM`, and a lamp lit while it has the focus); the taskbar is the
-  annunciator panel (dark = closed, green text = open, lit green = in front, amber = the inbox has
-  something to read, flashing red = something urgent); a clock keeps UTC. The hue tints only the
+  annunciator panel (an unlit, dark key = closed, its legend still readable grey; green text = open,
+  lit green = in front, amber = the inbox has something to read, flashing red = something urgent); a
+  clock keeps UTC. The hue tints only the
   housing, never a signal. A display comes on with a short flicker.
 
 - **Schreibtisch** (desk; back from the desk shell of the layout prototypes): programs are slips of
