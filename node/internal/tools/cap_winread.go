@@ -73,6 +73,13 @@ func (c *capBuf) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// psArgs is PowerShell's command line for one script: no profile, never a prompt (stdin is
+// empty, a prompt would wait until the timeout), the script base64-encoded.
+func psArgs(script string) []string {
+	return []string{"-NoProfile", "-NonInteractive", "-NoLogo",
+		"-ExecutionPolicy", "Bypass", "-EncodedCommand", encodePS(psPrelude + script)}
+}
+
 // Run implements PowerShellAPI.
 func (PowerShell) Run(ctx context.Context, script string, env map[string]string, maxOutput int) ([]byte, error) {
 	if runtime.GOOS != "windows" {
@@ -85,8 +92,7 @@ func (PowerShell) Run(ctx context.Context, script string, env map[string]string,
 	exe := filepath.Join(root, "System32", windowsPS) // absolute: no PATH lookup to hijack
 	// G204: an absolute path below SystemRoot and fixed flags; the script is one of the fixed
 	// windows.* scripts, passed base64-encoded, never through a shell.
-	cmd := exec.CommandContext(ctx, exe, "-NoProfile", //nolint:gosec // see above "-NonInteractive", "-NoLogo",
-		"-ExecutionPolicy", "Bypass", "-EncodedCommand", encodePS(psPrelude+script))
+	cmd := exec.CommandContext(ctx, exe, psArgs(script)...) //nolint:gosec // see above
 	cmd.Env = nil
 	for _, k := range []string{"SystemRoot", "windir", "SystemDrive", "ProgramData", "ProgramFiles", "ProgramFiles(x86)", "TEMP", "TMP", "COMPUTERNAME"} {
 		if v := os.Getenv(k); v != "" {
