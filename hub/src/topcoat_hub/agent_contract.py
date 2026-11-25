@@ -69,6 +69,11 @@ class Contract:
         """Its tool groups, without the internet (that is a switch of its own)."""
         return [t["group"] for t in self.raw["tools"] if t["group"] != "internet"]
 
+    @property
+    def internet(self) -> bool:
+        """Whether it may use the web (the tool ``internet`` in its list)."""
+        return any(t["group"] == "internet" for t in self.raw["tools"])
+
     def purpose(self, language: str = "en") -> str:
         texts = self.raw["purpose"]
         return str(texts.get(language) or texts["en"])
