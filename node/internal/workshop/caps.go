@@ -323,7 +323,7 @@ func (w *Workshop) capRead() capability.Capability {
 			if err != nil {
 				return nil, err
 			}
-			rel, abs, err := confine(dir, in.Path, false)
+			rel, abs, err := w.confineTracked(ctx, dir, in.Path, false)
 			if err != nil {
 				return nil, err
 			}
@@ -613,7 +613,7 @@ func (w *Workshop) capEdit() capability.Capability {
 			if err != nil {
 				return nil, err
 			}
-			rel, abs, err := confine(dir, in.Path, true)
+			rel, abs, err := w.confineTracked(ctx, dir, in.Path, true)
 			if err != nil {
 				return nil, err
 			}
@@ -667,7 +667,7 @@ func (w *Workshop) capWrite() capability.Capability {
 			if err != nil {
 				return nil, err
 			}
-			rel, abs, err := confine(dir, in.Path, true)
+			rel, abs, err := w.confineTracked(ctx, dir, in.Path, true)
 			if err != nil {
 				return nil, err
 			}
@@ -727,7 +727,7 @@ func (w *Workshop) capApplyPatch() capability.Capability {
 			}
 			for _, entry := range strings.Split(stat, "\x00") {
 				if _, p, ok := cutNumstat(entry); ok {
-					if _, _, err := confine(dir, p, true); err != nil {
+					if _, _, err := w.confineTracked(ctx, dir, p, true); err != nil {
 						return nil, err
 					}
 				}
@@ -793,8 +793,8 @@ func cleanRel(p string) (string, error) {
 
 // confine returns the clean relative path and the absolute one, and checks that the path stays
 // inside dir, does not touch .git, a secret-looking file or (when writing) a workflow file, and
-// does not run through a symbolic link. A file that does not exist yet is checked through its
-// nearest existing parent.
+// does not run through a symbolic link or another spelling of the path. A file that does not exist
+// yet is checked through its nearest existing parent.
 func confine(dir, p string, write bool) (string, string, error) {
 	rel, err := cleanRel(p)
 	if err != nil {
@@ -837,6 +837,64 @@ func confine(dir, p string, write bool) (string, string, error) {
 	real, err := filepath.EvalSymlinks(probe)
 	if err != nil || (real != root && !strings.HasPrefix(real, root+string(filepath.Separator))) {
 		return "", "", inputErr("%s leaves the repository", rel)
+	}
+	// the path must be the file's own name: a link on the way, or on Windows another spelling of
+	// the same file (other case, a short 8.3 name, a trailing dot), would slip past the name checks
+	// above and the index lookup of confineTracked
+	if real != probe {
+		return "", "", inputErr("%s is not the file's exact path (a link on the way, other case or a short name)", rel)
+	}
+	return rel, abs, nil
+}
+
+// trackedLinks returns the paths that the index records as symbolic links (mode 120000), only among
+// paths when any are given. Git on Windows usually checks such a link out as a plain file that holds
+// the target, which os.Lstat does not see as a link; writing that file would change the link in the
+// next commit. The workshop treats these files as links on every system.
+func (w *Workshop) trackedLinks(ctx context.Context, dir string, paths ...string) (map[string]bool, error) {
+	args := []string{"ls-files", "--stage", "-z"}
+	if len(paths) > 0 {
+		args = append(args, "--")
+		for _, p := range paths {
+			args = append(args, ":(literal)"+p)
+		}
+	}
+	out, err := w.git(ctx, dir, nil, "", args...)
+	if err != nil {
+		return nil, err
+	}
+	links := map[string]bool{}
+	for _, entry := range strings.Split(out, "\x00") {
+		meta, p, ok := strings.Cut(entry, "\t")
+		if ok && strings.HasPrefix(meta, "120000 ") {
+			links[p] = true
+		}
+	}
+	return links, nil
+}
+
+// confineTracked is confine plus the index: a path that runs through a file git tracks as a
+// symbolic link is refused even where the link was checked out as a plain file.
+func (w *Workshop) confineTracked(ctx context.Context, dir, p string, write bool) (string, string, error) {
+	rel, abs, err := confine(dir, p, write)
+	if err != nil {
+		return "", "", err
+	}
+	var prefixes []string
+	for i := range rel {
+		if rel[i] == '/' {
+			prefixes = append(prefixes, rel[:i])
+		}
+	}
+	prefixes = append(prefixes, rel)
+	links, err := w.trackedLinks(ctx, dir, prefixes...)
+	if err != nil {
+		return "", "", err
+	}
+	for _, q := range prefixes {
+		if links[q] {
+			return "", "", inputErr("%s is a symbolic link: the workshop does not follow it", q)
+		}
 	}
 	return rel, abs, nil
 }
