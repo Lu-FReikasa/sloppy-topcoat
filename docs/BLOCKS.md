@@ -1,6 +1,6 @@
 # Block programs
 
-A function of a program (PRG-00, D104) written as typed blocks. Code: `hub/src/topcoat_hub/blocks/`. API: `/api/blocks` (admin).
+A function of a program (D115) written as typed blocks. Code: `hub/src/topcoat_hub/blocks/`. API: `/api/blocks` (admin).
 A program is JSON; the validator (`program.validate`) runs when it is saved and before every run.
 
 ```json
@@ -24,7 +24,7 @@ After an `if`, only what both branches define exists.
 | block | does | writes |
 |---|---|---|
 | `ask` | one request to a model (`prompt`, `system`, `pick`, `max_tokens`, `temperature`) | text |
-| `agent` | a task of an application (`app`, `depth`) under the person's rights and the application's tool ceiling (D103) | text |
+| `agent` | a task of an application (`app`, `depth`) under the person's rights and the application's tool ceiling (D69, D116) | text |
 | `check` | a model reads `in` (against `question`) and answers `ok` + `issues`; `ok` with issues is not ok | verdict |
 | `revise` | a model rewrites `draft` with the `issues`; default pick: the author's model | text |
 | `set` | a text from a template | text |
