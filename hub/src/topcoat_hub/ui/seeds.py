@@ -336,10 +336,11 @@ async def ensure_builtin(sessionmaker: async_sessionmaker[AsyncSession]) -> int:
         try:
             templates = builtin_templates()
         except (OSError, ValueError, agent_contract.ContractError) as exc:
+            # only the programs depend on the contracts; the profiles below are still written
             log.error(
                 "ui: the contracts cannot be read (%s), built-in workspaces are not written", exc
             )
-            return 0
+            templates = []
         for key in RETIRED_BUILTINS:
             retired = await db.get(UiTemplate, key)
             if retired is not None and retired.builtin:

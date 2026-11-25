@@ -4,7 +4,11 @@ a new revision, and a row of a newer revision is left alone."""
 
 from typing import Any
 
-from topcoat_hub.models import UiTemplate
+from sqlalchemy import select
+
+from topcoat_hub.agent_contract import ContractError
+from topcoat_hub.models import UiProfile, UiTemplate
+from topcoat_hub.ui import seeds
 from topcoat_hub.ui.seeds import builtin_templates, contract_scope, ensure_builtin
 
 
@@ -62,3 +66,28 @@ async def test_a_row_of_a_newer_revision_is_left_alone(client) -> None:
                 await db.delete(row)
                 await db.commit()
         await ensure_builtin(sm)
+
+
+async def test_unreadable_contracts_skip_the_programs_but_not_the_profiles(
+    client, monkeypatch
+) -> None:
+    """A broken contract keeps the stored programs as they are (no program without tools), and the
+    built-in profiles, which do not depend on the contracts, are still written."""
+    sm = client.app.state.sessionmaker
+
+    def broken() -> list[dict[str, Any]]:
+        raise ContractError("admin.json: broken")
+
+    async with sm() as db:
+        guest = (await db.scalars(select(UiProfile).where(UiProfile.name == "guest"))).one()
+        await db.delete(guest)
+        admin = await db.get(UiTemplate, "admin")
+        assert admin is not None
+        before = admin.agent
+        await db.commit()
+    monkeypatch.setattr(seeds, "builtin_templates", broken)
+    assert await ensure_builtin(sm) == 1  # the guest profile
+    async with sm() as db:
+        assert (await db.scalars(select(UiProfile).where(UiProfile.name == "guest"))).one()
+        row = await db.get(UiTemplate, "admin")
+        assert row is not None and row.agent == before
