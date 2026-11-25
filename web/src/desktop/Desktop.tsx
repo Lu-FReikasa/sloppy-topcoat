@@ -62,6 +62,7 @@ import {
   tileOf,
   type Tiles,
 } from "./dwindle";
+import { ShellFailure, ShellLoading } from "../components/ShellPage";
 import { FrameMeter } from "./FrameMeter";
 import { clientCommand, clientConfig, installClientHandlers, installEscape, installOverlayMotion } from "./client";
 import { countRender } from "./frames";
@@ -855,19 +856,8 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
     return out;
   }, [programs, modules, ctx.isAdmin, t, change, onLogout, ui.boot, setPrefs, hasSettings, state.focus, toggleTalk]);
 
-  if (ui.status === "loading" && !ui.boot) {
-    return <p className="muted dt-note dt-root">{t("layout.loading")}</p>;
-  }
-  if (!ui.boot) {
-    return (
-      <div className="dt-root dt-note" role="alert">
-        <p className="bad">{t("layout.loadFailed", { error: ui.error ?? "" })}</p>
-        <button type="button" onClick={() => void ui.reload()}>
-          {t("layout.retry")}
-        </button>
-      </div>
-    );
-  }
+  if (ui.status === "loading" && !ui.boot) return <ShellLoading />;
+  if (!ui.boot) return <ShellFailure unreachable={ui.unreachable} detail={ui.error} onRetry={ui.reload} />;
 
   const shown = visible(state);
   // a narrow screen shows the one in front; a maximised window only grows (D: the others stay

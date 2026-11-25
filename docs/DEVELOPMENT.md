@@ -188,7 +188,7 @@ Admin endpoints use `require_admin`, which accepts only the admin token — a ke
 | PUT | `/api/scheduling/default-model` | admin token only | `{model}`: the default of the pool (null = the best answering model of the pools) |
 | GET | `/v1/models` | API key or admin token | models on connected nodes (OpenAI format, `topcoat.nodes` per model) |
 | POST | `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings` | API key or admin token | OpenAI-compatible gateway (E1-05, HUB-API "Model gateway") |
-| GET | `/api/stream` | admin token | Server-Sent Events: `node_updated`, `node_event` |
+| GET | `/api/stream` | admin token | Server-Sent Events: `node_updated`, `node_event`; a keepalive comment every `TOPCOAT_SSE_KEEPALIVE_SECONDS` (2 s), since the GUI shows the hub as lost after 5 s without a byte |
 | GET | `/api/tls`, `/api/tls/ca.pem` | none | TLS mode, CA fingerprint, CA certificate |
 | POST | `/api/node/pair` | pairing code | node pairing (see docs/PROTOCOL.md) |
 | POST | `/api/node/challenge` | none | single-use nonce for the node session |
