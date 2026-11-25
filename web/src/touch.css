@@ -1,0 +1,71 @@
+/* Phones and touch (issue #78). In the narrow layout (below NARROW_PX, layout/useNarrow.ts) every
+   control is a touch target of at least 40 px and every text field shows at least 16 px text, so iOS
+   Safari does not zoom the page when a field gets the focus. Loaded after every other style sheet
+   (main.tsx), so these floors hold against a page's own smaller sizes. Wider windows keep the
+   pages' own sizes. */
+
+@media (max-width: 759px) {
+  /* text fields: 16 px or the size the page gave them, whichever is larger. !important because the
+     floor must hold against every page's own field size, and it only ever raises a size. */
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em) !important;
+  }
+
+  /* touch targets: buttons, fields, the summary line of a fold, tabs */
+  button,
+  select,
+  summary,
+  [role="tab"],
+  [role="button"],
+  input:not([type="checkbox"], [type="radio"], [type="color"], [type="hidden"]),
+  .block-tree > li[tabindex] {
+    min-height: 40px;
+    box-sizing: border-box;
+  }
+
+  button,
+  [role="tab"],
+  [role="button"],
+  .dt-task,
+  .dt-titlebar-buttons button {
+    min-width: 40px;
+  }
+
+  /* a fold's summary is one line of text: centre it in its 40 px */
+  summary {
+    padding-block: max(0px, calc((40px - 1lh) / 2));
+  }
+
+  /* a checkbox or a radio is hit through its label: the label is the 40 px target */
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="radio"]) {
+    min-height: 40px;
+    min-width: 40px;
+    justify-content: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    box-sizing: border-box;
+  }
+
+  label:has(> input[type="checkbox"]) > input[type="checkbox"],
+  label:has(> input[type="radio"]) > input[type="radio"] {
+    flex: none;
+    width: auto;
+    margin: 0;
+  }
+
+  /* links that stand on their own (a link inside a sentence keeps the line's height) */
+  .archive-list li > a,
+  td.model-name > a,
+  .mt-title > a,
+  .link-row > a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    min-width: 40px;
+  }
+}

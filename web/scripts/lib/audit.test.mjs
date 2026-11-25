@@ -62,6 +62,35 @@ describe("the measurements", () => {
     expect(violations[0].selector).toContain("button");
   });
 
+  it("measures a checkbox or a radio by its label when the label is larger", () => {
+    const { violations } = audit(
+      ["target_size"],
+      `<label data-box="0,0,120,44"><input type="checkbox" data-box="4,14,16,16"> big label</label>` +
+        `<label data-box="0,60,30,20"><input type="radio" id="r" data-box="4,62,16,16"> small</label>` +
+        `<input type="checkbox" data-box="0,100,16,16" aria-label="no label">`,
+    );
+    expect(violations.map((v) => [v.width, v.height])).toEqual([[30, 20], [16, 16]]);
+  });
+
+  it("lets a link inside a sentence keep the line's height, but not a link on its own", () => {
+    const { violations } = audit(
+      ["target_size"],
+      `<p>See the <a href="#a" data-box="0,0,60,18">models page</a> for more.</p>` +
+        `<p><a href="#b" data-box="0,40,60,18">alone</a></p>`,
+    );
+    expect(violations.map((v) => [v.width, v.height])).toEqual([[60, 18]]);
+    expect(violations[0].selector).toContain("a");
+  });
+
+  it("leaves out what sits in a closed fold, but not its summary", () => {
+    const { violations } = audit(
+      ["target_size"],
+      `<details><summary data-box="0,0,60,20">Options</summary><button data-box="0,30,20,20">hidden</button></details>` +
+        `<details open><summary data-box="0,60,60,44">Open</summary><button data-box="0,110,20,20">shown</button></details>`,
+    );
+    expect(violations.map((v) => [v.width, v.height])).toEqual([[60, 20], [20, 20]]);
+  });
+
   it("finds interactive elements that overlap, but not one inside another", () => {
     const { violations } = audit(
       ["overlap"],

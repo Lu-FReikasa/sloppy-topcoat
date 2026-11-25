@@ -170,6 +170,18 @@
   border-radius: calc(var(--radius, 12px) + 6px);
 }
 
+/* the message box takes the row and grows with the text from 3 to 10 lines (growTextarea.ts sets the
+   height; the limits here hold while it has not run yet), then scrolls inside. In a low window (a
+   phone held sideways) it stops at under half the window's height, so the stream stays visible. */
+.talk-composer textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.45;
+  resize: none;
+  min-height: calc(3 * 1.45em + 1rem + 2px);
+  max-height: min(calc(10 * 1.45em + 1rem + 2px), 45dvh);
+}
+
 .talk-composer button {
   min-height: 2.4rem;
   border-radius: 999px;
