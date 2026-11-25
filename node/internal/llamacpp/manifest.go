@@ -63,8 +63,12 @@ func Pinned() Manifest {
 	return m
 }
 
-// ParseManifest decodes and validates a manifest.
-func ParseManifest(b []byte) (Manifest, error) {
+// ParseManifest decodes and validates a manifest of llama.cpp releases (tags b<number>).
+func ParseManifest(b []byte) (Manifest, error) { return ParseManifestFor(b, releaseRe) }
+
+// ParseManifestFor validates the release tags against tagRe instead (another project's pins, e.g.
+// stable-diffusion.cpp's master-<n>-<commit>).
+func ParseManifestFor(b []byte, tagRe *regexp.Regexp) (Manifest, error) {
 	var m Manifest
 	if err := json.Unmarshal(b, &m); err != nil {
 		return m, err
@@ -73,7 +77,7 @@ func ParseManifest(b []byte) (Manifest, error) {
 		return m, fmt.Errorf("default release %q is not listed", m.Default)
 	}
 	for tag, rel := range m.Releases {
-		if !releaseRe.MatchString(tag) {
+		if !tagRe.MatchString(tag) {
 			return m, fmt.Errorf("release %q: bad tag", tag)
 		}
 		for _, b := range rel.Builds {

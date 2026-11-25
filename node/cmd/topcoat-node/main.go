@@ -48,6 +48,7 @@ import (
 	"topcoat/node/internal/providers/sysinfo"
 	"topcoat/node/internal/providers/watcher"
 	"topcoat/node/internal/restartproxy"
+	"topcoat/node/internal/sdcpp"
 	"topcoat/node/internal/service"
 	"topcoat/node/internal/servicebus"
 	"topcoat/node/internal/sethub"
@@ -380,6 +381,7 @@ func cmdRun(ctx context.Context, args []string, stderr io.Writer) int {
 		opts.Watcher = watcher.NewSystem()
 		opts.NewRunner = realRunner(d.Path, opts.GPU, opts.SysInfo, logger)
 		opts.NewCapabilities = realCapabilities(logger, d.Path)
+		opts.NewImageRunner = realImageRunner(d.Path, opts.GPU, logger)
 	}
 
 	var bus *servicebus.Bus
@@ -583,6 +585,38 @@ func realRunner(dataDir string, gpus gpu.GPUProvider, sys sysinfo.Provider, logg
 			GuardReserveMB: guardReserve,
 			MaxContext:     c.MaxContextLength,
 		})
+	}
+}
+
+// realImageRunner returns the factory of the image runner for config.images (D126): the pinned
+// stable-diffusion.cpp build for this platform and GPU, installed below <data dir>/runtime-sd when
+// the first image model loads.
+func realImageRunner(dataDir string, gpus gpu.GPUProvider, logger *slog.Logger) func(*protocol.ImagesConfig) runner.ImageRunner {
+	return func(c *protocol.ImagesConfig) runner.ImageRunner {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		detected, _ := gpus.GPUs(ctx)
+		cancel()
+		vendors := make([]string, 0, len(detected))
+		for _, g := range detected {
+			vendors = append(vendors, g.Vendor)
+		}
+		pins := sdcpp.Pinned()
+		backend := sdcpp.SelectBackend(runtime.GOOS, c.Backend, vendors)
+		if _, err := pins.Build(pins.Default, runtime.GOOS, backend); err != nil {
+			logger.Warn("no stable-diffusion.cpp build for this backend; using the CPU", "backend", backend, "err", err)
+			backend = llamacpp.BackendCPU
+		}
+		logger.Info("image runner selected", "release", pins.Default, "backend", backend)
+		s := runner.NewSDServer(runner.SDServerOptions{
+			DataDir:   dataDir,
+			ModelDirs: c.ModelDirs,
+			Backend:   backend,
+			Release:   pins.Default,
+			Installer: sdcpp.NewInstaller(filepath.Join(dataDir, "runtime-sd")),
+			Logger:    logger,
+		})
+		s.EnsureDir()
+		return s
 	}
 }
 

@@ -646,6 +646,29 @@
         }
       }
     },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "the image runner (stable-diffusion.cpp's sd-server, D126): a pinned official build, downloaded when the first image model loads, bound to 127.0.0.1; absent = off",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "backend": {
+          "type": "string",
+          "enum": ["auto", "vulkan", "cuda", "cpu"],
+          "description": "default auto; there is no Linux CUDA build, Linux uses vulkan or cpu"
+        },
+        "model_dirs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "extra read-only directories with image models (besides <data dir>/image-models)"
+        }
+      }
+    },
     "transfer": {
       "type": "object",
       "additionalProperties": false,

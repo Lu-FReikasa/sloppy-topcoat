@@ -208,6 +208,51 @@
             }
           }
         },
+        "images": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["release", "backend", "installed", "models", "loaded"],
+          "description": "the image runner (D126); absent = switched off",
+          "properties": {
+            "release": {
+              "type": "string"
+            },
+            "backend": {
+              "type": "string"
+            },
+            "installed": {
+              "type": "boolean"
+            },
+            "models": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "format"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "size_bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": ["gguf", "safetensors"]
+                  }
+                }
+              }
+            },
+            "loaded": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
         "update": {
           "type": "object",
           "additionalProperties": false,

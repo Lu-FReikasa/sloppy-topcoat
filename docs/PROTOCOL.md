@@ -325,6 +325,18 @@ the prerequisite of the OpenAI-compatible `tools` / `tool_calls`; b11223 has it 
 node passes it explicitly). llama-server's own agent tools (`--tools`, `--agent`, `--mcp-…`: shell
 and files) are never enabled. Both keys are additive in v1.
 
+### Image runner (D126)
+`config.images {enabled, backend?: auto|vulkan|cuda|cpu, model_dirs?}` switches on the node's second
+runner: stable-diffusion.cpp's `sd-server`, a pinned official release (`node/internal/sdcpp/releases.json`,
+SHA-256 = GitHub's asset digests) installed below `<data dir>/runtime-sd` when the first image
+model loads. Image models are `.gguf` and `.safetensors` files in `<data dir>/image-models` and
+`model_dirs` (pickle-based `.ckpt`/`.pt` are not offered: loading one can run code). One image model
+runs at a time, started with `--listen-ip 127.0.0.1` on a free port. `sd-server` has **no API key**
+(none in the pinned release nor in master of 2026-11-25), so it is protected only by loopback and the
+random port. There is no official Linux CUDA build: Linux NVIDIA uses Vulkan; the Linux builds need
+glibc 2.43 (Ubuntu 26.04). The inventory reports `images {release, backend, installed, models[],
+loaded[]}`. The actions `image.generate` / `image.edit` follow with milestone P6. Additive in v1.
+
 **Tool mode of the agent (hub).** How the agent talks to a model is set per model — hub setting
 `agent_tool_modes`, `GET/PUT /api/agent/settings` (PUT admin) — to `native` (one function per
 capability plus `finish`, `tool_choice: required`, results as `tool` messages), `json` (the
@@ -1121,6 +1133,7 @@ Additive changes in v1 (no version bump):
   `hardware.disk_total_mb` / `disk_free_mb`, error codes `insufficient_memory` /
   `insufficient_disk`, event `benchmark_error`, `benchmark_finished.failed_runs`.
 - E3-01c: `config.runner.jinja`, `config.runner.model_jinja`; hub `GET/PUT /api/agent/settings`.
+- D126 (#44): `config.images`, inventory `images`.
 - E3-05 (hub only): memory notes `kind`, `stage`, `expires_at`, `verify_with`, usage and feedback
   counters, status `archived`; `POST /api/memory/{id}/feedback`, `/archive`, `/api/memory/care`;
   runs of kind `care`; agent task origin `care`.

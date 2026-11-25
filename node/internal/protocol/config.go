@@ -294,6 +294,8 @@ type NodeConfig struct {
 	Update *UpdateConfig `json:"update,omitempty"`
 	// Transfer configures the direct model transfer between nodes (E2-07, D51); nil = defaults.
 	Transfer *TransferConfig `json:"transfer,omitempty"`
+	// Images switches the image runner on (stable-diffusion.cpp, D126); nil = off.
+	Images *ImagesConfig `json:"images,omitempty"`
 }
 
 // Direct model transfer defaults (E2-07).
@@ -514,6 +516,31 @@ func sameNetTargets(a, b []NetTarget) bool {
 		}
 	}
 	return true
+}
+
+// ImagesConfig is config.images (D126): the image runner of a node.
+type ImagesConfig struct {
+	// Enabled starts the image runner (nothing is downloaded or started before a model loads).
+	Enabled bool `json:"enabled"`
+	// Backend of the sd.cpp build: auto (default), vulkan, cuda (Windows only) or cpu.
+	Backend string `json:"backend,omitempty"`
+	// ModelDirs are extra read-only directories scanned for image models.
+	ModelDirs []string `json:"model_dirs,omitempty"`
+}
+
+// On reports whether the image runner is switched on.
+func (c *ImagesConfig) On() bool { return c != nil && c.Enabled }
+
+// Equal reports whether two image configs are the same (nil = off).
+func (c *ImagesConfig) Equal(o *ImagesConfig) bool {
+	var a, b ImagesConfig
+	if c != nil {
+		a = *c
+	}
+	if o != nil {
+		b = *o
+	}
+	return a.Enabled == b.Enabled && a.Backend == b.Backend && sameStrings(a.ModelDirs, b.ModelDirs)
 }
 
 // Equal reports whether two tools configs are the same (nil = empty).
@@ -856,6 +883,13 @@ func ParseNodeConfig(raw []byte) (NodeConfig, error) {
 
 // Validate checks the fields the node relies on.
 func (c *NodeConfig) Validate() error {
+	if c.Images != nil {
+		switch c.Images.Backend {
+		case "", BackendAuto, BackendCUDA, BackendVulkan, BackendCPU:
+		default:
+			return fmt.Errorf("config: unknown images.backend %q", c.Images.Backend)
+		}
+	}
 	switch c.Runner.Type {
 	case RunnerLlamaServer, RunnerFake, RunnerNone:
 	default:
