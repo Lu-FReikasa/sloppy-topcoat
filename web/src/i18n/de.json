@@ -2327,42 +2327,16 @@
       "people": "Personen"
     }
   },
-  "marks": {
-    "kindLabel": "Art der Markierung",
-    "kind": {
-      "comment": "Kommentar",
-      "postit": "Post-it",
-      "sticker": "Aufkleber",
-      "highlight": "Textmarker"
-    },
-    "author": {
-      "recheck": "Nachprüfung",
-      "chat": "Chat",
-      "research": "Recherche",
-      "dev": "Dev",
-      "admin": "Admin"
-    },
-    "text": "Darauf schreiben …",
-    "add": "Aufkleben",
-    "done": "Erledigt",
-    "reopen": "Wieder öffnen",
-    "remove": "Entfernen",
-    "failed": "Die Markierungen konnten nicht geladen oder gespeichert werden."
-  },
   "inbox": {
     "title": "Posteingang",
     "tabInbox": "Inbox",
-    "tabFiled": "Abgelegt",
     "all": "Alle",
     "empty": "Nichts wartet auf dich.",
-    "filedEmpty": "Hier ist noch nichts abgelegt.",
     "loadFailed": "Die Inbox konnte nicht geladen werden.",
     "retry": "Noch einmal",
     "urgent": "dringend",
     "unresolved": "braucht deine Aufmerksamkeit",
     "show": "Zeigen",
-    "pin": "An die Pinnwand heften",
-    "unpin": "Von der Pinnwand nehmen",
     "resolve": "Als erledigt markieren",
     "close": "Schließen",
     "delete": "Löschen",
@@ -2384,16 +2358,23 @@
       "tasks_resumed": "Aufgaben laufen weiter, weil ein Rechner online ist",
       "project_reminder": "Eine Erinnerung an eine Aufgabe ist fällig",
       "project_digest": "Deine überfälligen Aufgaben",
-      "fix_blocked": "Ein Fix wartet auf dich: die Entwürfe scheitern immer wieder"
+      "fix_blocked": "Ein Fix wartet auf dich: die Entwürfe scheitern immer wieder",
+      "handover_result": "Eine Antwort ist zurück",
+      "handover_failed": "Eine Übergabe ist gescheitert"
     },
     "bundle": {
       "title": "{{count}} Hinweise vom zweiten Blick",
       "errors": "{{count}} mit Fehler",
-      "settle": "Alle ablegen",
-      "settling": "Lege ab …"
+      "settle": "Alle als gelesen markieren",
+      "settling": "Markiere …"
     },
     "readAll": "Alle als gelesen markieren",
-    "readAllHint": "Legt alles ab. Was noch auf eine Aktion von dir wartet, bleibt stehen."
+    "readAllHint": "Markiert alles als gelesen. Was noch auf eine Aktion von dir wartet, bleibt.",
+    "group": {
+      "decide": "Entscheiden",
+      "errors": "Fehler",
+      "results": "Ergebnisse"
+    }
   },
   "handover": {
     "class": {

@@ -194,7 +194,7 @@ The programs (Chat, Research, Development, Administration, Projects), their righ
 | [D65](decisions/D65.md) | Hand-over between applications | Amended |
 | [D72](decisions/D72.md) | The chat model may propose a hand-over | Current |
 | [D63](decisions/D63.md) | The incognito folder | Current |
-| [D111](decisions/D111.md) | The inbox has no marks, no board and no re-check | Decided, not built |
+| [D111](decisions/D111.md) | The inbox has no marks, no board and no re-check | Current |
 | [D68](decisions/D68.md) | Marks and the regular re-check | Replaced |
 
 ### Chat and answers

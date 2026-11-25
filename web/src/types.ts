@@ -1843,7 +1843,10 @@ export interface ConversationThread {
 
 // --- the inbox (docs/PLATFORM.md, 3.7) ------------------------------------------------------------
 
-export type InboxView = "inbox" | "board" | "filed";
+/** Where an item stands in the list (D111): it waits for a decision, something went wrong, or it
+ *  is a result. */
+export const INBOX_GROUPS = ["decide", "errors", "results"] as const;
+export type InboxGroup = (typeof INBOX_GROUPS)[number];
 
 /** Something that happened and wants to be read. `ref` says which window shows the matter. */
 export interface InboxItem {
@@ -1857,26 +1860,9 @@ export interface InboxItem {
   /** Urgent and not yet settled: reading it does not put it away. */
   unresolved: boolean;
   read: boolean;
-  pinned: boolean;
-  filed: boolean;
+  group: InboxGroup;
   created_at: string | null;
   read_at: string | null;
-  resolved_at: string | null;
-}
-
-export const MARK_KINDS = ["comment", "postit", "sticker", "highlight"] as const;
-export type MarkKind = (typeof MARK_KINDS)[number];
-
-/** A mark on an item (docs/PLATFORM.md, 3.7): data on the item, never a change of its text. */
-export interface ItemMark {
-  id: string;
-  item_id: string;
-  /** "person", an application key, or "recheck". */
-  author: string;
-  kind: MarkKind;
-  text: string;
-  line: number | null;
-  created_at: string | null;
   resolved_at: string | null;
 }
 
