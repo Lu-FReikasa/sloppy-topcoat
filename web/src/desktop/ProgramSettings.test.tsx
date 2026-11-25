@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ApiClient } from "../api/client";
+import i18n from "../i18n";
 import { ShelfPage } from "../library/ShelfPage";
 import { mockFetch } from "../test/mockFetch";
 import { ProgramSettings } from "./ProgramSettings";
@@ -8,7 +9,7 @@ import { ProgramSettings } from "./ProgramSettings";
 describe("ProgramSettings", () => {
   it("shows the contract of the program's employee in words", async () => {
     const mock = mockFetch({
-      "GET /api/ui/workspaces/dev/agent": {
+      "GET /api/ui/workspaces/dev/agent?language=de": {
         tool_scope: { nodes: null, groups: ["workshop"], internet: false },
         contract: {
           key: "dev",
@@ -34,6 +35,37 @@ describe("ProgramSettings", () => {
     expect(card.textContent).not.toContain("Was deinen Klick braucht"); // an empty part is left out
   });
 
+  it("asks for the contract in the GUI's language and shows it in English", async () => {
+    await i18n.changeLanguage("en");
+    const mock = mockFetch({
+      "GET /api/ui/workspaces/dev/agent?language=en": {
+        tool_scope: { nodes: null, groups: ["workshop"], internet: false },
+        contract: {
+          key: "dev",
+          language: "en",
+          title: "Development",
+          purpose: "Code, tests and branches.",
+          tasks: [{ text: "Read and explain code", example: "Where does the hub load a model?" }],
+          tools: ["read the repository in the workshop"],
+          never: ["push to main or merge"],
+          needs_click: ["applying and testing a draft in the workshop"],
+          talks_to: [{ to: "Administration", for: "questions about the running system" }],
+        },
+      },
+      "GET /api/chat/tools?application=dev": { groups: [], nodes: [], internet: { node: null } },
+      "GET /api/memory/tags": { tags: [], programs: [], responsible: [], max_depth: 4 },
+    });
+    render(<ProgramSettings api={new ApiClient({ token: "t", fetchImpl: mock.fetch })} workspace="dev" />);
+    const card = await screen.findByTestId("program-contract");
+    expect(card.textContent).toContain("What Development is for");
+    expect(card.textContent).toContain(
+      "Read and explain code (for example: “Where does the hub load a model?”)",
+    );
+    expect(card.textContent).toContain("What needs your click");
+    expect(card.textContent).toContain("Administration: questions about the running system");
+    expect(card.textContent).not.toContain("„");
+  });
+
   it("shows the frame, what the program may use and the sensitive branches it may see", async () => {
     const health = {
       id: "h",
@@ -50,7 +82,7 @@ describe("ProgramSettings", () => {
       notes: 0,
     };
     const mock = mockFetch({
-      "GET /api/ui/workspaces/research/agent": {
+      "GET /api/ui/workspaces/research/agent?language=de": {
         tool_scope: { nodes: null, groups: ["notes"], internet: true },
         frame: { tone: "Thorough and neutral.", rules: ["Name the sources."] },
       },
@@ -74,7 +106,7 @@ describe("ProgramSettings", () => {
 
   it("lists what the program may use even when no machine offers it now", async () => {
     const mock = mockFetch({
-      "GET /api/ui/workspaces/research/agent": {
+      "GET /api/ui/workspaces/research/agent?language=de": {
         tool_scope: { nodes: null, groups: ["notes"], internet: true },
       },
       "GET /api/chat/tools?application=research": { groups: [], nodes: [], internet: { node: null } },
@@ -88,7 +120,7 @@ describe("ProgramSettings", () => {
 
   it("says when a program has no tools at all", async () => {
     const mock = mockFetch({
-      "GET /api/ui/workspaces/inbox/agent": {
+      "GET /api/ui/workspaces/inbox/agent?language=de": {
         tool_scope: { nodes: null, groups: [], internet: false },
       },
       "GET /api/chat/tools?application=inbox": { groups: [], nodes: [], internet: { node: null } },

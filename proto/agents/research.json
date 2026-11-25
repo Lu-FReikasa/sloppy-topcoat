@@ -13,12 +13,16 @@
   "tasks": [
     {
       "de": "Öffentliche Quellen finden, lesen und vergleichen",
+      "en": "Find, read and compare public sources",
       "example_de": "Vergleiche Ollama und llama.cpp für 8 GB VRAM.",
+      "example_en": "Compare Ollama and llama.cpp for 8 GB of VRAM.",
       "output": "report"
     },
     {
       "de": "Eine Liste Punkt für Punkt mit Belegen prüfen",
+      "en": "Check a list point by point, with evidence",
       "example_de": "Stimmen diese fünf Versionsangaben?",
+      "example_en": "Are these five version numbers right?",
       "output": "table"
     }
   ],
@@ -45,7 +49,13 @@
       "deine Hostnamen, Adressen oder Daten ins Web schicken",
       "eine Freigabe selbst erteilen, ausweiten oder einen Klick von dir vorwegnehmen"
     ],
-    "needs_click_de": []
+    "never_en": [
+      "present claims without a source as fact",
+      "send your hostnames, addresses or data to the web",
+      "grant or widen an approval myself, or take a click of yours for granted"
+    ],
+    "needs_click_de": [],
+    "needs_click_en": []
   },
   "outputs": [
     "check"
@@ -53,7 +63,8 @@
   "talks_to": [
     {
       "to": "project",
-      "for_de": "Ergebnisse als Bericht an eine Aufgabe"
+      "for_de": "Ergebnisse als Bericht an eine Aufgabe",
+      "for_en": "results as a report on a task"
     }
   ],
   "model_role": "general",

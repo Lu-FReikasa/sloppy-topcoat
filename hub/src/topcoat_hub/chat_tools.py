@@ -225,7 +225,8 @@ def asks_about_abilities(text: str) -> bool:
 
 
 def abilities_hint(contract_text: str) -> str:
-    """For the answer to such a question: the contract in German, and to say it in words."""
+    """For the answer to such a question: the contract (in the person's language), and to say it
+    in words."""
     return (
         "(The person asks what you can do. Answer from this description of you, in their "
         "language and in plain words: what you are for, what you may use, what you never do, "

@@ -32,7 +32,9 @@ function ContractList({ title, items }: { title: string; items: string[] }) {
  *  What it may use is listed whether or not a machine offers it right now; what no connected
  *  machine offers is marked. */
 export function ProgramSettings({ api, workspace }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // the contract comes in the language the GUI shows (the person's, else the browser's)
+  const language = i18n.resolvedLanguage === "de" ? "de" : "en";
   const [ceiling, setCeiling] = useState<UiAgentDefaults["tool_scope"] | null>(
     null,
   );
@@ -43,7 +45,7 @@ export function ProgramSettings({ api, workspace }: Props) {
 
   useEffect(() => {
     let alive = true;
-    api.uiWorkspaceAgent(workspace).then(
+    api.uiWorkspaceAgent(workspace, language).then(
       (a) => {
         if (!alive) return;
         setCeiling(
@@ -61,7 +63,7 @@ export function ProgramSettings({ api, workspace }: Props) {
     return () => {
       alive = false;
     };
-  }, [api, workspace]);
+  }, [api, workspace, language]);
 
   const reachable = new Set(reach?.groups.map((g) => g.key) ?? []);
   const away = (ok: boolean) =>
@@ -77,9 +79,8 @@ export function ProgramSettings({ api, workspace }: Props) {
           <p>{contract.purpose}</p>
           <ContractList
             title={t("program.contractTasks")}
-            items={contract.tasks.map(
-              (x) =>
-                `${x.text} (${t("program.contractExample")}: „${x.example}“)`,
+            items={contract.tasks.map((x) =>
+              t("program.contractTask", { text: x.text, example: x.example }),
             )}
           />
           <ContractList

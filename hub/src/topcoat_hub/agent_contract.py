@@ -10,12 +10,13 @@ Who uses it:
 - the agent prompt (agent_prompts.for_application): the role sentence and its own rules in place of
   the shared bullets about machines (Development and Projekte; the others keep the shared prompt);
 - the registry's responsibility of an application (messages.responsibility);
-- the self-description: a short German one (at most :data:`SHORT_CHARS`) in front of every chat
-  turn, so "what can you do" is answered in words, and a long one for the chat's function
+- the self-description: a short one (at most :data:`SHORT_CHARS`) in front of every chat turn, so
+  "what can you do" is answered in words, and a long one for the chat's function
   ``about_abilities`` and the GUI (``/api/ui/workspaces/<key>/agent``). Neither names a function.
+  Both are in the person's language (``de``/``en``, English by default).
 
-The text for models is English (small models follow it better), the ``*_de`` fields are for the
-person.
+The text for models (``intro``, ``rules``) is English (small models follow it better); the texts
+for the person come in both languages (``*_de`` and ``*_en``, ``purpose.de``/``purpose.en``).
 """
 
 from __future__ import annotations
@@ -48,9 +49,8 @@ class Contract:
     key: str
     raw: dict[str, Any]
 
-    @property
-    def title(self) -> str:
-        return str(self.raw["title_de"])
+    def title(self, language: str = "en") -> str:
+        return str(self.raw["title_de" if language == "de" else "title_en"])
 
     @property
     def intro(self) -> str | None:
@@ -69,7 +69,7 @@ class Contract:
         """Its tool groups, without the internet (that is a switch of its own)."""
         return [t["group"] for t in self.raw["tools"] if t["group"] != "internet"]
 
-    def purpose(self, language: str = "de") -> str:
+    def purpose(self, language: str = "en") -> str:
         texts = self.raw["purpose"]
         return str(texts.get(language) or texts["en"])
 
@@ -112,34 +112,79 @@ def all_contracts() -> dict[str, Contract]:
     return dict(_load_all())
 
 
-# --- the self-description (German, deterministic, never a function name) --------------------------
+# --- the self-description (in the person's language, deterministic, never a function name) --------
+
+LANGUAGES = ("en", "de")
+
+# the fixed words of the self-description, per language
+_WORDS: dict[str, dict[str, str]] = {
+    "en": {
+        "and": " and ",
+        "i_am": "I am {title}: {purpose}",
+        "i_can": "I can {items}.",
+        "i_cannot": "I cannot {items}.",
+        "i_ask": "For that I ask {items}.",
+        "tasks": "Typical tasks:",
+        "task": "- {text} (for example: “{example}”)",
+        "tools": "What I may use:",
+        "no_tools": "- nothing but what I know",
+        "never": "What I never do:",
+        "clicks": "What needs your click:",
+        "asks": "Whom I ask:",
+    },
+    "de": {
+        "and": " und ",
+        "i_am": "Ich bin {title}: {purpose}",
+        "i_can": "Ich kann {items}.",
+        "i_cannot": "Ich kann nicht {items}.",
+        "i_ask": "Dafür frage ich {items}.",
+        "tasks": "Typische Aufgaben:",
+        "task": "- {text} (zum Beispiel: „{example}“)",
+        "tools": "Was ich benutzen darf:",
+        "no_tools": "- nichts außer meinem Wissen",
+        "never": "Was ich nie tue:",
+        "clicks": "Was deinen Klick braucht:",
+        "asks": "Wen ich frage:",
+    },
+}
 
 
-def _join(items: list[str]) -> str:
+def language_of(language: str | None) -> str:
+    """``de`` or ``en``: a language the contracts speak, English for anything else."""
+    return language if language in LANGUAGES else "en"
+
+
+def _join(items: list[str], language: str) -> str:
     items = [i for i in items if i]
     if len(items) <= 1:
         return "".join(items)
-    return ", ".join(items[:-1]) + " und " + items[-1]
+    return ", ".join(items[:-1]) + _WORDS[language]["and"] + items[-1]
 
 
-def short(application: str | None) -> str:
-    """ "Ich bin …, ich kann …, ich kann nicht …, dafür frage ich …" in at most
-    :data:`SHORT_CHARS` characters; "" without a contract."""
+def _title_of(key: str, language: str) -> str:
+    other = get(key)
+    return other.title(language) if other else key
+
+
+def short(application: str | None, language: str = "en") -> str:
+    """ "I am …, I can …, I cannot …, for that I ask …" in at most :data:`SHORT_CHARS`
+    characters, in ``language`` (``de``/``en``); "" without a contract."""
     c = get(application)
     if c is None:
         return ""
-    can = [t["say_de"] for t in c.raw["tools"]]
-    cannot = list(c.raw["limits"]["never_de"])
-    asks = [f"{get(t['to']).title if get(t['to']) else t['to']} ({t['for_de']})"
-            for t in c.raw["talks_to"]]  # fmt: skip
+    lang = language_of(language)
+    w = _WORDS[lang]
+    can = [t[f"say_{lang}"] for t in c.raw["tools"]]
+    cannot = list(c.raw["limits"][f"never_{lang}"])
+    asks = [f"{_title_of(t['to'], lang)} ({t[f'for_{lang}']})" for t in c.raw["talks_to"]]
     while True:
-        parts = [f"Ich bin {c.title}: {c.purpose('de')}"]
+        parts = [w["i_am"].format(title=c.title(lang), purpose=c.purpose(lang))]
         if can:
-            parts.append(f"Ich kann {_join(can)}.")
+            parts.append(w["i_can"].format(items=_join(can, lang)))
         if cannot:
-            parts.append(f"Ich kann nicht {_join(cannot)}.")
+            parts.append(w["i_cannot"].format(items=_join(cannot, lang)))
         if asks:
-            parts.append(f"Dafür frage ich {_join(asks)}.")
+            parts.append(w["i_ask"].format(items=_join(asks, lang)))
         text = " ".join(parts)
         if len(text) <= SHORT_CHARS:
             return text
@@ -150,43 +195,45 @@ def short(application: str | None) -> str:
         longest.pop()
 
 
-def long(application: str | None) -> str:
-    """Everything the contract says to the person, as German text (Markdown lists)."""
+def long(application: str | None, language: str = "en") -> str:
+    """Everything the contract says to the person, as text (Markdown lists) in ``language``."""
     c = get(application)
     if c is None:
         return ""
-    lines = [f"**{c.title}**: {c.purpose('de')}", "", "Typische Aufgaben:"]
-    lines += [f"- {t['de']} (zum Beispiel: „{t['example_de']}“)" for t in c.raw["tasks"]]
-    lines += ["", "Was ich benutzen darf:"]
-    lines += [f"- {t['say_de']}" for t in c.raw["tools"]] or ["- nichts außer meinem Wissen"]
-    lines += ["", "Was ich nie tue:"] + [f"- {n}" for n in c.raw["limits"]["never_de"]]
-    clicks = c.raw["limits"]["needs_click_de"]
+    lang = language_of(language)
+    w = _WORDS[lang]
+    lines = [f"**{c.title(lang)}**: {c.purpose(lang)}", "", w["tasks"]]
+    lines += [w["task"].format(text=t[lang], example=t[f"example_{lang}"]) for t in c.raw["tasks"]]
+    lines += ["", w["tools"]]
+    lines += [f"- {t[f'say_{lang}']}" for t in c.raw["tools"]] or [w["no_tools"]]
+    lines += ["", w["never"]] + [f"- {n}" for n in c.raw["limits"][f"never_{lang}"]]
+    clicks = c.raw["limits"][f"needs_click_{lang}"]
     if clicks:
-        lines += ["", "Was deinen Klick braucht:"] + [f"- {n}" for n in clicks]
+        lines += ["", w["clicks"]] + [f"- {n}" for n in clicks]
     if c.raw["talks_to"]:
-        lines += ["", "Wen ich frage:"]
-        for t in c.raw["talks_to"]:
-            other = get(t["to"])
-            lines.append(f"- {other.title if other else t['to']}: {t['for_de']}")
+        lines += ["", w["asks"]]
+        lines += [f"- {_title_of(t['to'], lang)}: {t[f'for_{lang}']}" for t in c.raw["talks_to"]]
     return "\n".join(lines)
 
 
-def view(application: str | None) -> dict[str, Any] | None:
-    """The contract for the GUI (German fields only)."""
+def view(application: str | None, language: str = "en") -> dict[str, Any] | None:
+    """The contract for the GUI, in ``language`` (``de``/``en``)."""
     c = get(application)
     if c is None:
         return None
+    lang = language_of(language)
+    limits = c.raw["limits"]
     return {
         "key": c.key,
-        "title": c.title,
-        "purpose": c.purpose("de"),
-        "tasks": [{"text": t["de"], "example": t["example_de"]} for t in c.raw["tasks"]],
-        "tools": [t["say_de"] for t in c.raw["tools"]],
-        "never": list(c.raw["limits"]["never_de"]),
-        "needs_click": list(c.raw["limits"]["needs_click_de"]),
+        "language": lang,
+        "title": c.title(lang),
+        "purpose": c.purpose(lang),
+        "tasks": [{"text": t[lang], "example": t[f"example_{lang}"]} for t in c.raw["tasks"]],
+        "tools": [t[f"say_{lang}"] for t in c.raw["tools"]],
+        "never": list(limits[f"never_{lang}"]),
+        "needs_click": list(limits[f"needs_click_{lang}"]),
         "talks_to": [
-            {"to": (get(t["to"]).title if get(t["to"]) else t["to"]), "for": t["for_de"]}
-            for t in c.raw["talks_to"]
+            {"to": _title_of(t["to"], lang), "for": t[f"for_{lang}"]} for t in c.raw["talks_to"]
         ],
     }
 
@@ -197,7 +244,7 @@ SELF_HINT = (
 )
 
 
-def prompt_block(application: str | None) -> str:
+def prompt_block(application: str | None, language: str = "en") -> str:
     """The short self-description as a block in front of a chat turn ("" without a contract)."""
-    text = short(application)
+    text = short(application, language)
     return f"{SELF_HINT}\n{text}\n\n" if text else ""

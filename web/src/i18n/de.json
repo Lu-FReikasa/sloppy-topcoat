@@ -3027,7 +3027,7 @@
     "frameHint": "Wie der Assistent dieser Anwendung antwortet. Er geht deinem eigenen Stil vor, wo sie sich unterscheiden; der Admin legt ihn fest.",
     "contract": "Wofür {{title}} da ist",
     "contractTasks": "Typische Aufgaben",
-    "contractExample": "zum Beispiel",
+    "contractTask": "{{text}} (zum Beispiel: „{{example}}“)",
     "contractTools": "Was er benutzen darf",
     "contractNever": "Was er nie tut",
     "contractClick": "Was deinen Klick braucht",
