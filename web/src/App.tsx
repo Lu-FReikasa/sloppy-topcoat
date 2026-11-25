@@ -3,7 +3,7 @@ import { heraldOf, signalTask } from "./persona/heraldNews";
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiClient, UnauthorizedError } from "./api/client";
-import { connectStream, type StreamStatus } from "./api/sse";
+import { connectStream, LOST_AFTER_MS, type StreamStatus } from "./api/sse";
 import { clearToken, loadToken, saveToken } from "./auth";
 import { announceHubMessage, parseHubMessage } from "./chat/hubMessage";
 import { announceProjectChanged, projectOfEvent } from "./project/liveProject";
@@ -122,6 +122,8 @@ function AuthedApp({ token, onLogout, onUnauthorized }: AuthedProps) {
       token,
       onUnauthorized,
       onStatus: setStatus,
+      // back within a few seconds of the hub's return, not after a long backoff
+      maxBackoffMs: LOST_AFTER_MS,
       onOpen: () => {
         // Catch up on anything missed while disconnected, the programs too: a hub that was
         // updated while away may offer other ones.

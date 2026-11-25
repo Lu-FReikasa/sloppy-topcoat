@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
-import { backoffDelay, connectStream, SseParser, type SseEvent } from "./sse";
+import { backoffDelay, connectStream, LOST_AFTER_MS, SseParser, type SseEvent } from "./sse";
 
 describe("SseParser", () => {
   it("parses a single event", () => {
@@ -119,9 +119,62 @@ describe("connectStream", () => {
     // First close -> attempt 0; network error -> attempt 1; after the
     // successful reconnect the backoff resets to attempt 0.
     expect(delays).toEqual([100, 200, 100]);
-    expect(statuses).toEqual(["live", "reconnecting", "reconnecting", "live", "reconnecting"]);
+    // one `lost` while it is away, however many attempts fail
+    expect(statuses).toEqual(["live", "lost", "live", "lost"]);
     const init = fetchImpl.mock.calls[0]?.[1];
     expect(new Headers(init?.headers).get("authorization")).toBe("Bearer tok");
+  });
+
+  it("marks the hub lost within the set time when it stops answering, and live again", async () => {
+    vi.useFakeTimers();
+    try {
+      const enc = new TextEncoder();
+      // a stream that sends one keepalive and then nothing: the hub stopped answering, the
+      // connection stays open (a proxy in between, a dead network); it ends only on abort
+      const silent = (init?: RequestInit) =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(enc.encode(": ping\n\n"));
+              init?.signal?.addEventListener("abort", () => controller.error(new Error("aborted")));
+            },
+          }),
+          { status: 200 },
+        );
+      const answers = [
+        (init?: RequestInit) => Promise.resolve(silent(init)),
+        () => Promise.reject(new TypeError("Failed to fetch")),
+        () => Promise.reject(new TypeError("Failed to fetch")),
+        (init?: RequestInit) => Promise.resolve(silent(init)),
+      ];
+      let call = 0;
+      const fetchImpl = vi.fn((_url: string, init?: RequestInit) => {
+        const next = answers[call++];
+        return next ? next(init) : new Promise<Response>(() => undefined);
+      });
+      const statuses: string[] = [];
+      const stop = connectStream({
+        url: "/api/stream",
+        token: "tok",
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        onEvent: () => undefined,
+        onStatus: (s) => statuses.push(s),
+        sleep: async () => undefined,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(statuses).toEqual(["live"]);
+      await vi.advanceTimersByTimeAsync(LOST_AFTER_MS - 100);
+      expect(statuses).toEqual(["live"]);
+      expect(LOST_AFTER_MS).toBeLessThanOrEqual(5000);
+      // the silence passes the set time: lost; the failed attempts that follow add nothing; the
+      // fourth attempt answers again: live
+      await vi.advanceTimersByTimeAsync(100);
+      expect(statuses).toEqual(["live", "lost", "live"]);
+      expect(fetchImpl).toHaveBeenCalledTimes(4);
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("stops on 401 and reports it", async () => {

@@ -44,7 +44,7 @@
   "connection": {
     "connecting": "Verbinde …",
     "live": "Live",
-    "reconnecting": "Verbindung wird wiederhergestellt …"
+    "lost": "Hub nicht erreichbar"
   },
   "state": {
     "available": "Verfügbar",
@@ -2393,10 +2393,17 @@
     "start": "Start",
     "sheets": "Sheets"
   },
+  "shell": {
+    "unreachable": "Der Hub ist nicht erreichbar",
+    "unreachableHint": "Vielleicht startet er gerade neu, oder das Netz ist weg. Die Seite kommt von selbst zurück, sobald der Hub antwortet.",
+    "failed": "Die Arbeitsbereiche konnten nicht geladen werden",
+    "failedHint": "Versuche es noch einmal. Schlägt es weiter fehl, steht der Grund im Log des Hubs.",
+    "retrying": "Versuche …",
+    "details": "Details: {{detail}}"
+  },
   "layout": {
     "workspaces": "Arbeitsbereiche",
     "loading": "Arbeitsbereiche werden geladen …",
-    "loadFailed": "Die Arbeitsbereiche konnten nicht geladen werden: {{error}}",
     "retry": "Noch einmal",
     "failed": "{{module}} funktioniert nicht mehr.",
     "unknownModule": "Dieser Build kennt das Fenster «{{module}}» nicht. Platz und Einstellungen bleiben erhalten.",

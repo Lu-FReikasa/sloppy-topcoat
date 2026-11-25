@@ -38,7 +38,17 @@ export function auditInPage({ checks, opts }) {
   }
 
   const round = (n) => Math.round(n * 100) / 100;
+  // the content of a closed fold (<details> without open) is not on the page, only its summary is;
+  // browsers still give it a box
+  const inClosedFold = (el) => {
+    for (let d = el.parentElement?.closest("details:not([open])"); d; d = d.parentElement?.closest("details:not([open])")) {
+      const summary = [...d.children].find((c) => c.tagName === "SUMMARY");
+      if (!summary || !summary.contains(el)) return true;
+    }
+    return false;
+  };
   const visible = (el) => {
+    if (inClosedFold(el)) return false;
     const s = getComputedStyle(el);
     if (s.display === "none" || s.visibility === "hidden" || Number(s.opacity) === 0) return false;
     const r = el.getBoundingClientRect();
@@ -99,8 +109,16 @@ export function auditInPage({ checks, opts }) {
   if (run.has("target_size") || run.has("overlap")) {
     const items = interactive();
     if (run.has("target_size")) {
+      // a checkbox or a radio is hit through its label too: the larger of the two is its target
+      const targetBox = (el) => {
+        const boxes = [el, ...(["checkbox", "radio"].includes(el.type) ? [...(el.labels ?? [])] : [])].map((x) => x.getBoundingClientRect());
+        return boxes.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
+      };
+      // a link inside a sentence may keep the height of the line (WCAG 2.5.8, "inline")
+      const inSentence = (el) => el.tagName === "A" && !!el.parentElement && hasText(el.parentElement);
       for (const el of items) {
-        const r = el.getBoundingClientRect();
+        if (inSentence(el)) continue;
+        const r = targetBox(el);
         if (r.width < minTarget || r.height < minTarget) {
           add("target_size", el, { width: round(r.width), height: round(r.height), min: minTarget });
         }

@@ -44,7 +44,7 @@
   "connection": {
     "connecting": "Connecting …",
     "live": "Live",
-    "reconnecting": "Reconnecting …"
+    "lost": "Hub not reachable"
   },
   "state": {
     "available": "Available",
@@ -2393,10 +2393,17 @@
     "start": "Start",
     "sheets": "Sheets"
   },
+  "shell": {
+    "unreachable": "The hub cannot be reached",
+    "unreachableHint": "It may be restarting, or the network is down. This page comes back by itself as soon as the hub answers.",
+    "failed": "The workspaces could not be loaded",
+    "failedHint": "Try again. If it keeps failing, the hub's log says why.",
+    "retrying": "Trying …",
+    "details": "Details: {{detail}}"
+  },
   "layout": {
     "workspaces": "Workspaces",
     "loading": "Loading the workspaces …",
-    "loadFailed": "The workspaces could not be loaded: {{error}}",
     "retry": "Try again",
     "failed": "{{module}} stopped working.",
     "unknownModule": "This build does not know the window «{{module}}». Its place and settings are kept.",
