@@ -53,6 +53,7 @@ from topcoat_hub.api import theme_workshop as theme_workshop_api
 from topcoat_hub.api import tools as tools_api
 from topcoat_hub.api import ui as ui_api
 from topcoat_hub.api import updates as updates_api
+from topcoat_hub.api import vorhaben as vorhaben_api
 from topcoat_hub.api import wiki as wiki_api
 from topcoat_hub.bench.service import BenchService
 from topcoat_hub.blocks.service import BlockService
@@ -517,6 +518,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(project_api.router)
     app.include_router(messages_api.router)
     app.include_router(mandates_api.router)
+    app.include_router(vorhaben_api.router)
     app.include_router(project_export_api.router)
     app.include_router(incognito_api.router)
     app.include_router(handovers_api.router)
