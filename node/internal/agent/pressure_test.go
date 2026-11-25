@@ -74,7 +74,7 @@ func TestPressureYieldsAndReloadsResident(t *testing.T) {
 	if g := hb.GPUs[0]; g.ForeignVRAMUsedMB == nil || *g.ForeignVRAMUsedMB < 6000 || g.ForeignGPUUtil == nil || *g.ForeignGPUUtil != 95 {
 		t.Fatalf("foreign usage in heartbeat: %+v", g)
 	}
-	// the heartbeat also carries the utilisation of the whole GPU (at least the other program's share)
+	// the heartbeat also carries the utilization of the whole GPU (at least the other program's share)
 	if g := hb.GPUs[0]; g.GPUUtil == nil || *g.GPUUtil < 95 || *g.GPUUtil > 100 {
 		t.Fatalf("gpu_util in heartbeat: %+v", g)
 	}

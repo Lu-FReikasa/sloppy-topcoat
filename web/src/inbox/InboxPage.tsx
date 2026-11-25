@@ -3,9 +3,8 @@ import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
 import { formatDateTime } from "../format";
 import { requestOpen } from "../layout/intent";
-import type { InboxCounts, InboxItem, InboxView } from "../types";
+import { INBOX_GROUPS, type InboxCounts, type InboxItem } from "../types";
 import { APPLICATIONS, AppTag } from "./AppTag";
-import { ItemMarks } from "./ItemMarks";
 
 const POLL_MS = 30_000;
 
@@ -55,13 +54,12 @@ interface Props {
   tick: number;
 }
 
-/** What happened and wants to be read (docs/PLATFORM.md, 3.7). A click opens an item and marks it
- *  read: it leaves the list, and when it is closed it is filed in the corner of its application,
- *  unless it is pinned to the board. An urgent item stays in the list until its matter is settled. */
+/** What happened and wants to be read (docs/PLATFORM.md, 3.7): one list in three groups (decide,
+ *  errors, results). A click opens an item and marks it read: it leaves the list, and the thing it
+ *  is about stays in its application. An urgent item stays until its matter is settled. Nothing is
+ *  filed, pinned or marked (D111). */
 export function InboxPage({ api, tick }: Props) {
   const { t, i18n } = useTranslation();
-  const [tab, setTab] =
-    useState<Extract<InboxView, "inbox" | "filed">>("inbox");
   const [application, setApplication] = useState<string | null>(null);
   const [items, setItems] = useState<InboxItem[]>([]);
   const [counts, setCounts] = useState<InboxCounts | null>(null);
@@ -72,7 +70,7 @@ export function InboxPage({ api, tick }: Props) {
   const [settling, setSettling] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    api.inbox(tab, application ?? undefined).then(
+    api.inbox(application ?? undefined).then(
       (r) => {
         setItems(r.items);
         setCounts(r.counts);
@@ -80,7 +78,7 @@ export function InboxPage({ api, tick }: Props) {
       },
       () => setFailed(true),
     );
-  }, [api, tab, application]);
+  }, [api, application]);
 
   useEffect(() => {
     load();
@@ -116,7 +114,7 @@ export function InboxPage({ api, tick }: Props) {
     }
   }
 
-  /** Put a whole bundle away: an urgent note is settled, any other read (it is filed). */
+  /** Put a whole bundle away: an urgent note is settled, any other read. */
   async function settle(key: string, list: InboxItem[]) {
     setSettling(key);
     try {
@@ -147,31 +145,65 @@ export function InboxPage({ api, tick }: Props) {
     </button>
   );
 
+  const rowView = (row: Row) => {
+    if ("item" in row) return <li key={row.item.id}>{itemButton(row.item)}</li>;
+    const open = openBundles.includes(row.bundle);
+    const errors = row.items.filter((i) => i.kind === "review_error").length;
+    const pending = row.items.some((i) => i.unresolved || !i.read);
+    return (
+      <li key={`bundle-${row.bundle}`} className="inbox-bundle" data-testid="inbox-bundle">
+        <div className="inbox-bundle-head">
+          <button
+            type="button"
+            className={`inbox-item${errors > 0 ? " is-urgent" : ""}`}
+            aria-expanded={open}
+            onClick={() =>
+              setOpenBundles((o) => (open ? o.filter((k) => k !== row.bundle) : [...o, row.bundle]))
+            }
+          >
+            <span className="inbox-dot" aria-hidden="true">
+              {open ? "▾" : "▸"}
+            </span>
+            <AppTag application={row.bundle} />
+            <span className="inbox-title">
+              {t("inbox.bundle.title", { count: row.items.length })}
+              {errors > 0 && ` · ${t("inbox.bundle.errors", { count: errors })}`}
+            </span>
+          </button>
+          {pending && (
+            <button
+              type="button"
+              disabled={settling !== null}
+              onClick={() => void settle(row.bundle, row.items)}
+            >
+              {settling === row.bundle ? t("inbox.bundle.settling") : t("inbox.bundle.settle")}
+            </button>
+          )}
+        </div>
+        {open && (
+          <ul className="inbox-list inbox-bundle-items">
+            {row.items.map((item) => (
+              <li key={item.id}>{itemButton(item)}</li>
+            ))}
+          </ul>
+        )}
+      </li>
+    );
+  };
+
   const unread = (key: string) => counts?.applications[key] ?? 0;
   return (
     <section className="inbox" aria-label={t("inbox.title")}>
-      <div className="inbox-tabs" role="tablist">
-        {(["inbox", "filed"] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            role="tab"
-            aria-selected={tab === v}
-            className={tab === v ? "primary" : undefined}
-            onClick={() => {
-              setTab(v);
-              setReading(null);
-            }}
-          >
-            {v === "inbox" ? t("inbox.tabInbox") : t("inbox.tabFiled")}
-            {v === "inbox" && counts && counts.unread > 0 && (
-              <span className="nav-badge" data-testid="inbox-unread">
-                {counts.unread}
-              </span>
-            )}
-          </button>
-        ))}
-        {tab === "inbox" && counts && counts.unread > 0 && (
+      <div className="inbox-tabs">
+        <span className="inbox-heading">
+          {t("inbox.tabInbox")}
+          {counts && counts.unread > 0 && (
+            <span className="nav-badge" data-testid="inbox-unread">
+              {counts.unread}
+            </span>
+          )}
+        </span>
+        {counts && counts.unread > 0 && (
           <button
             type="button"
             title={t("inbox.readAllHint")}
@@ -201,7 +233,7 @@ export function InboxPage({ api, tick }: Props) {
             onClick={() => setApplication(key)}
           >
             <AppTag application={key} />
-            {tab === "inbox" && unread(key) > 0 ? ` ${unread(key)}` : ""}
+            {unread(key) > 0 ? ` ${unread(key)}` : ""}
           </button>
         ))}
       </div>
@@ -235,7 +267,6 @@ export function InboxPage({ api, tick }: Props) {
           {reading.summary && (
             <p className="inbox-summary">{reading.summary}</p>
           )}
-          <ItemMarks api={api} itemId={reading.id} tick={tick} />
           <div className="actions">
             {reading.ref.module && (
               <button
@@ -246,14 +277,6 @@ export function InboxPage({ api, tick }: Props) {
                 {t("inbox.show")}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() =>
-                void change(api.pinInboxItem(reading.id, !reading.pinned))
-              }
-            >
-              {reading.pinned ? t("inbox.unpin") : t("inbox.pin")}
-            </button>
             {reading.unresolved && (
               <button
                 type="button"
@@ -262,7 +285,7 @@ export function InboxPage({ api, tick }: Props) {
                 {t("inbox.resolve")}
               </button>
             )}
-            {reading.filed && (
+            {reading.read && !reading.unresolved && (
               <button
                 type="button"
                 className="danger"
@@ -280,56 +303,19 @@ export function InboxPage({ api, tick }: Props) {
 
       {!failed && items.length === 0 && (
         <p className="muted" data-testid="inbox-empty">
-          {tab === "inbox" ? t("inbox.empty") : t("inbox.filedEmpty")}
+          {t("inbox.empty")}
         </p>
       )}
-      <ul className="inbox-list">
-        {rowsOf(items).map((row) => {
-          if ("item" in row) return <li key={row.item.id}>{itemButton(row.item)}</li>;
-          const open = openBundles.includes(row.bundle);
-          const errors = row.items.filter((i) => i.kind === "review_error").length;
-          const pending = row.items.some((i) => i.unresolved || !i.read);
-          return (
-            <li key={`bundle-${row.bundle}`} className="inbox-bundle" data-testid="inbox-bundle">
-              <div className="inbox-bundle-head">
-                <button
-                  type="button"
-                  className={`inbox-item${errors > 0 ? " is-urgent" : ""}`}
-                  aria-expanded={open}
-                  onClick={() =>
-                    setOpenBundles((o) => (open ? o.filter((k) => k !== row.bundle) : [...o, row.bundle]))
-                  }
-                >
-                  <span className="inbox-dot" aria-hidden="true">
-                    {open ? "▾" : "▸"}
-                  </span>
-                  <AppTag application={row.bundle} />
-                  <span className="inbox-title">
-                    {t("inbox.bundle.title", { count: row.items.length })}
-                    {errors > 0 && ` · ${t("inbox.bundle.errors", { count: errors })}`}
-                  </span>
-                </button>
-                {pending && tab === "inbox" && (
-                  <button
-                    type="button"
-                    disabled={settling !== null}
-                    onClick={() => void settle(row.bundle, row.items)}
-                  >
-                    {settling === row.bundle ? t("inbox.bundle.settling") : t("inbox.bundle.settle")}
-                  </button>
-                )}
-              </div>
-              {open && (
-                <ul className="inbox-list inbox-bundle-items">
-                  {row.items.map((item) => (
-                    <li key={item.id}>{itemButton(item)}</li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      {INBOX_GROUPS.map((group) => {
+        const inGroup = items.filter((i) => i.group === group);
+        if (inGroup.length === 0) return null;
+        return (
+          <section key={group} className="inbox-group" data-testid={`inbox-group-${group}`}>
+            <h3 className="inbox-group-title">{t(`inbox.group.${group}`)}</h3>
+            <ul className="inbox-list">{rowsOf(inGroup).map(rowView)}</ul>
+          </section>
+        );
+      })}
     </section>
   );
 }

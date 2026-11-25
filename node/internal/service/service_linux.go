@@ -309,10 +309,10 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	return os.Rename(tmp, dst) // atomic even while the old binary runs
 }
 
-// IsWindowsService is false on Linux.
 // EnsureUpdaterRestarts is a Windows matter (systemd restarts the updater by its unit's Restart=).
 func EnsureUpdaterRestarts() error { return nil }
 
+// IsWindowsService is false on Linux.
 func IsWindowsService() bool { return false }
 
 // RunWindowsService is only used on Windows.
@@ -328,4 +328,12 @@ func newLinuxHost(s linuxSys) update.Host {
 		stop:    func(context.Context) error { return s.run("systemctl", "stop", Name) },
 		start:   func(context.Context) error { return s.run("systemctl", "start", Name) },
 	}
+}
+
+// stateFlag is the command line part that hands the updater's directory to node and updater.
+func stateFlag(stateDir string) string {
+	if stateDir == "" {
+		return ""
+	}
+	return " --update-state-dir " + stateDir
 }

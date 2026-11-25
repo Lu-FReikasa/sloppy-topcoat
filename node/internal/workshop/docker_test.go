@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -242,5 +243,44 @@ func TestTheStartAndTheEndOfALongOutputAreKept(t *testing.T) {
 	}
 	if keepEnds("short", 10, 10) != "short" {
 		t.Fatal("a short output was changed")
+	}
+}
+
+// openUp makes the worktree copy writable for the unprivileged test user, and a symbolic link in it
+// does not carry the chmod to a file outside the copy.
+func TestOpenUpOpensTheCopyButNotWhatALinkPointsTo(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix modes")
+	}
+	base := t.TempDir()
+	dir, outside := filepath.Join(base, "copy"), filepath.Join(base, "outside.txt")
+	if err := os.MkdirAll(filepath.Join(dir, "sub"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, mode := range map[string]os.FileMode{"sub/plain.txt": 0o600, "run.sh": 0o700} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(outside, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(dir, "link")); err != nil {
+		t.Fatal(err)
+	}
+	if err := openUp(dir); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]os.FileMode{".": 0o777, "sub": 0o777, "sub/plain.txt": 0o666, "run.sh": 0o777} {
+		st, err := os.Stat(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := st.Mode().Perm(); got != want {
+			t.Errorf("%s: mode %o, want %o", name, got, want)
+		}
+	}
+	if st, err := os.Stat(outside); err != nil || st.Mode().Perm() != 0o600 {
+		t.Errorf("the file behind the link was changed: %v %v", st.Mode().Perm(), err)
 	}
 }

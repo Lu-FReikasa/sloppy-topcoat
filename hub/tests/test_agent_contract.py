@@ -1,8 +1,15 @@
 """The employee contracts (agent_contract.py, plan step 1.9): they hold their schema, the prompts
 of Development and Projekte carry no home-lab rules, the self-description speaks in words, and the
-seeded tool ceilings stay inside what each contract says."""
+seeded tool ceilings are what each contract says."""
 
+import json
 import re
+import shutil
+from collections.abc import Callable, Iterator
+from pathlib import Path
+from typing import Any
+
+import pytest
 
 from topcoat_hub import agent_contract, agent_prompts, local_tools, messages
 from topcoat_hub.ui import seeds
@@ -53,18 +60,69 @@ def test_the_self_description_speaks_in_words() -> None:
     assert view is not None and view["title"] == "Entwicklung" and view["needs_click"]
 
 
-def test_the_seeded_tool_ceilings_lie_inside_the_contracts() -> None:
-    """The ceiling an admin starts from (ui/seeds.py) names no group the contract does not
-    explain, so the self-description covers every tool the program may use."""
-    for program in seeds.BUILTIN_TEMPLATES:
+def test_the_seeded_tool_ceilings_are_the_contracts() -> None:
+    """The ceiling an admin starts from (ui/seeds.py) is the contract's list of tools: no group and
+    no internet beyond what the contract explains, so the self-description covers every tool the
+    program may use, and nothing the contract offers is missing. Programs without a contract (Files,
+    Wiki, ...) have no tools."""
+    for program in seeds.builtin_templates():
         contract = agent_contract.get(program["key"])
-        groups = (program["agent"].get("tool_scope") or {}).get("groups")
-        if contract is None or not groups:
+        scope = program["agent"]["tool_scope"]
+        if contract is None:
+            assert scope["groups"] == [] and scope["internet"] is False, program["key"]
             continue
-        assert set(groups) <= set(contract.groups), (
-            program["key"],
-            set(groups) - set(contract.groups),
-        )
+        assert set(scope["groups"]) <= set(contract.groups), program["key"]
+        assert set(scope["groups"]) == set(contract.groups), program["key"]
+        assert scope["internet"] is contract.internet, program["key"]
+        assert scope["nodes"] is None  # a contract names no machines
+    admin = next(t for t in seeds.builtin_templates() if t["key"] == "admin")
+    assert admin["agent"]["tool_scope"]["internet"] is False  # it is not in admin.json
+
+
+def _copy_contracts(tmp_path: Path) -> Path:
+    root = tmp_path / "proto"
+    shutil.copytree(agent_contract._PROTO[0] / "agents", root / "agents")
+    return root
+
+
+def _edit(root: Path, key: str, change: Callable[[dict[str, Any]], None]) -> None:
+    path = root / "agents" / f"{key}.json"
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    change(raw)
+    path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+
+
+@pytest.fixture
+def proto_copy(tmp_path: Path) -> Iterator[Path]:
+    before = agent_contract._PROTO[0]
+    root = _copy_contracts(tmp_path)
+    agent_contract.set_proto_root(root)
+    try:
+        yield root
+    finally:
+        agent_contract.set_proto_root(before)
+
+
+def test_changing_a_contract_changes_the_seed(proto_copy: Path) -> None:
+    """One source: a tool dropped from or added to a contract is gone from or in the seed."""
+
+    def drop_github_add_internet(raw: dict[str, Any]) -> None:
+        raw["tools"] = [t for t in raw["tools"] if t["group"] != "github"]
+        raw["tools"].append({"group": "internet", "say_de": "das Web", "say_en": "the web"})
+
+    _edit(proto_copy, "dev", drop_github_add_internet)
+    agent_contract.set_proto_root(proto_copy)  # the files are cached
+    dev = next(t for t in seeds.builtin_templates() if t["key"] == "dev")
+    assert "github" not in dev["agent"]["tool_scope"]["groups"]
+    assert dev["agent"]["tool_scope"]["internet"] is True
+    assert dev["agent"]["frame"] == seeds.FRAMES["dev"]  # what the contract cannot say stays
+
+
+def test_a_broken_contract_is_an_error_not_a_program_without_tools(proto_copy: Path) -> None:
+    (proto_copy / "agents" / "admin.json").write_text("{", encoding="utf-8")
+    agent_contract.set_proto_root(proto_copy)
+    with pytest.raises(ValueError):
+        seeds.builtin_templates()
 
 
 def test_the_registry_reads_the_responsibility_from_the_contract() -> None:
