@@ -478,7 +478,6 @@ func sameFile(a, b string) bool {
 	return err1 == nil && err2 == nil && os.SameFile(sa, sb)
 }
 
-// IsWindowsService reports whether the process was started by the SCM.
 // EnsureUpdaterRestarts sets, on the updater's own service, that the SCM restarts it after a
 // non-zero exit (see installUpdater). The updater runs as LocalSystem and may change its own
 // service; it does this at every start, so an installation made before 0.2.8 is repaired by the
@@ -497,6 +496,7 @@ func EnsureUpdaterRestarts() error {
 	return s.SetRecoveryActionsOnNonCrashFailures(true)
 }
 
+// IsWindowsService reports whether the process was started by the SCM.
 func IsWindowsService() bool {
 	ok, err := svc.IsWindowsService()
 	return err == nil && ok

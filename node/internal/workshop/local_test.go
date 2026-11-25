@@ -38,7 +38,7 @@ func capOf(t *testing.T, w *Workshop, name string) capability.Capability {
 	return nil
 }
 
-func call(t *testing.T, w *Workshop, ctx context.Context, name, input string) (map[string]any, error) {
+func call(t *testing.T, w *Workshop, ctx context.Context, name, input string) (map[string]any, error) { //nolint:revive // test helper: t and the fixture come first
 	t.Helper()
 	raw, err := capOf(t, w, name).Invoke(ctx, json.RawMessage(input))
 	if err != nil {
@@ -51,7 +51,7 @@ func call(t *testing.T, w *Workshop, ctx context.Context, name, input string) (m
 	return out, nil
 }
 
-func must(t *testing.T, w *Workshop, ctx context.Context, name, input string) map[string]any {
+func must(t *testing.T, w *Workshop, ctx context.Context, name, input string) map[string]any { //nolint:revive // test helper: t and the fixture come first
 	t.Helper()
 	out, err := call(t, w, ctx, name, input)
 	if err != nil {

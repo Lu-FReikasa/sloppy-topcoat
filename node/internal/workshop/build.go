@@ -41,8 +41,8 @@ var versionRe = regexp.MustCompile(versionPatternS)
 // (never spliced into the command line). The script is the one `make build` and the maintainer use.
 var buildCmd = []string{"sh", "-c", `cd node && bash ../scripts/build-node-release.sh "$0" /work/.out`}
 
-// artefact is one file a build produced.
-type artefact struct {
+// artifact is one file a build produced.
+type artifact struct {
 	Name   string `json:"name"`
 	Bytes  int64  `json:"bytes"`
 	SHA256 string `json:"sha256"`
@@ -96,7 +96,7 @@ func (w *Workshop) capBuildNode() capability.Capability {
 			if err := w.copyWorktree(ctx, dir, run); err != nil {
 				return nil, err
 			}
-			if err := os.MkdirAll(filepath.Join(run, ".out"), 0o755); err != nil {
+			if err := os.MkdirAll(filepath.Join(run, ".out"), 0o755); err != nil { //nolint:gosec // G301: mounted into the build container like the worktree copy (copyWorktree, 0755)
 				return nil, err
 			}
 			job := Job{
@@ -122,21 +122,21 @@ func (w *Workshop) capBuildNode() capability.Capability {
 			if res.ExitCode != 0 || res.TimedOut {
 				return reply, nil
 			}
-			files, err := w.keepArtefacts(filepath.Join(run, ".out"), w.outDir(in.Repo, in.Version))
+			files, err := w.keepArtifacts(filepath.Join(run, ".out"), w.outDir(in.Repo, in.Version))
 			if err != nil {
 				return nil, err
 			}
 			reply["built"] = len(files) > 0
-			reply["artefacts"] = files
+			reply["artefacts"] = files //nolint:misspell // wire field read by the web GUI (DevWorkshop.tsx)
 			reply["folder"] = filepath.ToSlash(filepath.Join(outDirName, in.Repo, in.Version))
 			return reply, nil
 		},
 	}
 }
 
-// keepArtefacts moves the regular files of a finished build to the output folder of the version
+// keepArtifacts moves the regular files of a finished build to the output folder of the version
 // (replacing an earlier build of the same version) and describes them.
-func (w *Workshop) keepArtefacts(from, to string) ([]artefact, error) {
+func (w *Workshop) keepArtifacts(from, to string) ([]artifact, error) {
 	entries, err := os.ReadDir(from)
 	if err != nil {
 		return nil, err
@@ -158,10 +158,10 @@ func (w *Workshop) keepArtefacts(from, to string) ([]artefact, error) {
 	if err := os.RemoveAll(to); err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(to, 0o755); err != nil {
+	if err := os.MkdirAll(to, 0o755); err != nil { //nolint:gosec // G301: unsigned build output for the maintainer to sign, not secret; files are 0644 too
 		return nil, err
 	}
-	var files []artefact
+	var files []artifact
 	for _, e := range entries {
 		dst := filepath.Join(to, e.Name())
 		if err := copyFile(filepath.Join(from, e.Name()), dst, 0o644); err != nil {
@@ -177,18 +177,18 @@ func (w *Workshop) keepArtefacts(from, to string) ([]artefact, error) {
 	return files, nil
 }
 
-func describe(p string) (artefact, error) {
+func describe(p string) (artifact, error) {
 	f, err := os.Open(p)
 	if err != nil {
-		return artefact{}, err
+		return artifact{}, err
 	}
 	defer f.Close()
 	h := sha256.New()
 	n, err := io.Copy(h, f)
 	if err != nil {
-		return artefact{}, err
+		return artifact{}, err
 	}
-	return artefact{Name: filepath.Base(p), Bytes: n, SHA256: hex.EncodeToString(h.Sum(nil))}, nil
+	return artifact{Name: filepath.Base(p), Bytes: n, SHA256: hex.EncodeToString(h.Sum(nil))}, nil
 }
 
 func (w *Workshop) capBuildList() capability.Capability {
@@ -220,7 +220,7 @@ func (w *Workshop) capBuildList() capability.Capability {
 					continue
 				}
 				entries, _ := os.ReadDir(filepath.Join(base, v.Name()))
-				var files []artefact
+				var files []artifact
 				var newest time.Time
 				for _, e := range entries {
 					info, err := e.Info()

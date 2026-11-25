@@ -814,7 +814,7 @@ func TestBuildNodeKeepsUnsignedArtefactsOfTheWorktree(t *testing.T) {
 	}
 	body, err := os.ReadFile(filepath.Join(f.w.dir, "out", "demo", "0.1.6-dev1", "topcoat-node-linux-amd64"))
 	if err != nil || string(body) != "ELF" {
-		t.Fatalf("artefact: %v %q", err, body)
+		t.Fatalf("artifact: %v %q", err, body)
 	}
 	if _, err := os.Stat(filepath.Join(f.w.dir, ".runs")); err == nil {
 		if ents, _ := os.ReadDir(filepath.Join(f.w.dir, ".runs")); len(ents) > 0 {
@@ -858,7 +858,7 @@ func TestBuildNodeNeedsAnImageAndTheNodeDirectoryAndReportsFailure(t *testing.T)
 		t.Fatalf("build: %v", got)
 	}
 	if _, err := os.Stat(filepath.Join(g.w.dir, "out", "demo", "1")); err == nil {
-		t.Fatal("a failed build left artefacts")
+		t.Fatal("a failed build left artifacts")
 	}
 }
 

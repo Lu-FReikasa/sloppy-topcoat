@@ -83,11 +83,11 @@ func buildBus(ctx context.Context, dir, userName, work string, logger *slog.Logg
 		return nil, err
 	}
 	bus, err := servicebus.New(dir, []servicebus.Spec{{ID: buildcap.Service, Actions: buildsvc.Actions}},
-		func(peer uint32) (string, bool) { return buildcap.Service, peer == uint32(uid) })
+		func(peer uint32) (string, bool) { return buildcap.Service, peer == uint32(uid) }) //nolint:gosec // G115: ParseUint(…, 32) bounds uid
 	if err != nil {
 		return nil, err
 	}
-	chown := func(path, _ string) error { return os.Chown(path, int(uid), int(gid)) }
+	chown := func(path, _ string) error { return os.Chown(path, int(uid), int(gid)) } //nolint:gosec // G115: ParseUint(…, 32) bounds uid and gid; os.Chown takes int
 	if err := bus.Listen(ctx, chown); err != nil {
 		return nil, err
 	}
