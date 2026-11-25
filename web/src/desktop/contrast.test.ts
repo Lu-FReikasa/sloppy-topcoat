@@ -155,20 +155,39 @@ const ALL_HUES = Array.from({ length: FULL_CIRCLE }, (_, h) => h);
 const ANY_HUE = 140;
 const MIN_TAG_PX = 12;
 const APPS = ["chat", "research", "dev", "admin", "project"];
-/** The status badges on a signal fill (ok, warn, off): fill and text as `styles.css` pairs them. */
-const SIGNAL_BADGES = [
-  "badge-available",
-  "badge-degraded",
-  "badge-offline",
-  "badge-knowledge-ready",
-  "badge-knowledge-new",
-  "badge-knowledge-error",
-];
+/** A badge's fill and text, as `styles.css` pairs them. */
+interface Badge {
+  name: string;
+  fill: string;
+  text: string;
+}
+/** The fills of the status badges (ok, warn, off): light in the dark looks, dark inks on paper. */
+const SIGNAL_FILLS = ["var(--ok)", "var(--warn)", "var(--off)"];
 /** The badges on the accent fill take the accent's own text colour, like a primary button. The
  *  terminal's accent follows the person's hue, and around blue (220-260) it stays under 4.5:1 with
  *  any text colour: a matter of the accent, so these are measured at the default hue only. */
-const ACCENT_BADGES = ["badge-busy_gaming", "badge-knowledge-indexing"];
-const BADGES = [...SIGNAL_BADGES, ...ACCENT_BADGES];
+const ACCENT_FILL = "var(--accent)";
+/** Every badge rule of `styles.css` on one of these fills, found by its background so a new badge is
+ *  measured without being listed here; its text is its own colour or the one `.badge` gives. */
+function badges(fills: string[]): Badge[] {
+  const base = decls("styles.css", ".badge").color!;
+  return SHEETS["styles.css"]!
+    .filter((r) => r.within === "" && r.selector.includes("badge") && fills.includes(r.decls.background ?? ""))
+    .map((r) => {
+      const d = decls("styles.css", r.selector);
+      return { name: r.selector, fill: d.background!, text: d.color ?? base };
+    });
+}
+const SIGNAL_BADGES = badges(SIGNAL_FILLS);
+const BADGES = [...SIGNAL_BADGES, ...badges([ACCENT_FILL])];
+/** The unread count on the navigation, urgent: the count's text on the red of `.ws-badge-urgent`. */
+function urgentCount(): Badge {
+  return {
+    name: ".nav-badge.ws-badge-urgent",
+    fill: decls("styles.css", ".ws-badge-urgent").background!,
+    text: decls("styles.css", ".nav-badge").color!,
+  };
+}
 
 function worst(pairs: { what: string; fg: RGB; bg: RGB }[]) {
   return pairs
@@ -180,10 +199,11 @@ describe.each(["terminal", "leitstand", "schreibtisch"] as const)("the %s look o
   it("puts readable text on every status badge", () => {
     const pairs = HUES.flatMap((hue) => {
       const vars = looksVars(look, hue);
-      return (hue === ANY_HUE ? BADGES : SIGNAL_BADGES).map((b) => {
-        const d = decls("styles.css", `.${b}`);
-        return { what: `${b} hue ${hue}`, fg: colour(d.color!, vars), bg: colour(d.background!, vars) };
-      });
+      return [...(hue === ANY_HUE ? BADGES : SIGNAL_BADGES), urgentCount()].map((b) => ({
+        what: `${b.name} hue ${hue}`,
+        fg: colour(b.text, vars),
+        bg: colour(b.fill, vars),
+      }));
     });
     expect(worst(pairs)).toEqual([]);
   });
@@ -216,6 +236,19 @@ function writeBadges(vars: Vars, what: string) {
     bg: colour(d.background!, { ...vars, "--app-color": `var(--app-${app})` }),
   }));
 }
+
+describe("the status badges", () => {
+  it("are found by their fill, the unread count among them", () => {
+    expect(BADGES.map((b) => b.name)).toEqual(
+      expect.arrayContaining([".badge-available", ".badge-degraded", ".badge-offline", ".badge-busy_gaming", ".nav-badge"]),
+    );
+  });
+
+  it("are not faded by an offline machine's row", () => {
+    // opacity fades the "Offline" badge's fill and text together: 3.3:1 at 0.75 in the dark looks
+    expect(decls("styles.css", ".state-offline").opacity).toBeUndefined();
+  });
+});
 
 describe("the application tags", () => {
   it("are at least 12 px and take the button's text in the chosen filter", () => {
@@ -263,10 +296,7 @@ describe("the desk's paper", () => {
   });
 
   it("puts readable text on every status badge", () => {
-    const pairs = BADGES.map((b) => {
-      const d = decls("styles.css", `.${b}`);
-      return { what: b, fg: colour(d.color!, vars), bg: colour(d.background!, vars) };
-    });
+    const pairs = [...BADGES, urgentCount()].map((b) => ({ what: b.name, fg: colour(b.text, vars), bg: colour(b.fill, vars) }));
     expect(worst(pairs)).toEqual([]);
   });
 
