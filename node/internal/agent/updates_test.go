@@ -328,6 +328,10 @@ func TestTheNodeReportsAResultThatAppearsAfterItStarted(t *testing.T) {
 	hc.handshake(t, updateConfig(""))
 	// The updater writes its result only once the new node is up and confirmed.
 	l := update.NewLayout(dir)
+	// The real updater creates the directory before it writes (Updater.Apply); the node may not have yet.
+	if err := l.EnsureDir(); err != nil {
+		t.Fatal(err)
+	}
 	raw, _ := json.Marshal(update.Result{OK: true, Version: "0.2.0", At: "2026-10-07T20:00:00Z"})
 	if err := os.WriteFile(filepath.Join(l.Dir, "result.json"), raw, 0o644); err != nil { //nolint:gosec // test
 		t.Fatal(err)
