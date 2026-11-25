@@ -194,7 +194,8 @@
   pointer-events: none;
 }
 
-.dt-look-leitstand .dt-nav {
+.dt-look-leitstand .dt-nav,
+.dt-look-leitstand .dt-program-body > .open-chats {
   background: #070d0f;
   border-color: #16302a;
 }

@@ -580,4 +580,26 @@ describe("the overlay of the desktop client (?overlay=1)", () => {
     await waitFor(() => expect(screen.queryByRole("region", { name: "Settings" })).toBeNull());
     expect(screen.getByRole("region", { name: "Archive" })).toBeTruthy();
   });
+
+  it("keeps Start's open conversations out of its row of views, so the row stays one line high (#77)", async () => {
+    const b = bootstrap([workspace("chat", ["page.library", "page.chat"], { icon: "tc", title: "Start" })]);
+    const h = hub(
+      { ...b, prefs: { hue: 140, look: "terminal", desktop: { open: ["chat"], minimised: [], focus: "chat", maximised: null, views: {} } } },
+      undefined,
+      {
+        "GET /api/conversations": [
+          { id: "c1", title: "Why does the container restart at night?", application: "chat", open: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+        ],
+      },
+    );
+    render(<Desktop api={h.api} ctx={ctx(h.api)} uiTick={0} status="live" onSaveLanguage={() => undefined} onLogout={() => undefined} />);
+    const start = await screen.findByRole("region", { name: "Start" });
+    await within(start).findByRole("button", { name: "Why does the container restart at night?" });
+    const open = within(start).getByRole("group", { name: "Offen" });
+    const views = within(start).getByRole("navigation");
+    // the views are buttons of their own row; the list is a row (or the rail's lower part) of its own
+    expect(views.contains(open)).toBe(false);
+    expect(open.parentElement).toBe(views.parentElement);
+    expect(within(views).getAllByRole("button").map((x) => x.textContent)).toHaveLength(2);
+  });
 });

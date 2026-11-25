@@ -2125,6 +2125,7 @@ table.grants td.model-name {
 /* E3-07 D2: time on every message, a line between messages of different days */
 .message-time {
   font-variant-numeric: tabular-nums;
+  white-space: nowrap; /* "1:56 PM" on one line, also at phone width (#77) */
   cursor: help;
 }
 
@@ -3870,11 +3871,9 @@ pre.diff {
   color: hsl(var(--pg-hue, 140) 60% 65%);
 }
 
-/* Start's open conversations in its side rail, by application (2026-11-13) */
+/* Start's open conversations, by application (2026-11-13): below its views in the rail, or a row of
+   their own above the view when the window is narrow (#77; placed in desktop/desktop.css) */
 .open-chats {
-  margin-top: 0.8rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--line, #333);
   min-width: 0;
 }
 .open-chats-head {
@@ -3903,11 +3902,20 @@ pre.diff {
   gap: 0.15rem;
   min-width: 0;
 }
+.open-chats button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.open-chats button:hover,
 .open-chats-group li[aria-current="page"] .open-chats-title {
   color: var(--text);
+}
+.open-chats-group li[aria-current="page"] .open-chats-title {
   font-weight: 600;
 }
-.dt-nav .open-chats-title {
+.open-chats .open-chats-title {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -3916,15 +3924,37 @@ pre.diff {
   text-align: left;
   padding: 0.15rem 0.2rem;
 }
-.dt-nav .open-chats-act {
+.open-chats .open-chats-act {
   flex: none;
   padding: 0 0.2rem;
   opacity: 0.45;
   font-size: 0.8em;
 }
-.dt-nav .open-chats-act:hover,
-.dt-nav .open-chats-act[aria-pressed="true"] {
+.open-chats .open-chats-act:hover,
+.open-chats .open-chats-act:focus-visible,
+.open-chats .open-chats-act[aria-pressed="true"] {
   opacity: 1;
+}
+/* the row of a narrow window: every group and conversation on one line */
+@container program (max-width: 640px) {
+  .open-chats-head,
+  .open-chats-app {
+    margin: 0;
+  }
+  .open-chats-group,
+  .open-chats-group ul {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex: none;
+    margin: 0;
+  }
+  .open-chats-group li {
+    flex: none;
+  }
+  .open-chats .open-chats-title {
+    max-width: 12rem;
+  }
 }
 .open-chats-run {
   display: inline-block;

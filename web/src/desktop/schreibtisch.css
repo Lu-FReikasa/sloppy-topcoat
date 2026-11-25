@@ -137,7 +137,8 @@
 }
 
 .dt-look-schreibtisch .dt-program-body,
-.dt-look-schreibtisch .dt-nav {
+.dt-look-schreibtisch .dt-nav,
+.dt-look-schreibtisch .dt-program-body > .open-chats {
   background: transparent;
   border-color: var(--border);
 }

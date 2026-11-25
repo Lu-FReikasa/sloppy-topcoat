@@ -787,6 +787,24 @@ describe("pointing at code (E8-01)", () => {
       screen.getAllByRole("button", { name: "In Entwicklung untersuchen" }),
     ).toHaveLength(2);
   });
+
+  it("puts 'Have it checked' in the answer's footer as a small button, not as a bar of its own (#77)", async () => {
+    const mock = setup(
+      { ...CONV, messages: [msg(1, "user", "Hallo"), msg(2, "assistant", "Hi")] },
+      [CONV],
+      { "POST /api/messages/2/review": { started: true } },
+    );
+    const ask = await screen.findByRole("button", { name: "Prüfen lassen" });
+    // one per answer, in the line with the answer's time and number, none under the question
+    expect(screen.getAllByRole("button", { name: "Prüfen lassen" })).toHaveLength(1);
+    const footer = ask.closest(".message-line");
+    expect(footer?.textContent).toContain("#2");
+    fireEvent.click(ask);
+    await waitFor(() =>
+      expect(mock.calls.some((c) => c.method === "POST" && c.url === "/api/messages/2/review")).toBe(true),
+    );
+    expect((ask as HTMLButtonElement).disabled).toBe(true);
+  });
 });
 
 describe("the choices that stay in the calm view", () => {

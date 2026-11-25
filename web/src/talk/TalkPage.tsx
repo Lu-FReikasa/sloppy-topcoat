@@ -495,7 +495,24 @@ export function TalkPage({
                 </div>
               )}
               {id && m.id > 0 && (
-                <MessageLine api={api} conversationId={id} message={m} />
+                <MessageLine api={api} conversationId={id} message={m}>
+                  {m.role === "assistant" &&
+                    m.status === "complete" &&
+                    (m.kind ?? "say") === "say" &&
+                    (reviews[m.id]?.reviewer_model ?? "hub") === "hub" && (
+                      // in the answer's footer, a small button: as a bar of its own it read as a
+                      // separator between messages (#77)
+                      <button
+                        type="button"
+                        className="talk-review-ask"
+                        disabled={asked.has(m.id)}
+                        onClick={() => reviewAnswer(m.id)}
+                        title={t("talk.reviewAskHint")}
+                      >
+                        {asked.has(m.id) ? t("talk.reviewAsked") : t("talk.reviewAsk")}
+                      </button>
+                    )}
+                </MessageLine>
               )}
               {m.role === "assistant" && notes?.[m.id] && id && (
                 <RememberedNotes
@@ -515,22 +532,6 @@ export function TalkPage({
               {m.role === "assistant" && (
                 <EvidenceMark message={m} light={lights[m.id] ?? null} />
               )}
-              {m.role === "assistant" &&
-                api &&
-                m.id > 0 &&
-                m.status === "complete" &&
-                (m.kind ?? "say") === "say" &&
-                (reviews[m.id]?.reviewer_model ?? "hub") === "hub" && (
-                  <button
-                    type="button"
-                    className="talk-review-ask small"
-                    disabled={asked.has(m.id)}
-                    onClick={() => reviewAnswer(m.id)}
-                    title={t("talk.reviewAskHint")}
-                  >
-                    {asked.has(m.id) ? t("talk.reviewAsked") : t("talk.reviewAsk")}
-                  </button>
-                )}
             </div>
           );
         })}

@@ -265,7 +265,9 @@ function MachineRowView({
             <a
               href={nodeHref(first.id)}
               title={nodeTitle}
-              aria-label={t("overview.openDetail", { name: row.name })}
+              // the short name stays on screen; the full node name is the tooltip and what a screen
+              // reader says (#77)
+              aria-label={t("overview.openDetail", { name: nodeTitle ?? row.name })}
             >
               {row.name}
             </a>
