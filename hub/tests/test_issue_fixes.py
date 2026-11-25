@@ -563,6 +563,28 @@ async def test_the_same_failure_twice_stops_the_drafts_and_tells_the_inbox(
 
 
 @pytest.mark.asyncio
+async def test_a_sub_task_of_a_large_task_leaves_the_inbox_to_its_coordinator(
+    client: TestClient,
+) -> None:
+    """D109: the coordinator replans the branch first; the person hears only if that fails."""
+    store = ProjectStore(client.app.state.sessionmaker)
+    project = await store.create_project(USER, title=f"Fix {uuid.uuid4().hex[:6]}")
+    issue = await store.create_node(
+        USER, project.id, kind="task", title="Teilaufgabe",
+        body="Zielanwendung: dev\nProgramm: issue_investigate\nErgebnisform: Diagnose\n"
+             "Art: issue\nVorhaben: 1\n",
+    )  # fmt: skip
+    service = _service(client, FakeTools(test_state="failed", log=RED_LOG))
+    before = len(await _blocked_items(client))
+    for summary in ("x", "y"):
+        fix = await service.create(USER, issue.id, None, summary, GOOD["edits"], [])
+        await service.apply(ADMIN, fix.id)
+        await asyncio.gather(*service._tasks)
+    assert len(service.runs.started) == 1  # the drafts stopped as for any issue
+    assert len(await _blocked_items(client)) == before
+
+
+@pytest.mark.asyncio
 async def test_another_failure_gets_its_next_draft(client: TestClient) -> None:
     issue = await _issue(client)
     tools = FakeTools(test_state="failed", log=RED_LOG)

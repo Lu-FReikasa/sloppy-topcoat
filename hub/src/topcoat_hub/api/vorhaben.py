@@ -48,6 +48,7 @@ def coordinator(request: Request) -> vorhaben.Coordinator:
         IssuePipeline(getattr(state, "project_runs", None), getattr(state, "fixes", None)),
         repo=LIVE_REPO,
         contract=agent_contract.long("dev"),
+        bus=getattr(state, "bus", None),
     )
 
 

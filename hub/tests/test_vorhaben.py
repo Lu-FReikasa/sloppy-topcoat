@@ -228,6 +228,18 @@ async def test_a_failure_twice_replans_its_branch_once_then_blocks(client: TestC
     tick = await coord.tick(USER, large.id, asker(new), read)
     assert tick.blocked == ["s4"]
     assert (await store.get_node(USER, after["s4"].node.id)).status == "blocked"
+    # only now the person hears of it: one inbox item for the sub-task
+    from sqlalchemy import select
+
+    from topcoat_hub.models import InboxItem
+
+    async with client.app.state.sessionmaker() as db:
+        rows = list(await db.scalars(select(InboxItem).where(
+            InboxItem.user_id == USER, InboxItem.source_type == "large_task",
+            InboxItem.source_ref == str(after["s4"].node.id),
+        )))  # fmt: skip
+    assert len(rows) == 1 and rows[0].kind == "fix_blocked"
+    assert "Teilaufgabe blockiert" in rows[0].title
 
 
 @pytest.mark.asyncio

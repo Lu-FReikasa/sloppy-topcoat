@@ -963,6 +963,12 @@ class FixService:
             node = await db.get(ProjectNode, fix.issue_id)
             if node is None or node.user_id != fix.user_id:
                 return
+            from topcoat_hub.vorhaben import large_of
+
+            if large_of(node.body or "") is not None:
+                # a sub-task of a large task: the coordinator replans its branch first and asks
+                # the person only when that fails (D109, vorhaben.Coordinator.tick)
+                return
             await InboxStore(db, fix.user_id).add(
                 Candidate(
                     kind=KIND_BLOCKED,

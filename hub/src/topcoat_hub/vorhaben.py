@@ -392,12 +392,14 @@ class Coordinator:
         *,
         repo: str,
         contract: str = "",
+        bus: Any = None,
     ) -> None:
         self.store = store
         self.changesets = changesets
         self.pipeline = pipeline
         self.repo = repo
         self.contract = contract
+        self.bus = bus  # "a sub-task is blocked" reaches the inbox at once
 
     # -- decompose ---------------------------------------------------------------------------
 
@@ -587,6 +589,36 @@ class Coordinator:
             user_id, item.node.id, revision=item.node.revision, status="blocked"
         )
         log.info("vorhaben: sub-task %s blocked (%s)", item.node.number, why)
+        await self._tell(user_id, item, why)
+
+    async def _tell(self, user_id: uuid.UUID, item: Item, why: str) -> None:
+        """The inbox item that sends a blocked sub-task to the person (D109). The issue pipeline
+        leaves its own ``fix_blocked`` out for sub-tasks, so the replan comes first."""
+        from topcoat_hub.inbox import Candidate, InboxStore
+        from topcoat_hub.issue_fixes import KIND_BLOCKED
+        from topcoat_hub.project_base import APPLICATION
+
+        node = item.node
+        async with self.store._sessionmaker() as db:
+            await InboxStore(db, user_id).add(
+                Candidate(
+                    kind=KIND_BLOCKED,
+                    source_type="large_task",
+                    source_ref=str(node.id),
+                    title=f"Teilaufgabe blockiert: {node.number} {node.title}",
+                    summary=why,
+                    application=APPLICATION,
+                    ref={
+                        "module": "page.project",
+                        "props": {"project": str(node.project_id), "node": str(node.id)},
+                        "project_id": str(node.project_id),
+                        "node_id": str(node.id),
+                    },
+                )
+            )
+            await db.commit()
+        if self.bus is not None:
+            self.bus.publish("inbox", {"_user": str(user_id)})
 
 
 def operations(
