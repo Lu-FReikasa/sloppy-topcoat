@@ -174,7 +174,8 @@ func (w *Workshop) copyWorktree(ctx context.Context, dir, dst string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(dst, 0o755); err != nil {
+	// the copy is mounted into the test container, which may read it as another uid (gosec G301)
+	if err := os.MkdirAll(dst, 0o755); err != nil { //nolint:gosec // G301: see above
 		return err
 	}
 	var total int64
@@ -192,7 +193,7 @@ func (w *Workshop) copyWorktree(ctx context.Context, dir, dst string) error {
 			return inputErr("the worktree is larger than %d MB", w.o.MaxRepoMB)
 		}
 		to := filepath.Join(dst, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil { //nolint:gosec // G301: see above
 			return err
 		}
 		if err := copyFile(src, to, st.Mode().Perm()); err != nil {
@@ -213,7 +214,7 @@ func copyFile(src, dst string, perm os.FileMode) error {
 		return err
 	}
 	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
+		_ = out.Close()
 		return err
 	}
 	return out.Close()

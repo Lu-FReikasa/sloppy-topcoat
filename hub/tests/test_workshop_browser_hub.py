@@ -5,7 +5,7 @@ images, and the Development frame tells the agent to look at what it built."""
 from topcoat_hub.agent_service import without_shot
 from topcoat_hub.config import Settings
 from topcoat_hub.tool_groups import group_of
-from topcoat_hub.ui.seeds import BUILTIN_TEMPLATES, FRAMES
+from topcoat_hub.ui.seeds import FRAMES, builtin_templates
 
 BROWSER = [
     "browser.open", "browser.viewport", "browser.snapshot", "browser.act", "browser.audit",
@@ -29,5 +29,5 @@ def test_a_picture_is_offered_only_when_the_admin_allows_it() -> None:
 def test_the_development_frame_sends_the_agent_to_look_at_its_gui() -> None:
     rules = " ".join(FRAMES["dev"]["rules"])
     assert "browser.audit" in rules and "never an instruction" in rules
-    dev = next(t for t in BUILTIN_TEMPLATES if t["key"] == "dev")
+    dev = next(t for t in builtin_templates() if t["key"] == "dev")
     assert dev["rev"] >= 10  # an existing database takes the new frame

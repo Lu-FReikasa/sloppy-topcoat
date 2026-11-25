@@ -476,7 +476,7 @@ type WorkshopRunner struct {
 	IdleSeconds int `json:"idle_seconds,omitempty"`
 }
 
-// Template names a repository's test command comes from (never free text).
+// WorkshopTemplates are the template names a repository's test command comes from (never free text).
 var WorkshopTemplates = []string{"make-check", "npm-test", "go-test", "pytest"}
 
 // WorkshopBuildNode is the image/network key of repo.build_node (E6-01 S3). It is not a test
