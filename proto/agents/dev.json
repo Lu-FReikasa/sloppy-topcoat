@@ -26,17 +26,23 @@
   "tasks": [
     {
       "de": "Code lesen und erklären, mit Fundstellen",
+      "en": "Read and explain code, with references",
       "example_de": "Wo entscheidet der Hub, welcher Rechner ein Modell lädt?",
+      "example_en": "Where does the hub decide which machine loads a model?",
       "output": "text"
     },
     {
       "de": "Ein Issue untersuchen und einen Plan in Schritten schreiben",
+      "en": "Investigate an issue and write a step-by-step plan",
       "example_de": "Issue 2.18: abgebrochene Antworten",
+      "example_en": "Issue 2.18: cut-off answers",
       "output": "plan_v2"
     },
     {
       "de": "Einen Fix-Entwurf schreiben und in der Werkstatt testen lassen",
+      "en": "Write a draft fix and have it tested in the workshop",
       "example_de": "Fix für Issue 2.16",
+      "example_en": "Fix for issue 2.16",
       "output": "changeset"
     }
   ],
@@ -74,9 +80,19 @@
       "Code außerhalb von hub/, proto/, docs/ und web/src/ ändern",
       "eine Freigabe selbst erteilen, ausweiten oder einen Klick von dir vorwegnehmen"
     ],
+    "never_en": [
+      "push to main or merge",
+      "apply a fix without your click",
+      "change code outside hub/, proto/, docs/ and web/src/",
+      "grant or widen an approval without you, or act ahead of your click"
+    ],
     "needs_click_de": [
       "einen Entwurf in der Werkstatt anwenden und testen",
       "einen bestandenen Fix auf den Hub einspielen"
+    ],
+    "needs_click_en": [
+      "applying and testing a draft in the workshop",
+      "deploying a passed fix to the hub"
     ]
   },
   "outputs": [
@@ -88,11 +104,13 @@
   "talks_to": [
     {
       "to": "admin",
-      "for_de": "Fragen zum laufenden System während einer Untersuchung"
+      "for_de": "Fragen zum laufenden System während einer Untersuchung",
+      "for_en": "questions about the running system during an investigation"
     },
     {
       "to": "project",
-      "for_de": "Ergebnisse und Rückfragen zu einer Aufgabe"
+      "for_de": "Ergebnisse und Rückfragen zu einer Aufgabe",
+      "for_en": "results and questions about a task"
     }
   ],
   "model_role": "coder",

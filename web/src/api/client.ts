@@ -2688,8 +2688,10 @@ export class ApiClient {
     return this.request("DELETE", `/api/ui/themes/${encodeURIComponent(key)}`);
   }
 
+  /** `language` (de/en): the language of the contract; without it, the person's stored one. */
   uiWorkspaceAgent(
     key: string,
+    language?: "de" | "en",
   ): Promise<
     UiAgentDefaults & {
       workspace: string;
@@ -2698,7 +2700,8 @@ export class ApiClient {
       contract?: import("../layout/types").AgentContractView | null;
     }
   > {
-    return this.request("GET", `/api/ui/workspaces/${encodeURIComponent(key)}/agent`);
+    const query = language ? `?language=${language}` : "";
+    return this.request("GET", `/api/ui/workspaces/${encodeURIComponent(key)}/agent${query}`);
   }
 
   uiTemplates(): Promise<{ templates: UiTemplateView[] }> {

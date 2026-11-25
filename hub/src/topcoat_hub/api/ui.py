@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from topcoat_hub import agent_contract
 from topcoat_hub import plugins as plugins_mod
 from topcoat_hub.auth import CurrentUser, api_user, require_admin
-from topcoat_hub.models import UiGrant, UiProfile, UiTemplate
+from topcoat_hub.models import UiGrant, UiProfile, UiTemplate, User
 from topcoat_hub.ui import prefs as prefs_mod
 from topcoat_hub.ui import themes as themes_mod
 from topcoat_hub.ui.access import Access, effective_agent, resolve_access
@@ -224,18 +224,27 @@ async def prefs_defaults(_user: CurrentUser = Depends(api_user)) -> dict[str, An
 
 @router.get("/workspaces/{key}/agent")
 async def workspace_agent(
-    key: str, request: Request, user: CurrentUser = Depends(api_user)
+    key: str,
+    request: Request,
+    language: str | None = None,
+    user: CurrentUser = Depends(api_user),
 ) -> dict[str, Any]:
     """What a conversation started in this workspace begins with for this person: the tool scope
     (in the shape the chat API takes) narrowed by their profile, the answer path, the persona, the
-    model role. Nothing is applied here; the web passes it on when it starts a conversation."""
+    model role. Nothing is applied here; the web passes it on when it starts a conversation.
+
+    ``language`` (``de``/``en``) is the language the GUI shows; without it the contract is in the
+    person's stored language, else English."""
     async with request.app.state.sessionmaker() as db:
         template, access = await _visible(db, user, key)
+        if language not in agent_contract.LANGUAGES:
+            row = await db.get(User, user.uuid)
+            language = (row.language if row else None) or "en"
         return {
             "workspace": key,
             **effective_agent(template.agent, access),
-            # what the employee of this program is for and may do, in German (1.9)
-            "contract": agent_contract.view(key),
+            # what the employee of this program is for and may do, in the person's language (1.9)
+            "contract": agent_contract.view(key, language),
         }
 
 

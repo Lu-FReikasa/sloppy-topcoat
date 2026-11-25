@@ -37,10 +37,12 @@
         "additionalProperties": false,
         "properties": {
           "de": {"type": "string", "minLength": 1},
+          "en": {"type": "string", "minLength": 1},
           "example_de": {"type": "string", "minLength": 1},
+          "example_en": {"type": "string", "minLength": 1},
           "output": {"type": "string", "minLength": 1}
         },
-        "required": ["de", "example_de", "output"]
+        "required": ["de", "en", "example_de", "example_en", "output"]
       }
     },
     "tools": {
@@ -62,9 +64,11 @@
       "additionalProperties": false,
       "properties": {
         "never_de": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
-        "needs_click_de": {"type": "array", "items": {"type": "string", "minLength": 1}}
+        "never_en": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "needs_click_de": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "needs_click_en": {"type": "array", "items": {"type": "string", "minLength": 1}}
       },
-      "required": ["never_de", "needs_click_de"]
+      "required": ["never_de", "never_en", "needs_click_de", "needs_click_en"]
     },
     "outputs": {
       "description": "Names of the enforced answer forms it writes (proto/agents/outputs)",
@@ -78,9 +82,10 @@
         "additionalProperties": false,
         "properties": {
           "to": {"enum": ["assistant", "research", "dev", "admin", "project"]},
-          "for_de": {"type": "string", "minLength": 1}
+          "for_de": {"type": "string", "minLength": 1},
+          "for_en": {"type": "string", "minLength": 1}
         },
-        "required": ["to", "for_de"]
+        "required": ["to", "for_de", "for_en"]
       }
     },
     "model_role": {"enum": ["general", "coder", "reviewer", "worker"]},
