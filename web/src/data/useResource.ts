@@ -15,8 +15,10 @@
  *
  * What `useResource` guarantees
  * - Loads on mount and whenever `key` changes; data of the old key is never shown for the new.
- * - An answer that arrives late is dropped: after the key changed, after unmount, or after a
- *   newer local change (`mutate`, a live update) that it would otherwise overwrite.
+ * - An answer that arrives late is dropped: after the key changed or after unmount.
+ * - A local change (`mutate`, a live update) made while a load is on its way is not lost: the
+ *   load's answer comes in and the change is done again on top of it. So an action's answer and
+ *   the stream win over an older load, and the load still brings what they did not touch.
  * - `reload()` while a load is on its way does not pile up requests: one more load follows the
  *   running one, and every caller's promise resolves after that.
  * - A failed reload keeps the data it had and sets `error`; the next good load clears it.
@@ -24,6 +26,8 @@
  * - Live: listed stream events are handed to `apply`, which returns new data, `RELOAD`, or
  *   `undefined` (not about this resource). Without `apply` every listed event reloads. After the
  *   stream reconnects a live resource reloads (events sent meanwhile are lost).
+ *   `apply` may see an event again on top of a load that already holds it, so it must be
+ *   idempotent: replace or merge by id, never count up or append blindly.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { UnauthorizedError } from "../api/client";
@@ -39,7 +43,8 @@ export interface LiveOptions<T> {
   /** Names of the stream events that may change this resource (`node_updated`, ...). */
   readonly events: readonly string[];
   /** What a listed event does: new data, `RELOAD`, or `undefined` to ignore it (another node's
-   *  update). `current` is undefined before the first load. Without it, every listed event reloads. */
+   *  update). `current` is undefined before the first load. Without it, every listed event reloads.
+   *  Must be idempotent: it runs again on a load's answer that may already hold the event. */
   readonly apply?: (current: T | undefined, ev: SseEvent) => T | typeof RELOAD | undefined;
 }
 
@@ -58,9 +63,12 @@ export interface Resource<T> {
   readonly error: ActionError | null;
   /** Load again; resolves when the data is fresh (or the load failed). */
   readonly reload: () => Promise<void>;
-  /** Put data in place at once (an action's answer); a load already on its way is dropped. */
+  /** Put data in place at once (an action's answer). A load already on its way still lands, and
+   *  the change is done again on top of its answer (a value replaces it, a function updates it). */
   readonly mutate: (next: T | ((current: T | undefined) => T)) => void;
 }
+
+type Update<T> = (current: T | undefined) => T | undefined;
 
 interface Snapshot<T> {
   readonly key: string;
@@ -100,9 +108,11 @@ export function useResource<T>(
   });
 
   // `epoch` moves on a key change and on unmount: every answer started before is dropped.
-  // `changed` moves on a local change: an answer started before it is older than what is shown.
+  // `changed` moves on a local change: an answer started before it is older than what is shown,
+  // so the changes made while it was on its way (`replay`) are done again on top of it.
   const epoch = useRef(0);
   const changed = useRef(0);
+  const replay = useRef<{ readonly seq: number; readonly update: Update<T> }[]>([]);
   const running = useRef<Promise<void> | null>(null);
   const runs = useRef(0);
   const queued = useRef<Promise<void> | null>(null);
@@ -117,13 +127,16 @@ export function useResource<T>(
     const forKey = keyRef.current;
     commit({ ...snapshotOf(forKey), loading: true });
     try {
-      const data = await loadRef.current();
+      const loaded = await loadRef.current();
       if (epoch.current !== startEpoch) return;
-      const now = snapshotOf(forKey);
-      if (changed.current !== startChanged) commit({ ...now, loading: false });
-      else commit({ key: forKey, data, loading: false, error: null });
+      const data = replay.current
+        .filter((change) => change.seq > startChanged)
+        .reduce<T | undefined>((cur, change) => change.update(cur), loaded);
+      replay.current = [];
+      commit({ key: forKey, data, loading: false, error: null });
     } catch (err: unknown) {
       if (epoch.current !== startEpoch) return;
+      replay.current = [];
       const now = snapshotOf(forKey);
       if (err instanceof UnauthorizedError) commit({ ...now, loading: false });
       else commit({ ...now, loading: false, error: toActionError(err) });
@@ -161,15 +174,24 @@ export function useResource<T>(
     return queued.current;
   }, [startRun]);
 
-  const mutate = useCallback(
-    (next: T | ((current: T | undefined) => T)): void => {
+  // a local change: shown at once, and kept for the answer of a load already on its way
+  const change = useCallback(
+    (data: T | undefined, update: Update<T>, clearError: boolean): void => {
       const now = snapshotOf(keyRef.current);
-      const data =
-        typeof next === "function" ? (next as (current: T | undefined) => T)(now.data) : next;
       changed.current += 1;
-      commit({ ...now, data, error: null });
+      if (running.current !== null) replay.current.push({ seq: changed.current, update });
+      commit({ ...now, data, error: clearError ? null : now.error });
     },
     [commit, snapshotOf],
+  );
+
+  const mutate = useCallback(
+    (next: T | ((current: T | undefined) => T)): void => {
+      const update: Update<T> =
+        typeof next === "function" ? (next as (current: T | undefined) => T) : () => next;
+      change(update(snapshotOf(keyRef.current).data), update, true);
+    },
+    [change, snapshotOf],
   );
 
   // load on mount and for every new key
@@ -177,11 +199,13 @@ export function useResource<T>(
     epoch.current += 1;
     running.current = null;
     queued.current = null;
+    replay.current = [];
     void reload();
     return () => {
       epoch.current += 1;
       running.current = null;
       queued.current = null;
+      replay.current = [];
     };
   }, [key, reload]);
 
@@ -195,15 +219,19 @@ export function useResource<T>(
         void reload();
         return;
       }
-      const now = snapshotOf(keyRef.current);
-      const result = live.apply(now.data, ev);
+      const apply = live.apply;
+      const result = apply(snapshotOf(keyRef.current).data, ev);
       if (result === undefined) return;
       if (result === RELOAD) {
         void reload();
         return;
       }
-      changed.current += 1;
-      commit({ ...now, data: result });
+      // done again on a load's answer: the event again, not `result` (that would undo the load)
+      const again: Update<T> = (cur) => {
+        const next = apply(cur, ev);
+        return next === undefined || next === RELOAD ? cur : next;
+      };
+      change(result, again, false);
     });
     const offConnect = bus.onConnect(() => {
       void reload();
@@ -212,7 +240,7 @@ export function useResource<T>(
       offEvent();
       offConnect();
     };
-  }, [isLive, bus, reload, commit, snapshotOf]);
+  }, [isLive, bus, reload, change, snapshotOf]);
 
   // before the effect for a new key has run, show nothing of the old key
   const shown = snapshot.key === key ? snapshot : fresh<T>(key);

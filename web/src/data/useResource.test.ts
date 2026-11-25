@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { createElement, StrictMode, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError, UnauthorizedError } from "../api/client";
 import { createHubEvents, type HubEvents } from "./hubEvents";
@@ -187,7 +188,7 @@ describe("useResource", () => {
     expect(calls).toHaveLength(3);
   });
 
-  it("mutate shows an action's answer at once and drops an older load on its way", async () => {
+  it("mutate shows an action's answer at once and wins over an older load on its way", async () => {
     const { api, calls } = fakeClient();
     const { result } = renderHook(() => useNodeResource(api, "n1", createHubEvents()));
     await answer(calls, 0, node("n1"));
@@ -251,6 +252,60 @@ describe("useResource", () => {
       act(() => events.publish({ event: "node_updated", data: JSON.stringify(node("n1", 5)) }));
       await answer(calls, 1, node("n1", 4));
       expect(result.current.data).toEqual(node("n1", 5));
+    });
+
+    it("a load still on its way keeps what it brings; the stream's updates go on top of it", async () => {
+      // a node's detail: the stream adds events, a reload brings the rest (config, benchmarks)
+      interface Detail {
+        readonly id: string;
+        readonly config: string;
+        readonly events: readonly string[];
+      }
+      const loads: Deferred<Detail>[] = [];
+      const load = (): Promise<Detail> => {
+        const d = deferred<Detail>();
+        loads.push(d);
+        return d.promise;
+      };
+      const events = createHubEvents();
+      const live: LiveOptions<Detail> = {
+        events: ["node_event"],
+        apply: (cur, ev) =>
+          cur && !cur.events.includes(ev.data) ? { ...cur, events: [ev.data, ...cur.events] } : undefined,
+      };
+      const { result } = renderHook(() => useResource("node:n1", load, { events, live }));
+      await act(async () => loads[0]?.resolve({ id: "n1", config: "old", events: [] }));
+
+      act(() => void result.current.reload());
+      act(() => events.publish({ event: "node_event", data: "e1" }));
+      expect(result.current.data?.events).toEqual(["e1"]);
+
+      // the reload was answered before e1 reached the hub's database: new config, no e1 yet
+      await act(async () => loads[1]?.resolve({ id: "n1", config: "new", events: [] }));
+      expect(result.current.data).toEqual({ id: "n1", config: "new", events: ["e1"] });
+
+      // and once more with an answer that already holds the event: it is not added twice
+      act(() => void result.current.reload());
+      act(() => events.publish({ event: "node_event", data: "e2" }));
+      await act(async () => loads[2]?.resolve({ id: "n1", config: "newer", events: ["e2", "e1"] }));
+      expect(result.current.data).toEqual({ id: "n1", config: "newer", events: ["e2", "e1"] });
+    });
+
+    it("listens once under StrictMode's double effects and shows the second load's answer", async () => {
+      const { api, calls } = fakeClient();
+      const events = createHubEvents();
+      const wrapper = ({ children }: { children: ReactNode }) => createElement(StrictMode, null, children);
+      const { result } = renderHook(
+        () => useNodeResource(api, "n1", events, { events: ["node_benchmark"] }),
+        { wrapper },
+      );
+      const first = calls.length;
+      await answer(calls, first - 1, node("n1", 2));
+      if (first > 1) await answer(calls, 0, node("n1", 1));
+      expect(result.current).toMatchObject({ data: node("n1", 2), loading: false });
+
+      act(() => events.publish({ event: "node_benchmark", data: "{}" }));
+      expect(calls).toHaveLength(first + 1);
     });
 
     it("reloads after the stream reconnects; a resource that is not live does not", async () => {
