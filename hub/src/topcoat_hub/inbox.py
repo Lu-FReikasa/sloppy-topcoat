@@ -1,8 +1,10 @@
 """The inbox (docs/PLATFORM.md, 3.7): what happened and wants to be read.
 
-An item belongs to a person (D20) and to an application. Reading an item opens it and files it in
-the corner of its application, unless it is pinned (the board) or **urgent** and not yet resolved:
-an urgent item needs an action or attention and stays in the inbox until the matter is settled.
+An item belongs to a person (D20) and to an application. Reading an item opens it and it leaves
+the inbox; the thing it is about stays in its application. An **urgent** item needs an action or
+attention and stays in the inbox until the matter is settled. There is nothing to file, pin or
+mark (D111). The list comes in three groups (:func:`group_of`): what waits for a decision, what
+went wrong, and results.
 
 Most items are not pushed by the code that causes them. :func:`sync` looks at the places that
 already hold such things (open questions of the memory, proposals waiting for a click, findings of
@@ -26,13 +28,16 @@ from topcoat_hub.models import Conversation, InboxItem
 from topcoat_hub.review_store import ReviewStore
 
 DEFAULT_APPLICATION = "chat"
-VIEWS = ("inbox", "board", "filed")
+# the groups of the list, in the order they are shown (D111)
+GROUPS = ("decide", "errors", "results")
+# kinds that report something that went wrong; they are errors whether or not they are urgent
+ERROR_KINDS = frozenset({"task_failed", "handover_failed", "review_error", "review_hint"})
 RECENT_TASKS = timedelta(days=14)
 # a mistake the second look found is worth an item while it is fresh (2026-11-13: the inbox held
 # 150 notes of the second look, most about answers of days ago)
 RECENT_REVIEWS = timedelta(days=7)
-# kinds that no longer make an item: their open items are filed on the next look. A note of the
-# second look is shown at the answer; it asks nothing of the person.
+# kinds that no longer make an item: their open items are read and settled on the next look. A
+# note of the second look is shown at the answer; it asks nothing of the person.
 RETIRED_KINDS = ("review_hint",)
 # kinds whose item is resolved when the thing it is about is gone (most are urgent while it is
 # open; a mistake of the second look is not urgent, but settles itself once it was seen)
@@ -76,8 +81,7 @@ def item_view(i: InboxItem) -> dict[str, Any]:
         "urgent": i.urgent,
         "unresolved": i.urgent and i.resolved_at is None,
         "read": i.read_at is not None,
-        "pinned": i.pinned,
-        "filed": i.filed_at is not None,
+        "group": group_of(i),
         "created_at": _iso(i.created_at),
         "read_at": _iso(i.read_at),
         "resolved_at": _iso(i.resolved_at),
@@ -85,8 +89,16 @@ def item_view(i: InboxItem) -> dict[str, Any]:
 
 
 def _holds(i: InboxItem) -> bool:
-    """An urgent item that is not resolved is not filed away by reading."""
+    """An urgent item that is not resolved stays in the inbox although it was read."""
     return i.urgent and i.resolved_at is None
+
+
+def group_of(i: InboxItem) -> str:
+    """Where an item stands in the list: an error, else a decision while it waits for one, else a
+    result."""
+    if i.kind in ERROR_KINDS:
+        return "errors"
+    return "decide" if _holds(i) else "results"
 
 
 class InboxStore:
@@ -119,7 +131,7 @@ class InboxStore:
                 found.title, found.summary = c.title[:200], c.summary[:600]
             if c.urgent and found.resolved_at is not None:
                 found.resolved_at = None  # the thing is open again
-                found.read_at = found.filed_at = None
+                found.read_at = None
             return found, False
         item = InboxItem(
             user_id=self.user_id,
@@ -136,31 +148,22 @@ class InboxStore:
         await self.db.flush()
         return item, True
 
-    async def listing(
-        self, view: str, application: str | None = None, limit: int = 200
-    ) -> Sequence[InboxItem]:
-        where = [self._mine()]
+    async def listing(self, application: str | None = None, limit: int = 200) -> list[InboxItem]:
+        """The inbox: unread items and urgent ones that are not settled, in their groups
+        (:data:`GROUPS`), the newest first within a group."""
+        where = [
+            self._mine(),
+            or_(
+                InboxItem.read_at.is_(None),
+                and_(InboxItem.urgent.is_(True), InboxItem.resolved_at.is_(None)),
+            ),
+        ]
         if application:
             where.append(InboxItem.application == application)
-        if view == "inbox":
-            where.append(
-                or_(
-                    InboxItem.read_at.is_(None),
-                    and_(InboxItem.urgent.is_(True), InboxItem.resolved_at.is_(None)),
-                )
-            )
-        elif view == "board":
-            where.append(InboxItem.pinned.is_(True))
-        else:
-            where += [InboxItem.filed_at.is_not(None), InboxItem.pinned.is_(False)]
-        order = [InboxItem.created_at.desc()]
-        if view == "inbox":  # what needs an action first
-            order.insert(
-                0,
-                (InboxItem.urgent.is_(True) & InboxItem.resolved_at.is_(None)).desc(),
-            )
-        rows = await self.db.scalars(select(InboxItem).where(*where).order_by(*order).limit(limit))
-        return rows.all()
+        rows = await self.db.scalars(
+            select(InboxItem).where(*where).order_by(InboxItem.created_at.desc()).limit(limit)
+        )
+        return sorted(rows.all(), key=lambda i: GROUPS.index(group_of(i)))
 
     async def counts(self) -> dict[str, Any]:
         rows = await self.db.execute(
@@ -177,24 +180,12 @@ class InboxStore:
         return {"unread": sum(per_app.values()), "urgent": urgent or 0, "applications": per_app}
 
     async def open(self, item_id: uuid.UUID) -> InboxItem | None:
-        """Read it: it is marked read and, unless it is pinned or still urgent, filed."""
+        """Read it: it leaves the inbox unless it is urgent and not settled."""
         item = await self.get(item_id)
         if item is None:
             return None
-        now = _now()
         if item.read_at is None:
-            item.read_at = now
-        if not item.pinned and not _holds(item) and item.filed_at is None:
-            item.filed_at = now
-        return item
-
-    async def pin(self, item_id: uuid.UUID, pinned: bool) -> InboxItem | None:
-        item = await self.get(item_id)
-        if item is None:
-            return None
-        item.pinned = pinned
-        if not pinned and item.read_at is not None and not _holds(item) and item.filed_at is None:
-            item.filed_at = _now()
+            item.read_at = _now()
         return item
 
     async def resolve(self, item_id: uuid.UUID) -> InboxItem | None:
@@ -206,15 +197,13 @@ class InboxStore:
 
     @staticmethod
     def _resolve(item: InboxItem, handled_elsewhere: bool = False) -> None:
-        """Settled. An item that was read is filed; one whose matter was settled somewhere else
-        (the question answered on the memory page) counts as read, too."""
+        """Settled. An item whose matter was settled somewhere else (the question answered on the
+        memory page) counts as read, too."""
         now = _now()
         if item.resolved_at is None:
             item.resolved_at = now
         if handled_elsewhere and item.read_at is None:
             item.read_at = now
-        if item.read_at is not None and not item.pinned and item.filed_at is None:
-            item.filed_at = now
 
     async def delete(self, item_id: uuid.UUID) -> bool:
         result = await self.db.execute(
@@ -223,8 +212,8 @@ class InboxStore:
         return bool(result.rowcount)
 
     async def read_all(self, application: str | None = None) -> int:
-        """Mark every unread item read and file it, except what still waits for an action (an
-        urgent item not yet settled). Returns how many were put away."""
+        """Mark every unread item read, except what still waits for an action (an urgent item not
+        yet settled). Returns how many were read."""
         where = [self._mine(), InboxItem.read_at.is_(None)]
         if application:
             where.append(InboxItem.application == application)
@@ -234,13 +223,11 @@ class InboxStore:
             if _holds(item):
                 continue
             item.read_at = now
-            if not item.pinned and item.filed_at is None:
-                item.filed_at = now
             n += 1
         return n
 
     async def retire(self, kinds: Sequence[str]) -> int:
-        """File the open items of kinds that make no item any more (read and settled)."""
+        """Put away the open items of kinds that make no item any more (read and settled)."""
         n = 0
         rows = await self.db.scalars(
             select(InboxItem).where(

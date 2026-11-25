@@ -1406,10 +1406,8 @@ class InboxItem(Base):
     summary: Mapped[str] = mapped_column(Text, default="")
     ref: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     urgent: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    pinned: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    filed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
@@ -1445,11 +1443,6 @@ class Handover(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # set when this is the regular re-check of a pinned item: its answer becomes a mark on
-    # that item instead of a new item (recheck.py)
-    recheck_item_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("inbox_items.id", ondelete="SET NULL")
-    )
     # the Akte (handover_file.py): data and text, and the file of the finished one in the
     # person's knowledge source "Akten"
     file: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
@@ -1477,30 +1470,6 @@ class ProjectChange(Base):
     result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-
-class ItemMark(Base):
-    """PLATFORM.md 3.7: a comment, Post-It, sticker or highlight on an inbox item. It is data on the
-    item and never changes its text. Personal (D20): only ever read or written through
-    :class:`topcoat_hub.marks.MarkStore`."""
-
-    __tablename__ = "item_marks"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
-    item_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("inbox_items.id", ondelete="CASCADE"), index=True
-    )
-    # "person", an application key, or "recheck"
-    author: Mapped[str] = mapped_column(String(40))
-    # comment | postit | sticker | highlight
-    kind: Mapped[str] = mapped_column(String(12))
-    text: Mapped[str] = mapped_column(String(500), default="")
-    line: Mapped[int | None] = mapped_column(Integer)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Project(Base):

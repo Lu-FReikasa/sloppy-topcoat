@@ -227,49 +227,41 @@ The effort offer is a **suggestion, never a switch the hub flips alone**: when a
 serious (it would change a machine, touches a repository, asks about something that went wrong),
 the chat shows a button "check this carefully?", the same mechanism as the existing check offer.
 
-### 3.7 Inbox, files and the board
+### 3.7 Inbox
 
 Decisions of the maintainer. The **inbox** is where a session starts (on the desk, the letters on
 the tray). It shows what the person has not read yet, each item with the **application** it
 comes from: the result of a hand-over, a finished background run, a proposal waiting for its click,
 a failure, a node that came back.
 
-- A **read item leaves the dashboard**, unless the person pins it. It is **filed** in the corner of
-  its application (Admin, Dev, Research, ...): a drawer on the desk, a listing per application in
-  the Terminal. Nothing is deleted by reading; it moves.
-- The **board** is the permanent dashboard: pinned items, **widgets** (node states, running
-  tasks, the last inventory), and **Post-Its** with notes and updates. On the desk it is the pin
-  board with the red threads; in the Terminal it is a window of pinned lines and widgets.
-- The inbox stays the start in both shells; the board is one window away and stays as arranged.
+- It is **one list in three groups**: **Decide** (an urgent item that waits for the person: a
+  proposal waiting for its click, a question about the notes, a fix whose drafts keep failing),
+  **Errors** (a failed task or hand-over, a mistake the second look found) and **Results**
+  (everything else). Within a group the newest comes first.
+- A **read item leaves the inbox**. Nothing is filed, pinned or marked (D111): the thing the item
+  is about (the task, the hand-over, the report) stays in its application, which is where the
+  person finds it again. An item can be deleted.
 
 ```
-inbox_items  id, user_id, application, kind, severity, title, body_ref, created_at,
-             read_at, pinned, filed_at
+inbox_items  id, user_id, application, kind, source_type, source_ref, title, summary, ref,
+             urgent, created_at, read_at, resolved_at
 ```
 
-The body is a reference (a run, a hand-over, a task), never a copy of sensitive text: an item
-from Admin shows what the person may see in the inbox and opens the application for the rest.
+The summary is short and the rest is a reference (a run, a hand-over, a task), never a copy of
+sensitive text: an item from Admin shows what the person may see in the inbox and opens the
+application for the rest.
 
-#### Reading, filing, urgent items and marks
+#### Reading and urgent items
 
-- Clicking an item **opens** it and marks it **read**; it leaves the inbox at once. When it is
-  closed, an item that is not pinned is **filed** in the corner of its application; a pinned one
-  goes to the board.
+- Clicking an item **opens** it and marks it **read**; it leaves the inbox at once.
 - An item carries the tag **urgent** when it needs an action or attention: a proposal waiting
-  for its click, a failure, a stuck task, a finding on an answer. Opening an urgent item marks it
-  read, but it is **not filed** and stays visible (red, at the top of the inbox and on the board)
-  until the matter is **resolved**: the proposal answered, the failure acknowledged or fixed, the
-  task running again.
-- **Marks.** An application may leave marks on a report: a comment, a Post-It, a sticker, a
-  highlight. Stickers say "second look passed"; Post-Its and highlights say "error here", "this
-  fact is outdated", "the number changed". A mark is data on the item (`item_marks`: item,
-  application, kind, text, line, created_at, resolved_at), written by the application that owns
-  the item or by the person, and it never changes the text of the report.
-- **Regular re-check.** A system flow (Timer trigger, daily by default, and on events) takes every
-  pinned report and widget, runs its read-only source again (a Check or a Tool call), compares,
-  and leaves a mark: a "still correct" sticker with the date, or a Post-It "outdated: ..." with the
-  new value. A new finding raises a new inbox item. The run has the owner's rights and the
-  application's clearances; it marks reports, it does not rewrite them.
+  for its click, a failure, a stuck task. Opening an urgent item marks it read, but it stays
+  visible (red, in its group) until the matter is **resolved**: the proposal answered, the failure
+  acknowledged or fixed, the task running again.
+- "Mark all as read" reads everything except what still waits for an action.
+- There are **no marks** (comments, Post-Its, stickers, highlights), **no board** and **no regular
+  re-check** of pinned answers any more: D111 replaced D68 and the board of D61. The maintainer did
+  not use them, and re-checking an answer nobody asked about again cost model time.
 
 #### Applications as correspondents
 
@@ -372,8 +364,6 @@ recorded there with its result.
   waited or ended for lack of a node -> For each, resume (the existing `resume`, with its limits
   on active tasks) -> Notify in the inbox ("three tasks continue"). All current tasks belong to
   Chat, so this serves Chat first. The exact stop reasons to include are checked when it is built.
-- **Second use**: the regular re-check of the board (section 3.7). Both first uses are system
-  flows built from the nodes of section 3.3.
 - External model nodes stay out until the redaction layer exists (stage 3).
 
 ## 5. One UI
@@ -497,7 +487,7 @@ Decided by the maintainer:
 1. **Effort** stays as one simple choice (quick, balanced, careful), independent of model, node and
    tools; the model per level goes (section 3.6).
 2. **Two shells**, **Terminal** and **Schreibtisch**; both start with the **inbox** and an empty
-   chat window; the **board** is the permanent dashboard with widgets and Post-Its.
+   chat window.
 3. **Applications**: Chat, Research, Dev, Admin. **Homelab is part of Admin**. They act as
    correspondents with a responsibility, clearances and abilities.
 4. **Each application has its own memory, rights and flows**; a **shared set** (everything about
@@ -507,9 +497,8 @@ Decided by the maintainer:
    a stored record, and a summary in the inbox (section 3.8).
 6. **Incognito**: context-free, web only, may ask other applications with the person's approval,
    stays until the person deletes it or the hub restarts (section 3.9).
-7. **Reading and filing**: a click opens and marks read; closing files the item unless pinned;
-   **urgent** items stay until resolved; applications leave **marks** (comments, Post-Its,
-   stickers, highlights); board items are **re-checked regularly** (section 3.7).
+7. **Reading**: a click opens and marks read, and the item leaves the inbox; **urgent** items stay
+   until resolved; no filing, board, marks or re-check (section 3.7, D111).
 8. **The first trigger** is "a node came online", to resume stuck tasks (section 4).
 9. **No compare run**: the chat answer is built directly as a flow and tuned afterwards.
 
@@ -519,15 +508,14 @@ editor or in a setting):
 - Tags denied everywhere except where released: `private`, `health`, `finance`.
 - Wiki collections: Chat reads the ones the person marks "general"; until the person marks any,
   Chat reads none (the safe default), Admin reads all.
-- Filed items stay until the person deletes them; an application's notifications are on and the
-  person can turn them off per application.
-- The re-check runs daily; the person can change it on the flow's Timer node.
+- An application's notifications are on and the person can turn them off per application.
 
 ## Status of this plan
 
 Built: P1 (section 5), P2 (section 6), the incognito folder (3.9), the first trigger (a node
 comes online, section 4), the hand-over (3.8, D65), effort as a run variable with tables
-(3.6, D66), the chat policy nodes (3.4, D67) and marks with the regular re-check (3.7, D68).
+(3.6, D66), the chat policy nodes (3.4, D67) and the inbox in three groups (3.7, D111; marks
+and the re-check of D68 were built and removed again).
 Not built: the flow-editor side of the triggers (3.3), the application map (3.1, 3.2), the chat
 answer itself as a flow (3.5; the policy already decides how it is made), settings moving into
 flows, and the new Schreibtisch look (5). See the roadmap, stage 8.
