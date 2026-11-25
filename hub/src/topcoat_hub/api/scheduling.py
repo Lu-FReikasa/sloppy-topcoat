@@ -24,7 +24,6 @@ from topcoat_hub.house_residents import keep_house_resident
 from topcoat_hub.model_facts import PROOF_KEY
 from topcoat_hub.model_probes import run_probes
 from topcoat_hub.models import ChatReview, Conversation, JobRecord, Node, NodeInventory
-from topcoat_hub.protocol import ProtocolError
 from topcoat_hub.node_policy import (
     MAX_PAUSE_HOURS,
     POLICY_KEY,
@@ -37,6 +36,7 @@ from topcoat_hub.node_policy import (
     parse_policy,
     row_keys,
 )
+from topcoat_hub.protocol import ProtocolError
 from topcoat_hub.views import node_summary
 
 log = logging.getLogger(__name__)

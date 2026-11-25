@@ -23,13 +23,14 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
+from topcoat_hub.protocol import DEFAULT_RESIDENT_PRIORITY
+
 log = logging.getLogger(__name__)
 
-# the priority the scheduling page gives a house model (web/src/pressure.ts)
-HOUSE_PRIORITY = 50
 
-
-def house_mutation(model: str | None, previous: str | None = None) -> Callable[[dict[str, Any]], bool]:
+def house_mutation(
+    model: str | None, previous: str | None = None
+) -> Callable[[dict[str, Any]], bool]:
     """A ``change_config`` mutation: ``model`` becomes an auto-reloading resident, ``previous``
     (the house model it replaces) stops being one. Returns False when nothing changes."""
 
@@ -48,7 +49,9 @@ def house_mutation(model: str | None, previous: str | None = None) -> Callable[[
                         changed = True
                     break
             else:
-                residents.append({"model": model, "priority": HOUSE_PRIORITY, "auto_reload": True})
+                residents.append(
+                    {"model": model, "priority": DEFAULT_RESIDENT_PRIORITY, "auto_reload": True}
+                )
                 changed = True
         if changed:
             config["residents"] = residents

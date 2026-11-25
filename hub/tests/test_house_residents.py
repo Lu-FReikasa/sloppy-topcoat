@@ -50,9 +50,7 @@ def test_a_reconnect_brings_the_house_model_back(client: TestClient, connect) ->
     """The live case of 2026-11-24/25: the resident entry of the house model was gone, so the
     node unloaded it on idle and never loaded it again, not even after reconnecting."""
     node_id, key = pair(client, "node-a")
-    client.app.state.gateway.set_policy(
-        NodePolicy(house={"node-a": "big"})
-    )
+    client.app.state.gateway.set_policy(NodePolicy(house={"node-a": "big"}))
     # someone removed the entry on the node page (or it never existed)
     assert client.delete(f"/api/nodes/{node_id}/residents/big", headers=AUTH).status_code == 200
     assert _residents(client, node_id) == []
@@ -64,9 +62,10 @@ def test_a_reconnect_brings_the_house_model_back(client: TestClient, connect) ->
         {"model": "big", "priority": 50, "auto_reload": True}
     ]
     assert _residents(client, node_id) == config["body"]["config"]["residents"]
-    assert config["body"]["config_hash"] == client.get(
-        f"/api/nodes/{node_id}", headers=AUTH
-    ).json()["config_hash"]
+    assert (
+        config["body"]["config_hash"]
+        == client.get(f"/api/nodes/{node_id}", headers=AUTH).json()["config_hash"]
+    )
     assert _sources(client, node_id)[-1] == "house_reconnect"
     node.close()
 

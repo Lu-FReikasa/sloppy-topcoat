@@ -274,9 +274,7 @@ async def node_ws(ws: WebSocket) -> None:
 
     try:
         if not session.read_only:
-            await session.send(
-                envelope("config", {"config_hash": config_hash_, "config": config})
-            )
+            await session.send(envelope("config", {"config_hash": config_hash_, "config": config}))
         await service.publish_node(node.id)
         while True:
             try:
