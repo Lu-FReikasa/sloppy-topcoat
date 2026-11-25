@@ -396,6 +396,46 @@ func TestApplyPatch(t *testing.T) {
 	}
 }
 
+// git apply --numstat names only the new file of a rename or copy. The source must pass the same
+// checks, or a rename would make a secret readable or move a pipeline file away. A patch must not
+// create a symbolic link or a submodule either: repo.commit would commit it.
+func TestApplyPatchChecksRenameSourcesAndModes(t *testing.T) {
+	f := newFixture(t, nil)
+	f.must(t, "repo.sync", repoIn{"repo": "demo"})
+	clone := filepath.Join(f.w.dir, "demo")
+	for _, c := range []struct{ name, patch, want string }{
+		{"rename of a secret", "diff --git a/.env b/notes.txt\nsimilarity index 100%\nrename from .env\nrename to notes.txt\n", "may hold credentials"},
+		{"rename of a secret, quoted", "diff --git \"a/.env\" b/notes.txt\nsimilarity index 100%\nrename from \".env\"\nrename to notes.txt\n", "may hold credentials"},
+		{"copy of a secret", "diff --git a/deploy/server.key b/notes.txt\nsimilarity index 100%\ncopy from deploy/server.key\ncopy to notes.txt\n", "may hold credentials"},
+		{"rename out of the pipelines", "diff --git a/.github/workflows/ci.yml b/ci.yml\nsimilarity index 100%\nrename from .github/workflows/ci.yml\nrename to ci.yml\n", "pipeline definition"},
+		{"new link", "diff --git a/lnk b/lnk\nnew file mode 120000\n--- /dev/null\n+++ b/lnk\n@@ -0,0 +1 @@\n+/etc\n\\ No newline at end of file\n", "symbolic link"},
+		{"file turned into a link", "diff --git a/README.md b/README.md\nold mode 100644\nnew mode 120000\n", "symbolic link"},
+		{"new submodule", "diff --git a/sub b/sub\nnew file mode 160000\nindex 0000000..0123456\n--- /dev/null\n+++ b/sub\n@@ -0,0 +1 @@\n+Subproject commit 0123456789012345678901234567890123456789\n", "submodule"},
+	} {
+		_, err := f.call(t, "repo.apply_patch", repoIn{"repo": "demo", "patch": c.patch})
+		if err == nil {
+			t.Fatalf("%s: the patch was applied", c.name)
+		}
+		refused(t, err, c.want)
+	}
+	for _, gone := range []string{"notes.txt", "ci.yml", "lnk", "sub"} {
+		if _, err := os.Lstat(filepath.Join(clone, gone)); err == nil {
+			t.Fatalf("%s exists: a refused patch was applied", gone)
+		}
+	}
+	for _, kept := range []string{".env", "deploy/server.key", ".github/workflows/ci.yml", "README.md"} {
+		if st, err := os.Lstat(filepath.Join(clone, filepath.FromSlash(kept))); err != nil || !st.Mode().IsRegular() {
+			t.Fatalf("%s changed: %v %v", kept, st, err)
+		}
+	}
+	// a rename of an ordinary file still applies
+	ok := "diff --git a/app/util.py b/app/helpers.py\nsimilarity index 100%\nrename from app/util.py\nrename to app/helpers.py\n"
+	f.must(t, "repo.apply_patch", repoIn{"repo": "demo", "patch": ok})
+	if _, err := os.Stat(filepath.Join(clone, "app", "helpers.py")); err != nil {
+		t.Fatal("the rename was not applied")
+	}
+}
+
 func TestStartAndReset(t *testing.T) {
 	f := newFixture(t, nil)
 	f.must(t, "repo.sync", repoIn{"repo": "demo"})
