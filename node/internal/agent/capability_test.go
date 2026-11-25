@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -56,21 +57,52 @@ func inventoryNames(inv protocol.Inventory) map[string]bool {
 	return names
 }
 
+// baseCapabilities is what every node offers whatever its config says: the read capabilities of
+// E2-04 plus system.memory and compose.logs (E3-11), the collecting health.check and logs.search,
+// and inventory.snapshot. None of them needs a released directory, a target or a connectors file.
+var baseCapabilities = []string{
+	"system.info", "system.memory", "disk.usage",
+	"docker.ps", "docker.inspect", "docker.logs",
+	"compose.projects", "compose.file", "compose.logs",
+	"journal.logs", "service.status", "service.failed",
+	"health.check", "logs.search",
+	"inventory.snapshot",
+}
+
+// wantCapabilities fails the test unless the inventory offers exactly the base set plus extra:
+// a capability that appears without its precondition is as much a failure as one that is missing.
+func wantCapabilities(t *testing.T, inv protocol.Inventory, extra ...string) {
+	t.Helper()
+	want := slices.Concat(baseCapabilities, extra)
+	slices.Sort(want)
+	var got []string
+	for _, c := range inv.Capabilities {
+		got = append(got, c.Name)
+	}
+	slices.Sort(got)
+	if !slices.Equal(got, want) {
+		var missing, unexpected []string
+		for _, n := range want {
+			if !slices.Contains(got, n) {
+				missing = append(missing, n)
+			}
+		}
+		for _, n := range got {
+			if !slices.Contains(want, n) {
+				unexpected = append(unexpected, n)
+			}
+		}
+		t.Fatalf("inventory differs: missing %v, unexpected %v (got %v)", missing, unexpected, got)
+	}
+}
+
 func TestTheInventoryListsWhatTheNodeOffers(t *testing.T) {
 	_, _, inv := toolsSetup(t, toolsConfig(`"docker.ps"`, `"capability.invoke"`))
-	// the ten of E2-04, compose.logs (E3-11), health.check, logs.search and inventory.snapshot, the fake Uptime Kuma (E2-04c), docs.list / docs.read
-	// (the fake node releases a notes folder, tools.docs_roots, E2-03), web.search / web.fetch and
-	// the pictures web.images / web.image (fake SearXNG) and net.check (the fake node watches one
-	// gateway and one name)
-	if len(inv.Capabilities) != 22 {
-		t.Fatalf("%d capabilities", len(inv.Capabilities))
-	}
-	names := inventoryNames(inv)
-	for _, want := range []string{"docker.ps", "kuma.monitors", "docs.list", "docs.read", "web.search", "web.fetch", "web.images", "web.image", "health.check", "logs.search", "net.check"} {
-		if !names[want] {
-			t.Errorf("%s is not offered: %v", want, names)
-		}
-	}
+	// on top of the base set the fake node has a fake Uptime Kuma (E2-04c), releases a notes
+	// folder (tools.docs_roots, E2-03), has a fake SearXNG and may fetch pages (web.search /
+	// web.images, web.fetch / web.image) and watches one gateway and one name (net.check)
+	wantCapabilities(t, inv, "kuma.monitors", "docs.list", "docs.read",
+		"web.search", "web.images", "web.fetch", "web.image", "net.check")
 	for _, c := range inv.Capabilities {
 		if !c.ReadOnly || c.Description == "" || !strings.Contains(string(c.InputSchema), `"type":"object"`) {
 			t.Errorf("%+v", c)
@@ -82,21 +114,14 @@ func TestTheInventoryListsWhatTheNodeOffers(t *testing.T) {
 }
 
 // Without a released directory (tools.docs_roots, the default) and without a connectors file a
-// node offers only the ten of E2-04, the two collecting ones and inventory.snapshot that need no target: no docs.*, no connector capability.
+// node offers only the base set: no docs.*, no files.*, no web.*, no connector capability.
 func TestTheInventoryOffersNoKnowledgeFilesWithoutAReleasedDirectory(t *testing.T) {
 	_, _, inv := toolsSetup(t, toolsConfig(`"docker.ps"`, `"capability.invoke"`), func(o *Options) {
 		o.NewCapabilities = func(*protocol.ToolsConfig) *capability.Registry {
 			return tools.NewRegistry(tools.Options{})
 		}
 	})
-	if len(inv.Capabilities) != 14 {
-		t.Fatalf("%d capabilities: %v", len(inv.Capabilities), inventoryNames(inv))
-	}
-	for name := range inventoryNames(inv) {
-		if strings.HasPrefix(name, "docs.") || strings.HasPrefix(name, "kuma.") || strings.HasPrefix(name, "omada.") || strings.HasPrefix(name, "web.") {
-			t.Errorf("%s is offered without a released directory / connectors file", name)
-		}
-	}
+	wantCapabilities(t, inv)
 }
 
 // With docs_roots the node offers docs.list and docs.read, and only those two are added.
@@ -107,10 +132,7 @@ func TestTheInventoryOffersKnowledgeFilesWithAReleasedDirectory(t *testing.T) {
 			return tools.NewRegistry(tools.Options{DocsRoots: []string{dir}})
 		}
 	})
-	names := inventoryNames(inv)
-	if len(inv.Capabilities) != 16 || !names["docs.list"] || !names["docs.read"] {
-		t.Fatalf("%d capabilities: %v", len(inv.Capabilities), names)
-	}
+	wantCapabilities(t, inv, "docs.list", "docs.read")
 }
 
 func TestACapabilityRunsOnlyWhenTheNodeSwitchedItOn(t *testing.T) {
