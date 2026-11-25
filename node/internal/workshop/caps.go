@@ -323,7 +323,7 @@ func (w *Workshop) capRead() capability.Capability {
 			if err != nil {
 				return nil, err
 			}
-			rel, abs, err := confine(dir, in.Path, false)
+			rel, abs, err := w.confineTracked(ctx, dir, in.Path, false)
 			if err != nil {
 				return nil, err
 			}
@@ -613,7 +613,7 @@ func (w *Workshop) capEdit() capability.Capability {
 			if err != nil {
 				return nil, err
 			}
-			rel, abs, err := confine(dir, in.Path, true)
+			rel, abs, err := w.confineTracked(ctx, dir, in.Path, true)
 			if err != nil {
 				return nil, err
 			}
@@ -667,7 +667,7 @@ func (w *Workshop) capWrite() capability.Capability {
 			if err != nil {
 				return nil, err
 			}
-			rel, abs, err := confine(dir, in.Path, true)
+			rel, abs, err := w.confineTracked(ctx, dir, in.Path, true)
 			if err != nil {
 				return nil, err
 			}
@@ -727,7 +727,7 @@ func (w *Workshop) capApplyPatch() capability.Capability {
 			}
 			for _, entry := range strings.Split(stat, "\x00") {
 				if _, p, ok := cutNumstat(entry); ok {
-					if _, _, err := confine(dir, p, true); err != nil {
+					if _, _, err := w.confineTracked(ctx, dir, p, true); err != nil {
 						return nil, err
 					}
 				}
@@ -837,6 +837,58 @@ func confine(dir, p string, write bool) (string, string, error) {
 	real, err := filepath.EvalSymlinks(probe)
 	if err != nil || (real != root && !strings.HasPrefix(real, root+string(filepath.Separator))) {
 		return "", "", inputErr("%s leaves the repository", rel)
+	}
+	return rel, abs, nil
+}
+
+// trackedLinks returns the paths that the index records as symbolic links (mode 120000), only among
+// paths when any are given. Git on Windows usually checks such a link out as a plain file that holds
+// the target, which os.Lstat does not see as a link; writing that file would change the link in the
+// next commit. The workshop treats these files as links on every system.
+func (w *Workshop) trackedLinks(ctx context.Context, dir string, paths ...string) (map[string]bool, error) {
+	args := []string{"ls-files", "--stage", "-z"}
+	if len(paths) > 0 {
+		args = append(args, "--")
+		for _, p := range paths {
+			args = append(args, ":(literal)"+p)
+		}
+	}
+	out, err := w.git(ctx, dir, nil, "", args...)
+	if err != nil {
+		return nil, err
+	}
+	links := map[string]bool{}
+	for _, entry := range strings.Split(out, "\x00") {
+		meta, p, ok := strings.Cut(entry, "\t")
+		if ok && strings.HasPrefix(meta, "120000 ") {
+			links[p] = true
+		}
+	}
+	return links, nil
+}
+
+// confineTracked is confine plus the index: a path that runs through a file git tracks as a
+// symbolic link is refused even where the link was checked out as a plain file.
+func (w *Workshop) confineTracked(ctx context.Context, dir, p string, write bool) (string, string, error) {
+	rel, abs, err := confine(dir, p, write)
+	if err != nil {
+		return "", "", err
+	}
+	var prefixes []string
+	for i := range rel {
+		if rel[i] == '/' {
+			prefixes = append(prefixes, rel[:i])
+		}
+	}
+	prefixes = append(prefixes, rel)
+	links, err := w.trackedLinks(ctx, dir, prefixes...)
+	if err != nil {
+		return "", "", err
+	}
+	for _, q := range prefixes {
+		if links[q] {
+			return "", "", inputErr("%s is a symbolic link: the workshop does not follow it", q)
+		}
 	}
 	return rel, abs, nil
 }
