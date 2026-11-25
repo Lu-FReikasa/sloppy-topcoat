@@ -237,7 +237,7 @@ Notes:
 | GUI login says the token is invalid | token must match `TOPCOAT_DEV_ADMIN_TOKEN` in `deploy/hub.env`; after editing the file run `up -d` again |
 | `docker compose pull`: `denied` / `unauthorized` | not logged in to `ghcr.io`, or the token lacks `read:packages` → `docker login ghcr.io` again |
 | node never connects, log says the hub rejected the node identity (403) | the hub no longer knows this node (e.g. database reset with `down -v`) → new code, `pair … --force` |
-| GUI shows **Verbindung wird wiederhergestellt** | the live stream dropped (hub restart); it reconnects automatically |
+| GUI shows **Hub not reachable** (de: **Hub nicht erreichbar**), a red ring instead of the dot | the live stream got no byte for 5 s (hub restart, network); it reconnects every few seconds and turns live by itself |
 
 To start over: `docker compose -f deploy/docker-compose.yml --env-file deploy/hub.env
 down -v` (the `-v` deletes the database and the hub CA) and delete the nodes' data dirs.

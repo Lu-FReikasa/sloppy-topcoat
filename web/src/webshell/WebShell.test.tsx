@@ -82,4 +82,43 @@ describe("the web shell", () => {
     requestOpen({ module: "page.access", props: {}, program: "research" });
     await waitFor(() => expect(window.location.hash).toBe("#/w/research"));
   });
+
+  it("closes the user menu on Escape and on a click outside, the focus back on its button", async () => {
+    show();
+    const me = await screen.findByRole("button", { name: /Lu/ });
+    fireEvent.click(me);
+    expect(screen.getByRole("menu")).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(me);
+    // a click inside the menu leaves it open; one on the page closes it
+    fireEvent.click(me);
+    fireEvent.click(screen.getByRole("menu"));
+    expect(screen.getByRole("menu")).toBeTruthy();
+    me.blur();
+    fireEvent.click(document.body);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(me);
+  });
+
+  it("closes the phone drawer on Escape and on a tap beside it, the focus back on the menu button", async () => {
+    setNarrow(true);
+    show();
+    const side = await screen.findByRole("navigation", { name: "Navigation" });
+    const burger = screen.getByRole("button", { name: "Navigation öffnen" });
+    const backdrop = () => document.querySelector(".ws-backdrop");
+    expect(side.className).toContain("ws-side-closed");
+    expect(backdrop()).toBeNull();
+    fireEvent.click(burger);
+    expect(side.className).not.toContain("ws-side-closed");
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(side.className).toContain("ws-side-closed");
+    expect(document.activeElement).toBe(burger);
+    fireEvent.click(burger);
+    burger.blur();
+    fireEvent.click(backdrop()!);
+    expect(side.className).toContain("ws-side-closed");
+    expect(backdrop()).toBeNull();
+    expect(document.activeElement).toBe(burger);
+  });
 });

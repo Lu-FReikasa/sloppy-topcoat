@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-// cpuMeter turns two readings of "CPU time since boot" into a utilisation: the share of the time
+// cpuMeter turns two readings of "CPU time since boot" into a utilization: the share of the time
 // all processors together were not idle between the calls. The first call has no earlier reading
 // and gives nothing; a counter that went backwards (a reboot, a wrap) starts over.
 type cpuMeter struct {
@@ -17,7 +17,7 @@ type cpuMeter struct {
 	total, busy float64
 }
 
-// percent is the utilisation since the previous call in percent, 0..100 (known false on the
+// percent is the utilization since the previous call in percent, 0..100 (known false on the
 // first call and when no time passed).
 func (m *cpuMeter) percent(total, busy float64) (float64, bool) {
 	m.mu.Lock()

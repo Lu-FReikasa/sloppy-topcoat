@@ -135,6 +135,9 @@ the pages too (a light theme sets `--bg`, `--surface` and `--text` light and dar
 | `--accent`, `--accent-text` | the highlight colour (focused window, active entries, buttons); text on it |
 | `--track` | the track of bars and meters |
 | `--ok`, `--warn`, `--bad` | a good state, a warning, an error |
+| `--on-ok`, `--on-warn`, `--on-off` | text on a badge filled with `--ok`, `--warn` or the grey of "offline" (light fills want dark text) |
+| `--app-chat`, `--app-research`, `--app-dev`, `--app-admin`, `--app-project` | the colour of each application: its inbox tag, its rule, a task's badge |
+| `--on-app` | text on an application colour used as a fill |
 | `--radius` | the corner radius of the pages' controls |
 
 ## What a style sheet can reach

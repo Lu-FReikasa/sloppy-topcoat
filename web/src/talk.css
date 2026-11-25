@@ -170,6 +170,18 @@
   border-radius: calc(var(--radius, 12px) + 6px);
 }
 
+/* the message box takes the row and grows with the text from 3 to 10 lines (growTextarea.ts sets the
+   height; the limits here hold while it has not run yet), then scrolls inside. In a low window (a
+   phone held sideways) it stops at under half the window's height, so the stream stays visible. */
+.talk-composer textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.45;
+  resize: none;
+  min-height: calc(3 * 1.45em + 1rem + 2px);
+  max-height: min(calc(10 * 1.45em + 1rem + 2px), 45dvh);
+}
+
 .talk-composer button {
   min-height: 2.4rem;
   border-radius: 999px;
@@ -216,28 +228,52 @@
   padding: 0.5rem 0;
 }
 
-/* The line under a message: time, number, two ways to point at it. The buttons show on hover and
-   keyboard focus only; where there is no hover (touch) they stay visible. */
+/* The line under a message: time, number, two ways to point at it (on hover and keyboard focus only;
+   where there is no hover, touch, they stay visible) and, under an answer, "Have it checked". */
 .message-line {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem 0.5rem;
   font-size: 0.75rem;
-  opacity: 0.7;
+  color: var(--muted); /* not opacity: the buttons in the line keep their full contrast */
+  /* as high as one of its buttons (line, padding, border), so showing them on hover does not push
+     the messages below down */
+  min-height: calc(1lh + 0.2rem + 2px);
 }
 
 .message-line button {
-  visibility: hidden;
   font-size: inherit;
+  padding: 0.1rem 0.5rem;
 }
 
-.talk-row:hover .message-line button,
-.message-line:focus-within button {
-  visibility: visible;
+/* The two ways to point at a message are out of sight and out of the line until the row is hovered
+   or focused: a hidden button that kept its place pushed the line into a second, empty row at narrow
+   widths. They stay reachable by Tab. "Have it checked" (.talk-review-ask) is always there (#77). */
+.message-line button:not(.talk-review-ask) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.talk-row:hover .message-line button:not(.talk-review-ask),
+.message-line:focus-within button:not(.talk-review-ask) {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
 }
 
 @media (hover: none) {
-  .message-line button {
-    visibility: visible;
+  .message-line button:not(.talk-review-ask) {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
   }
 }

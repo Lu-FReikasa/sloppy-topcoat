@@ -15,6 +15,7 @@ type ExecRunner struct {
 	Timeout time.Duration
 }
 
+// Run runs one command in dir with env and returns its combined output.
 func (r ExecRunner) Run(ctx context.Context, dir string, env []string, name string, args ...string) (string, error) {
 	limit := r.Timeout
 	if limit <= 0 {

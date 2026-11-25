@@ -39,7 +39,7 @@ func newBus(t *testing.T, uid uint32, byUID map[uint32]string, specs ...Spec) (*
 	return b, ctx
 }
 
-func serve(t *testing.T, ctx context.Context, b *Bus, service string, actions []string, h Handler) *Client {
+func serve(t *testing.T, ctx context.Context, b *Bus, service string, actions []string, h Handler) *Client { //nolint:revive // test helper: t comes first by convention
 	t.Helper()
 	cl, err := Dial(ctx, b.SocketPath(service), service, actions)
 	if err != nil {

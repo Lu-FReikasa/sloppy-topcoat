@@ -23,8 +23,7 @@ function item(id: string, over: Partial<InboxItem> = {}): InboxItem {
     urgent: false,
     unresolved: false,
     read: false,
-    pinned: false,
-    filed: false,
+    group: "results",
     created_at: "2026-10-22T09:00:00Z",
     read_at: null,
     resolved_at: null,
@@ -46,33 +45,25 @@ function hub(start: InboxItem[]) {
     return items.find((i) => i.id === id)!;
   };
   const mock = mockFetch({
-    "GET /api/inbox?view=inbox": () =>
+    "GET /api/inbox": () =>
       jsonResponse({
         items: items.filter((i) => !i.read || i.unresolved),
         counts: counts(items),
       }),
-    "GET /api/inbox?view=filed": () =>
-      jsonResponse({
-        items: items.filter((i) => i.filed && !i.pinned),
-        counts: counts(items),
-      }),
-    "POST /api/inbox/a/open": () =>
-      jsonResponse(patch("a", { read: true, filed: true })),
+    "POST /api/inbox/a/open": () => jsonResponse(patch("a", { read: true })),
     "POST /api/inbox/u/open": () => jsonResponse(patch("u", { read: true })),
     "POST /api/inbox/u/resolve": () =>
       jsonResponse(
         patch("u", {
           unresolved: false,
-          filed: true,
+          group: "results",
           resolved_at: "2026-10-22T10:00:00Z",
         }),
       ),
-    "POST /api/inbox/a/pin": () =>
-      jsonResponse(patch("a", { pinned: true, filed: false })),
     "POST /api/inbox/read-all": () => {
       const before = items.filter((i) => !i.read && !i.unresolved).length;
-      items = items.map((i) => (i.unresolved ? i : { ...i, read: true, filed: !i.pinned }));
-      return jsonResponse({ filed: before });
+      items = items.map((i) => (i.unresolved ? i : { ...i, read: true }));
+      return jsonResponse({ read: before });
     },
   });
   const api = new ApiClient({ token: "t", fetchImpl: mock.fetch });
@@ -83,7 +74,7 @@ describe("InboxPage", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("marks everything read in one click; what waits for an action stays", async () => {
-    const { api, mock } = hub([item("a"), item("b"), item("u", { urgent: true, unresolved: true })]);
+    const { api, mock } = hub([item("a"), item("b"), item("u", { urgent: true, unresolved: true, group: "decide" })]);
     render(<InboxPage api={api} tick={0} />);
     fireEvent.click(await screen.findByRole("button", { name: "Alle als gelesen markieren" }));
     await waitFor(() => expect(screen.queryByText("Item a")).toBeNull());
@@ -134,6 +125,7 @@ describe("InboxPage", () => {
       title: "Needs a click",
       urgent: true,
       unresolved: true,
+      group: "decide",
     });
     const { api } = hub([urgent]);
     render(<InboxPage api={api} tick={0} />);
@@ -151,24 +143,23 @@ describe("InboxPage", () => {
     await waitFor(() => expect(screen.getByTestId("inbox-empty")).toBeTruthy());
   });
 
-  it("pins an open item to the board", async () => {
-    const { api, mock } = hub([item("a", { title: "Keep me" })]);
+  it("shows one list in three groups and offers no board, pin or marks", async () => {
+    const { api } = hub([
+      item("a", { title: "Backup done" }),
+      item("e", { title: "Task failed", kind: "task_failed", group: "errors" }),
+      item("d", { title: "Click me", kind: "proposal", urgent: true, unresolved: true, group: "decide" }),
+    ]);
     render(<InboxPage api={api} tick={0} />);
-    fireEvent.click(await screen.findByRole("button", { name: /Keep me/ }));
+    await screen.findByText("Backup done");
+    const groups = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(groups).toEqual(["Entscheiden", "Fehler", "Ergebnisse"]);
+    expect(within(screen.getByTestId("inbox-group-errors")).getByText("Task failed")).toBeTruthy();
+    expect(screen.queryByRole("tab")).toBeNull(); // no "Abgelegt" any more
+    fireEvent.click(screen.getByRole("button", { name: /Backup done/ }));
     const reading = await screen.findByTestId("inbox-reading");
-    fireEvent.click(
-      within(reading).getByRole("button", { name: "An die Pinnwand heften" }),
-    );
-    await waitFor(() =>
-      expect(
-        mock.calls.find((c) => c.url === "/api/inbox/a/pin")?.body,
-      ).toEqual({ pinned: true }),
-    );
-    expect(
-      await within(screen.getByTestId("inbox-reading")).findByRole("button", {
-        name: "Von der Pinnwand nehmen",
-      }),
-    ).toBeTruthy();
+    expect(within(reading).queryByRole("button", { name: /Pinnwand/ })).toBeNull();
+    expect(within(reading).queryByText(/Post-it|Aufkleber|Kommentar/)).toBeNull();
+    expect(within(reading).getByRole("button", { name: "Löschen" })).toBeTruthy();
   });
 
   it("shows the window an item is about", async () => {
@@ -188,18 +179,9 @@ describe("InboxPage", () => {
     window.removeEventListener(INTENT_EVENT, heard);
   });
 
-  it("keeps what was read in the filed corner", async () => {
-    const { api } = hub([
-      item("a", { title: "Old news", read: true, filed: true }),
-    ]);
-    render(<InboxPage api={api} tick={0} />);
-    fireEvent.click(await screen.findByRole("tab", { name: "Abgelegt" }));
-    expect(await screen.findByText("Old news")).toBeTruthy();
-  });
-
   it("offers a retry when the inbox cannot be loaded", async () => {
     const mock = mockFetch({
-      "GET /api/inbox?view=inbox": () => jsonResponse({ detail: "down" }, 503),
+      "GET /api/inbox": () => jsonResponse({ detail: "down" }, 503),
     });
     const api = new ApiClient({ token: "t", fetchImpl: mock.fetch });
     render(<InboxPage api={api} tick={0} />);

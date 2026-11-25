@@ -62,6 +62,7 @@ import {
   tileOf,
   type Tiles,
 } from "./dwindle";
+import { ShellFailure, ShellLoading } from "../components/ShellPage";
 import { FrameMeter } from "./FrameMeter";
 import { clientCommand, clientConfig, installClientHandlers, installEscape, installOverlayMotion } from "./client";
 import { countRender } from "./frames";
@@ -729,8 +730,11 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
     if (top) setStack((s) => [...s.filter((k) => k !== top), top]);
   }
 
-  // the keys of the desktop
-  useEffect(() => {
+  // The keys of the desktop. Attached while the drawing is committed (layout effect), not after
+  // it: a passive effect can run a moment after the windows are already on screen, and a key
+  // pressed in that gap reached a listener that still knew the earlier state (no window in front
+  // while loading, or the window that was in front before), so AltGr+C was lost (#73).
+  useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (mod && !e.altKey && (e.key === "k" || e.key === "K")) {
@@ -855,19 +859,8 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
     return out;
   }, [programs, modules, ctx.isAdmin, t, change, onLogout, ui.boot, setPrefs, hasSettings, state.focus, toggleTalk]);
 
-  if (ui.status === "loading" && !ui.boot) {
-    return <p className="muted dt-note dt-root">{t("layout.loading")}</p>;
-  }
-  if (!ui.boot) {
-    return (
-      <div className="dt-root dt-note" role="alert">
-        <p className="bad">{t("layout.loadFailed", { error: ui.error ?? "" })}</p>
-        <button type="button" onClick={() => void ui.reload()}>
-          {t("layout.retry")}
-        </button>
-      </div>
-    );
-  }
+  if (ui.status === "loading" && !ui.boot) return <ShellLoading />;
+  if (!ui.boot) return <ShellFailure unreachable={ui.unreachable} detail={ui.error} onRetry={ui.reload} />;
 
   const shown = visible(state);
   // a narrow screen shows the one in front; a maximised window only grows (D: the others stay

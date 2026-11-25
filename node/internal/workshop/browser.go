@@ -111,8 +111,10 @@ func (w *Workshop) openSession(ctx context.Context, repo, mode, page string, the
 		cleanup()
 		return nil, err
 	}
+	// The box is shared with the helper container, which reads it as another uid (gosec G301/G302/
+	// G306 below): nothing in it is secret, it holds the session's commands, answers and theme.
 	for _, d := range []string{filepath.Join(box, "in"), filepath.Join(box, "out")} {
-		if err := os.MkdirAll(d, 0o755); err != nil {
+		if err := os.MkdirAll(d, 0o755); err != nil { //nolint:gosec // G301: the helper must reach box/, see above
 			cleanup()
 			return nil, err
 		}
@@ -121,13 +123,13 @@ func (w *Workshop) openSession(ctx context.Context, repo, mode, page string, the
 	// writes its answers into out/ and removes the commands it took from in/ (2026-11-15: with in/
 	// at 0755 the first removal failed and the helper ended; every call after open timed out)
 	for _, d := range []string{"in", "out"} {
-		if err := os.Chmod(filepath.Join(box, d), 0o777); err != nil {
+		if err := os.Chmod(filepath.Join(box, d), 0o777); err != nil { //nolint:gosec // G302: the helper writes and removes here, see above
 			cleanup()
 			return nil, err
 		}
 	}
 	if theme != nil {
-		if err := os.WriteFile(filepath.Join(box, "theme.json"), theme, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(box, "theme.json"), theme, 0o644); err != nil { //nolint:gosec // G306: read by the helper, see Open
 			cleanup()
 			return nil, err
 		}
@@ -353,7 +355,7 @@ func (d *dockerBrowser) Call(ctx context.Context, op string, args json.RawMessag
 	}
 	in := filepath.Join(d.box, "in")
 	tmp := filepath.Join(in, name+".tmp")
-	if err := os.WriteFile(tmp, msg, 0o644); err != nil {
+	if err := os.WriteFile(tmp, msg, 0o644); err != nil { //nolint:gosec // G306: the helper reads its commands as another uid (see Open)
 		return nil, err
 	}
 	if err := os.Rename(tmp, filepath.Join(in, name+".json")); err != nil { // atomic: no half-written command
@@ -379,7 +381,7 @@ func (d *dockerBrowser) Call(ctx context.Context, op string, args json.RawMessag
 
 func (d *dockerBrowser) Close(ctx context.Context) error {
 	// ask politely, then make sure: the container is removed whatever happened
-	_ = os.WriteFile(filepath.Join(d.box, "in", "close.json"), []byte(`{"op":"close"}`), 0o644)
+	_ = os.WriteFile(filepath.Join(d.box, "in", "close.json"), []byte(`{"op":"close"}`), 0o644) //nolint:gosec // G306: read by the helper (see Open)
 	_, _, _ = d.r.do(ctx, "POST", "/containers/"+d.id+"/kill", nil)
 	d.remove()
 	return nil
