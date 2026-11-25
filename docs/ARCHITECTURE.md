@@ -100,8 +100,8 @@ what replaces or amends it; the text below the status is kept as it was decided.
 | Shelved | decided not to pursue for now; kept for later |
 | Under review / Open question | conflicts with the current state or goal; the maintainer decides |
 
-D109, D110, D113 and D114 are reserved for the open decisions of the plan of 2026-11-24 (decomposition into
-tasks, workshop scope, Theme v2, theme images). D115 and D116 restore two decisions of 2026-11-04 whose
+D109 and D110 are reserved for the open decisions of the plan of 2026-11-24 (decomposition of large tasks,
+workshop scope). D115 and D116 restore two decisions of 2026-11-04 whose
 numbers were reused by mistake on 2026-11-17.
 
 ### Foundations and security
@@ -272,6 +272,19 @@ How the GUI is drawn: the desktop, the desktop client and themes as data.
 | [D70](decisions/D70.md) | The desktop replaces the shells and the looks | Replaced |
 | [D73](decisions/D73.md) | A second look | Replaced |
 | [D106](decisions/D106.md) | A desktop client with free windows; themes decide behaviour as data | Current |
+| [D113](decisions/D113.md) | Theme v2: a theme arranges registered views with an engine | Decided, not built |
+| [D114](decisions/D114.md) | Images of themes and personas are hub files | Decided, not built |
+| [D128](decisions/D128.md) | Development makes personas and themes from a prompt; the person installs them | Decided, not built |
+
+### Images, vision and voice
+
+Seeing images in the chat, making images locally, and talking to Topcoat.
+
+| # | Decision | Status |
+|---|---|---|
+| [D125](decisions/D125.md) | The chat sees images the person gives it | Decided, not built |
+| [D126](decisions/D126.md) | Images are made locally by a second runner on a node | Decided, not built |
+| [D127](decisions/D127.md) | Voice: speech in and out through node services, half duplex first | Decided, not built |
 
 ### Development, workshop and releases
 
