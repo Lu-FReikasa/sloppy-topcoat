@@ -489,6 +489,11 @@
             "minLength": 1,
             "maxLength": 6000
           },
+          "brief": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
+          },
           "findings": {
             "type": "array",
             "items": {
@@ -594,6 +599,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 6000
+          },
+          "brief": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
           },
           "branch": {
             "type": "string",
@@ -738,6 +748,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 6000
+          },
+          "brief": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
           },
           "findings": {
             "type": "array",

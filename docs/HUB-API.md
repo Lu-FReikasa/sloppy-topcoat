@@ -634,3 +634,22 @@ value, whether overridden); `PUT /api/admin/params/{key}` with `{"value": ...}` 
 `{family: {fast|balanced|thorough: {reasoning_effort?, chat_template_kwargs?}}}`; the family is a part of the model name
 (the longest match wins). Set on 2026-10-31 for `gemma` and `qwen3.5` (`fast`, `balanced`:
 `{"chat_template_kwargs": {"enable_thinking": false}}`). It applies to chat answers only.
+
+### Results of an employee in two forms (D112, issue #35)
+
+The messages between the applications are typed by `proto/messages/registry.json` (D81). The result of an
+employee (`research.result`, `dev.result`, `admin.result`) carries two texts:
+
+- `summary`: for the person, as the employee wrote it.
+- `brief`: for the secretary, at most 600 characters. An employee may write its own; otherwise the hub writes
+  it from the payload when the message is filed (`result_forms.with_brief`, called by
+  `ProjectMessages.add_message`): the kind of result, the first sentence of the summary, how many findings,
+  the branch, tests and acceptance of a Development result, the required points without a finding, the open
+  points.
+
+What of a result may enter the secretary's conversation is `result_forms.for_secretary`: the summary, the
+brief and references (`{"kind": "file" | "branch", "ref": …}`), each through the private-data filter of D65
+(`redaction.private_kinds` with the node names, the user names and the own domains). A text that holds a
+secret or an identifier of the operator's network becomes a pointer ("The result holds private details; they
+stay in Research. Open it there."), a reference that names one is left out, and `withheld` lists the kinds
+found. The findings and their quotes, and the content of files and records, never enter the secretary's text.
