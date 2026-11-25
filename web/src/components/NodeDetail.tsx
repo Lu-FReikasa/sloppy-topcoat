@@ -83,7 +83,7 @@ export function NodeDetailView({ api, nodeId, detail, dispatch, epoch = 0 }: Pro
 
   return (
     <section>
-      <p>
+      <p className="link-row">
         <a href={overviewHref}>← {t("detail.back")}</a>
       </p>
       {!node && loadError && (
@@ -713,13 +713,16 @@ function ResidentControls({
 
   return (
     <>
-      <input
-        type="checkbox"
-        checked={resident !== undefined}
-        disabled={disabled}
-        aria-label={t("detail.residentToggle", { model })}
-        onChange={(e) => onChange(e.target.checked ? {} : null)}
-      />
+      {/* the label is the larger touch target around the box; the name is the input's own */}
+      <label className="resident-toggle">
+        <input
+          type="checkbox"
+          checked={resident !== undefined}
+          disabled={disabled}
+          aria-label={t("detail.residentToggle", { model })}
+          onChange={(e) => onChange(e.target.checked ? {} : null)}
+        />
+      </label>
       {resident && (
         <input
           type="number"

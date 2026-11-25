@@ -38,6 +38,7 @@ import { EvidenceMark } from "./EvidenceMark";
 import { IdleArt } from "./IdleArt";
 import { Clipper, moodOf, useClipperActive } from "../persona/Clipper";
 import { MessageLine } from "./MessageLine";
+import { MIN_LINES, useGrowingTextarea } from "./growTextarea";
 
 /** What the user sees of the history: what was said, an emoji answer, the card of a request that
  *  was handed to the queue, and the result cards of checks (folded), not the run behind it. */
@@ -147,6 +148,8 @@ export function TalkPage({
   // the window shows the open chat only; the chats before it are one click away
   const [showEarlier, setShowEarlier] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
+  const room = useRef<HTMLElement>(null);
+  useGrowingTextarea(input, draft, room);
   const creating = useRef(false);
   // a text another window handed over ("Look at this in Development") goes into the draft
   useEffect(() => {
@@ -365,7 +368,7 @@ export function TalkPage({
   const cutOff =
     lastAnswer?.status === "truncated" || lastAnswer?.status === "interrupted";
   return (
-    <section className="talk" aria-label={t("talk.label")}>
+    <section ref={room} className="talk" aria-label={t("talk.label")}>
       <div
         className="talk-stream"
         ref={ref}
@@ -727,7 +730,7 @@ export function TalkPage({
       >
         <textarea
           ref={input}
-          rows={1}
+          rows={MIN_LINES}
           value={draft}
           placeholder={t("talk.placeholder")}
           aria-label={t("talk.placeholder")}
