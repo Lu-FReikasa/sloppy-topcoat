@@ -62,7 +62,7 @@
 
 .app-badge.is-write {
   background: var(--app-color);
-  color: #fff;
+  color: var(--on-app, #fff);
 }
 
 .app-badge.app-research {
@@ -272,14 +272,17 @@ input {
 
 .badge-available {
   background: var(--ok);
+  color: var(--on-ok, #fff);
 }
 
 .badge-busy_gaming {
   background: var(--accent);
+  color: var(--accent-text);
 }
 
 .badge-degraded {
   background: var(--warn);
+  color: var(--on-warn, #fff);
 }
 
 .badge-yielded {
@@ -292,22 +295,27 @@ input {
 
 .badge-offline {
   background: var(--off);
+  color: var(--on-off, #fff);
 }
 
 .badge-knowledge-ready {
   background: var(--ok);
+  color: var(--on-ok, #fff);
 }
 
 .badge-knowledge-indexing {
   background: var(--accent);
+  color: var(--accent-text);
 }
 
 .badge-knowledge-new {
   background: var(--off);
+  color: var(--on-off, #fff);
 }
 
 .badge-knowledge-error {
   background: var(--warn);
+  color: var(--on-warn, #fff);
 }
 
 /* Usage bars */

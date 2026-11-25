@@ -16,6 +16,15 @@
   --ok: #7be08a;
   --warn: #ffcb6b;
   --bad: #ff6b6b;
+  /* text on a status fill: the fills are light here, so the text is dark (#75) */
+  --on-ok: #04080a;
+  --on-warn: #04080a;
+  --on-off: #04080a;
+  /* the application colours that stay under 4.5:1 on the dark surfaces, lifted (#75) */
+  --app-admin: #e8707f;
+  --app-project: #a891e6;
+  /* text on an application colour as a fill (a task that may propose changes) */
+  --on-app: #04080a;
   --radius: 0;
   color-scheme: dark;
   font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
