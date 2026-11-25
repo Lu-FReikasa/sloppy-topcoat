@@ -72,7 +72,9 @@ class Settings(BaseSettings):
     # a direct model transfer (E2-07) that reports no progress for this long fails with "timeout"
     model_transfer_timeout_seconds: float = 15 * 60.0
     heartbeat_interval_seconds: int = 10
-    sse_keepalive_seconds: float = 15.0
+    # the GUI counts the hub as lost after 5 s without a byte on its stream (web/src/api/sse.ts,
+    # LOST_AFTER_MS), so a quiet stream must send a comment well within that
+    sse_keepalive_seconds: float = 2.0
 
     # Model gateway (/v1, E1-05).
     # Which node and model do which work is decided by the table of applications of the node

@@ -19,6 +19,7 @@ import { workspaceHref } from "../route";
 import { LookContext, type LookControls } from "../settings/lookContext";
 import { SETTINGS } from "../settings/registry";
 import { setShellChoice } from "./shell";
+import { ShellFailure, ShellLoading } from "../components/ShellPage";
 
 interface Props {
   api: ApiClient;
@@ -206,19 +207,8 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
     return out;
   }, [programs, modules, hasSettings, t, open, openSettings, onLogout]);
 
-  if (ui.status === "loading" && !ui.boot) {
-    return <p className="muted dt-note dt-root">{t("layout.loading")}</p>;
-  }
-  if (!ui.boot) {
-    return (
-      <div className="dt-root dt-note" role="alert">
-        <p className="bad">{t("layout.loadFailed", { error: ui.error ?? "" })}</p>
-        <button type="button" onClick={() => void ui.reload()}>
-          {t("layout.retry")}
-        </button>
-      </div>
-    );
-  }
+  if (ui.status === "loading" && !ui.boot) return <ShellLoading />;
+  if (!ui.boot) return <ShellFailure unreachable={ui.unreachable} detail={ui.error} onRetry={ui.reload} />;
 
   const customThemes = ui.boot.themes ?? [];
   const theme = resolveTheme(ui.prefs?.look, customThemes);

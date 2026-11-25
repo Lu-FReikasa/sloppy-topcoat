@@ -75,7 +75,7 @@ describe("i18n catalogue", () => {
   it("contains keys that are built dynamically", () => {
     const dynamic = [
       ...["available", "busy_gaming", "degraded", "yielded", "offline"].map((s) => `state.${s}`),
-      ...["connecting", "live", "reconnecting"].map((s) => `connection.${s}`),
+      ...["connecting", "live", "lost"].map((s) => `connection.${s}`),
       ...["llamaserver", "fake"].map((s) => `runnerType.${s}`),
       ...[
         "model_loaded",
