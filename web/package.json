@@ -10,7 +10,8 @@
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
     "preview": "vite preview",
-    "layout": "node scripts/layout-check.mjs"
+    "layout": "node scripts/layout-check.mjs",
+    "shell-layout": "node scripts/shell-check.mjs"
   },
   "dependencies": {
     "@xyflow/react": "12.12.0",
