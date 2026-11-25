@@ -793,8 +793,8 @@ func cleanRel(p string) (string, error) {
 
 // confine returns the clean relative path and the absolute one, and checks that the path stays
 // inside dir, does not touch .git, a secret-looking file or (when writing) a workflow file, and
-// does not run through a symbolic link. A file that does not exist yet is checked through its
-// nearest existing parent.
+// does not run through a symbolic link or another spelling of the path. A file that does not exist
+// yet is checked through its nearest existing parent.
 func confine(dir, p string, write bool) (string, string, error) {
 	rel, err := cleanRel(p)
 	if err != nil {
@@ -837,6 +837,12 @@ func confine(dir, p string, write bool) (string, string, error) {
 	real, err := filepath.EvalSymlinks(probe)
 	if err != nil || (real != root && !strings.HasPrefix(real, root+string(filepath.Separator))) {
 		return "", "", inputErr("%s leaves the repository", rel)
+	}
+	// the path must be the file's own name: a link on the way, or on Windows another spelling of
+	// the same file (other case, a short 8.3 name, a trailing dot), would slip past the name checks
+	// above and the index lookup of confineTracked
+	if real != probe {
+		return "", "", inputErr("%s is not the file's exact path (a link on the way, other case or a short name)", rel)
 	}
 	return rel, abs, nil
 }
