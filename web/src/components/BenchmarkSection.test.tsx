@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { describe, expect, it } from "vitest";
 import { ApiClient } from "../api/client";
 import { makeDetail } from "../test/fixtures";
-import { mockFetch } from "../test/mockFetch";
+import { jsonResponse, mockFetch } from "../test/mockFetch";
 import type { BenchmarkRow, NodeDetail } from "../types";
 import { BenchmarkSection } from "./BenchmarkSection";
 
@@ -82,6 +82,20 @@ describe("BenchmarkSection", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "qwen-7b" }));
     fireEvent.click(screen.getByRole("button", { name: "Starten" }));
     expect((await screen.findByRole("alert")).textContent).toContain("benchmark already running");
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("shows the busy text when the hub itself answers 429 busy", async () => {
+    setup(
+      makeDetail(),
+      jsonResponse({ detail: { code: "busy", message: "too many runs are going" } }, 429),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Benchmark starten" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "qwen-7b" }));
+    fireEvent.click(screen.getByRole("button", { name: "Starten" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Alle Plätze für deine Programme sind belegt");
+    expect(alert.textContent).not.toContain("too many runs");
     expect(screen.getByRole("dialog")).toBeTruthy();
   });
 

@@ -82,7 +82,7 @@ describe("ApiClient", () => {
     });
     const api = new ApiClient({ token: "t", fetchImpl: fetch });
     const res = await api.runAction("n1", "models.unload", { model: "x" });
-    expect(res).toEqual({ ok: false, error: { code, message } });
+    expect(res).toEqual({ ok: false, error: { code, message, status } });
   });
 
   it("maps network failures to code 'network'", async () => {
@@ -90,7 +90,7 @@ describe("ApiClient", () => {
     const api = new ApiClient({ token: "t", fetchImpl: failing as unknown as typeof fetch });
     await expect(api.runAction("n1", "models.load", { model: "x" })).resolves.toEqual({
       ok: false,
-      error: { code: "network", message: "Failed to fetch" },
+      error: { code: "network", message: "Failed to fetch", status: 0 },
     });
     await expect(api.listNodes()).rejects.toBeInstanceOf(ApiError);
   });
