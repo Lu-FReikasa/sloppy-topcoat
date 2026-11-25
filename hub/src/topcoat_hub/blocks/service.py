@@ -1,7 +1,7 @@
 """The hub side of block programs: the ports on the gateway and the agent, and the runs.
 
 A run has the rights of the person who started it (D20): the agent block is a task of that person
-with the tools the application's ceiling and the person's grants allow (D103), and nothing a block
+with the tools the application's ceiling and the person's grants allow (D116), and nothing a block
 does adds to that. Runs are kept in memory while they go and for a while afterwards."""
 
 import asyncio
