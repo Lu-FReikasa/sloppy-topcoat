@@ -2,8 +2,10 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { TOKEN_KEY } from "./auth";
+import { hubEvents } from "./data/hubEvents";
 import { bootstrap, setNarrow, workspace } from "./test/layoutFixtures";
 import { jsonResponse, mockFetch } from "./test/mockFetch";
+import { sseResponse } from "./test/sse";
 
 // The stream endpoint never answers in these tests.
 const hangingStream = () => new Promise<Response>(() => undefined);
@@ -91,6 +93,28 @@ describe("App", () => {
     window.dispatchEvent(new HashChangeEvent("hashchange"));
     await waitFor(() => expect(mock.calls.some((c) => c.url === "/api/wiki/pages/p-2")).toBe(true));
     await waitFor(() => expect(window.location.hash).toBe("#/w/wiki"));
+  });
+
+  it("hands the stream's events and its connect to the data layer", async () => {
+    window.localStorage.setItem(TOKEN_KEY, "dev-token");
+    const mock = mockFetch(
+      hub(
+        { id: "u1", name: "Admin", role: "admin" },
+        {
+          "GET /api/stream": (init?: RequestInit) =>
+            sseResponse([["node_benchmark", { node_id: "n1" }]], { hold: true, signal: init?.signal }),
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", mock.fetch);
+    const seen: string[] = [];
+    const offEvent = hubEvents.subscribe((ev) => seen.push(`${ev.event} ${ev.data}`));
+    const offConnect = hubEvents.onConnect(() => seen.push("connected"));
+    const { unmount } = render(<App />);
+    await waitFor(() => expect(seen).toEqual(["connected", 'node_benchmark {"node_id":"n1"}']));
+    unmount();
+    offEvent();
+    offConnect();
   });
 
   it("returns to the token form on 401", async () => {
