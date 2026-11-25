@@ -227,6 +227,8 @@ DEV_CAPABILITIES = [
     "repo.list",
     "repo.read",
     "repo.search",
+    # the map of a folder: files with their named places and lines (plan step 1.11)
+    "repo.outline",
     "repo.diff",
     "repo.start",
     "repo.edit",

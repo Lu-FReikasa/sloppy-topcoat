@@ -31,6 +31,7 @@
         "repo.list",
         "repo.read",
         "repo.search",
+        "repo.outline",
         "repo.diff",
         "repo.start",
         "repo.edit",

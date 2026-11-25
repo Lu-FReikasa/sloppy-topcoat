@@ -105,3 +105,17 @@ def test_a_garbled_id_is_the_one_it_shares_its_beginning_with() -> None:
     assert expand_short_ids({"id": other}, seen)[0] == {"id": other}
     # too little in common: it stays and the tool refuses it
     assert expand_short_ids({"id": "22c53e4b-ffff?"}, seen)[0] == {"id": "22c53e4b-ffff?"}
+
+
+def test_a_read_after_an_outline_finds_the_file_the_outline_showed() -> None:
+    """repo.outline (plan step 1.11) lists files like repo.list: a read by the bare file name
+    means the one file of the map."""
+    h = Hits()
+    h.note(
+        "repo.outline",
+        {"files": [{"path": "web/src/project/ListView.tsx", "symbols": []}, {"path": "hub/x.py"}]},
+        "E1",
+    )
+    assert h.resolve("repo.read", {"path": "ListView.tsx"})[0]["path"] == (
+        "web/src/project/ListView.tsx"
+    )

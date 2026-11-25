@@ -82,7 +82,7 @@ const repoProp = `"repo":{"type":"string","maxLength":63,"description":"the repo
 
 func (w *Workshop) capabilities() []capability.Capability {
 	caps := []capability.Capability{
-		w.capSync(), w.capStatus(), w.capList(), w.capRead(), w.capSearch(), w.capDiff(),
+		w.capSync(), w.capStatus(), w.capList(), w.capRead(), w.capSearch(), w.capOutline(), w.capDiff(),
 		w.capStart(), w.capEdit(), w.capWrite(), w.capApplyPatch(), w.capReset(), w.capPush(),
 		w.capBranches(), w.capCommit(),
 	}
