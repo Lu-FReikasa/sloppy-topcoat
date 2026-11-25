@@ -1304,7 +1304,9 @@
     "error": "The task failed: {{message}}",
     "checks": "Checks",
     "checkProgress": "{{steps}} steps, {{calls}} calls",
-    "checkOpen": "open"
+    "checkOpen": "open",
+    "noTask": "No task open",
+    "noTaskHint": "A task opens from the inbox or from a check in a chat."
   },
   "proposal": {
     "heading": "Proposed changes",
@@ -3872,7 +3874,8 @@
     "navigation": "Navigation",
     "applications": "Applications",
     "system": "System",
-    "toWindows": "Window view"
+    "toWindows": "Window view",
+    "moved": "This page has moved or does not exist."
   },
   "research": {
     "title": "Research",

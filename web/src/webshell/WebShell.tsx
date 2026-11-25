@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
 import type { StreamStatus } from "../api/sse";
@@ -47,6 +47,8 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
   const [sideOpen, setSideOpen] = useState(false);
   const [intentTick, setIntentTick] = useState(0);
   const [unread, setUnread] = useState<{ n: number; urgent: boolean }>({ n: 0, urgent: false });
+  // the address that opened the view was not known: a note above it, until the person moves on
+  const [moved, setMoved] = useState(false);
 
   const programs = ui.workspaces;
   const offered = ui.boot?.modules;
@@ -70,8 +72,9 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
     ? (views[shownKey] ?? (shownInfo ? { module: shownInfo.first, props: {} } : null))
     : null;
 
-  const open = useCallback((key: string, v?: ProgramView) => {
+  const open = useCallback((key: string, v?: ProgramView, note = false) => {
     setCurrent(key);
+    setMoved(note);
     if (v) setViews((all) => ({ ...all, [key]: v }));
     setSideOpen(false);
   }, []);
@@ -94,6 +97,7 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
     return () => window.removeEventListener(INTENT_EVENT, onIntent);
   }, []);
   const ready = ui.status === "ready";
+  const opening = useRef(false);
   useEffect(() => {
     if (!ready) return;
     const intent = takeIntent();
@@ -110,7 +114,15 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
       key = direct ?? programFor(infos, v.module, shownKey);
     }
     // shown after this render, as the desktop's preferences arrive after it
-    if (key) queueMicrotask(() => open(key, v));
+    const note = intent.moved === true;
+    if (!key) return;
+    opening.current = true;
+    queueMicrotask(() => {
+      opening.current = false;
+      open(key, v, note);
+      // the address names the program it opens in (the effect below left it alone meanwhile)
+      if (window.location.hash !== workspaceHref(key)) window.location.replace(workspaceHref(key));
+    });
     // only a new intent opens something
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, intentTick, infos, routeKey]);
@@ -120,10 +132,15 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
   const [seenRoute, setSeenRoute] = useState(routeKey);
   if (routeKey !== seenRoute) {
     setSeenRoute(routeKey);
-    if (routeKey && routeKey !== current && programs.some((p) => p.key === routeKey)) setCurrent(routeKey);
+    if (routeKey && routeKey !== current && programs.some((p) => p.key === routeKey)) {
+      setCurrent(routeKey);
+      setMoved(false);
+    }
   }
   useEffect(() => {
-    if (!ready || !shownKey || shownKey === routeKey) return;
+    // a view asked for is about to open: writing the program shown until then would be read back
+    // as an address brought in and open that program again (a deep link at load was lost, #76)
+    if (!ready || !shownKey || shownKey === routeKey || opening.current) return;
     window.location.replace(workspaceHref(shownKey));
   }, [ready, shownKey, routeKey]);
 
@@ -353,6 +370,11 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
                     </button>
                   )}
                 </div>
+                {moved && (
+                  <p className="ws-moved" role="status">
+                    {t("webShell.moved")}
+                  </p>
+                )}
                 <ModuleView
                   key={`${shown.key}:${view.module}:${JSON.stringify(view.props)}`}
                   win={{ id: `${shown.key}:${view.module}`, module: view.module, docked: false, props: view.props }}

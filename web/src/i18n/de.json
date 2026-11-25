@@ -1304,7 +1304,9 @@
     "error": "Die Aufgabe ist fehlgeschlagen: {{message}}",
     "checks": "Prüfungen",
     "checkProgress": "{{steps}} Schritte, {{calls}} Aufrufe",
-    "checkOpen": "öffnen"
+    "checkOpen": "öffnen",
+    "noTask": "Keine Aufgabe geöffnet",
+    "noTaskHint": "Eine Aufgabe öffnet sich aus dem Posteingang oder aus einer Prüfung in einem Chat."
   },
   "proposal": {
     "heading": "Vorgeschlagene Änderungen",
@@ -3872,7 +3874,8 @@
     "navigation": "Navigation",
     "applications": "Anwendungen",
     "system": "System",
-    "toWindows": "Fenster-Ansicht"
+    "toWindows": "Fenster-Ansicht",
+    "moved": "Diese Seite ist umgezogen oder existiert nicht."
   },
   "research": {
     "title": "Recherchieren",

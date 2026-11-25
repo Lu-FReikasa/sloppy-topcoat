@@ -3689,6 +3689,14 @@ pre.diff {
   padding: 0.75rem 1.25rem 2rem;
   min-width: 0;
 }
+/* an address that was not known opened Start: one line above it, until the person moves on */
+.ws-moved {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
 .ws-crumb {
   display: flex;
   justify-content: space-between;
