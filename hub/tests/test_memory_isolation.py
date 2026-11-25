@@ -20,6 +20,7 @@ from tests.test_memory import (
     memory_items,
     note,
     run_consolidation,
+    with_contradicts,
 )
 from tests.users import make_user
 from topcoat_hub.embedding import HashingEmbedder
@@ -41,11 +42,12 @@ class Recorder:
             return None
         system, user = req["messages"][0]["content"], req["messages"][-1]["content"]
         if system == EXTRACTION_SYSTEM:
-            user = _user_part(user)
+            prompt, user = user, _user_part(user)
             if "A-MARKER" in user:
                 return json.dumps({"memories": [note(t) for t in A_NOTES]})
             if "B-MARKER" in user:
-                return json.dumps({"memories": [note("Isst gern Pizza"), note("Wohnt in Kiel")]})
+                notes = [note("Isst gern Pizza"), note("Wohnt in Kiel")]
+                return json.dumps({"memories": with_contradicts(notes, prompt)})
             return json.dumps({"memories": []})
         if system.startswith(CONSOLIDATION_PREFIX):
             self.consolidation_prompts.append(user)
