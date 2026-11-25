@@ -720,7 +720,7 @@ class MemoryStore:
     async def tagged(
         self, tag_ids: set[uuid.UUID], limit: int = 12
     ) -> list[tuple[MemoryItem, float]]:
-        """Live facts this reader may see that carry one of these tags, the most used first."""
+        """Live facts this reader may see that carry one of these tags, the newest first."""
         rows = await self.db.scalars(
             select(MemoryItem)
             .where(
@@ -733,7 +733,7 @@ class MemoryStore:
                     MemoryItemTag.tag_id.in_(list(tag_ids)),
                 ),
             )
-            .order_by(MemoryItem.used_count.desc(), MemoryItem.updated_at.desc())
+            .order_by(MemoryItem.updated_at.desc(), MemoryItem.id)
             .limit(limit)
         )
         return [(i, 1.0) for i in rows]

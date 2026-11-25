@@ -236,9 +236,10 @@ def archive_due(item: Any, now: datetime | None = None, cfg: CareConfig = DEFAUL
 
 
 def rank_factor(item: Any, now: datetime | None = None, cfg: CareConfig = DEFAULT) -> float:
-    """What the relevance of a hit is multiplied with in the recall: reliability and usefulness
-    (1.0 for a fresh note without use data, a little over 1 for a note that proved useful)."""
-    return (0.4 + 0.6 * reliability(item, now, cfg)) * (0.5 + usefulness(item, now))
+    """What the relevance of a hit is multiplied with in the recall: its reliability (1.0 for a
+    sure note, 0.4 for one nobody can vouch for). The usefulness arithmetic (recalled and used
+    counts, feedback weights) is no ranking input (D124)."""
+    return 0.4 + 0.6 * reliability(item, now, cfg)
 
 
 # --- "used" -------------------------------------------------------------------------------------

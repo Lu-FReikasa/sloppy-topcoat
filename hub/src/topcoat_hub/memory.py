@@ -628,8 +628,7 @@ class MemoryService:
             for rank, (item, _) in enumerate(hits):
                 score[item.id] = score.get(item.id, 0.0) + 1.0 / (RRF_K + rank)
                 items[item.id] = item
-        # relevance x reliability x usefulness (E3-05): an old note nobody confirmed and that
-        # never helped sinks, one that proved useful rises a little
+        # relevance x reliability (E3-05, D124): an old note nobody confirmed sinks
         now = memory_care.utcnow()
         for item_id in score:
             score[item_id] *= memory_care.rank_factor(items[item_id], now, self.care_config)
