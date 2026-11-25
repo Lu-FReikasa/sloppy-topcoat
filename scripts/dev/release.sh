@@ -46,6 +46,12 @@ case "$image" in
   */*) first="${image%%/*}"
        case "$first" in *.*|*:*|localhost) pull=1 ;; esac ;;
 esac
+# an unknown --stop-after would never stop, so refuse it before anything runs
+steps="tag check build smoke wayback transfer"
+[ "$pull" -eq 1 ] && steps="tag check pull smoke wayback transfer"
+if [ -n "$stop_after" ] && [[ " $steps " != *" $stop_after "* ]]; then
+  echo "--stop-after $stop_after: not a step of this run (steps: $steps)" >&2; exit 64
+fi
 # the branch the backup tag marks: origin/main, or the local main while there is no remote
 main_ref=origin/main
 git rev-parse -q --verify "$main_ref" >/dev/null || main_ref=main

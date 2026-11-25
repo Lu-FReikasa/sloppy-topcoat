@@ -263,7 +263,7 @@
   },
   "pairing": {
     "heading": "Add node",
-    "intro": "On the new machine, download the file for its operating system from the release (pre-release “test”) and run one of these commands in the download folder.",
+    "intro": "On the new machine, download the node file for its operating system (GitHub → Actions → newest green CI run on main → Artifacts “topcoat-node-test-…”) and run one of these commands in the download folder.",
     "code": "Pairing code",
     "expires": "Valid until {{time}}",
     "command": "Pair only (foreground, for trying it out)",
