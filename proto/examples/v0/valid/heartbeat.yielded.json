@@ -1,0 +1,20 @@
+{
+  "v": 0,
+  "type": "heartbeat",
+  "id": "7b1e9f00-0000-4000-8000-000000000003",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "state": "yielded",
+    "ram_used_mb": 9000,
+    "gpus": [
+      {
+        "index": 0,
+        "vram_used_mb": 15200,
+        "foreign_vram_used_mb": 15200,
+        "foreign_gpu_util": 87.5,
+        "foreign_shared_max_mb": 7743
+      }
+    ],
+    "loaded": []
+  }
+}

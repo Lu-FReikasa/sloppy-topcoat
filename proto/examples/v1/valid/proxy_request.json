@@ -1,0 +1,17 @@
+{
+  "v": 1,
+  "type": "proxy_request",
+  "id": "7b1e9f00-0000-4000-8000-000000000501",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "stream_id": "7b1e9f00-0000-4000-8000-00000000abcd",
+    "model": "fake-llm-8b-q4",
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "content-type": "application/json",
+      "accept": "text/event-stream"
+    },
+    "body": "eyJtb2RlbCI6ICJmYWtlLWxsbS04Yi1xNCIsICJzdHJlYW0iOiB0cnVlLCAibWVzc2FnZXMiOiBbeyJyb2xlIjogInVzZXIiLCAiY29udGVudCI6ICJIYWxsbyJ9XX0="
+  }
+}

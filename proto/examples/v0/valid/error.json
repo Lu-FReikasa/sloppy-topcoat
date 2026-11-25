@@ -1,0 +1,10 @@
+{
+  "v": 0,
+  "type": "error",
+  "id": "7b1e9f00-0000-4000-8000-000000000001",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "code": "upgrade_required",
+    "message": "protocol version 7 is not supported"
+  }
+}

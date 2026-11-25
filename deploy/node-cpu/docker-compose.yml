@@ -1,0 +1,25 @@
+# CPU-only model node (embedding model on an always-on server).
+#   cp deploy/node-cpu/node.env.example deploy/node-cpu/node.env     # then edit
+#   docker build -f deploy/node-cpu/Dockerfile -t sloppy-topcoat-node-cpu:local .
+#   docker compose -f deploy/node-cpu/docker-compose.yml --env-file deploy/node-cpu/node.env up -d
+# No port is published: the node only connects out to the hub.
+name: topcoat-node-cpu
+
+services:
+  node:
+    image: ${TOPCOAT_NODE_IMAGE:-sloppy-topcoat-node-cpu:local}
+    init: true
+    restart: unless-stopped
+    environment:
+      TZ: ${TOPCOAT_TZ:-Europe/Berlin}
+      TOPCOAT_NODE_NAME: ${TOPCOAT_NODE_NAME:-node-cpu}
+      TOPCOAT_HUB_URL: ${TOPCOAT_HUB_URL:-}
+      TOPCOAT_PAIR_CODE: ${TOPCOAT_PAIR_CODE:-}
+      TOPCOAT_CA_FINGERPRINT: ${TOPCOAT_CA_FINGERPRINT:-}
+    volumes:
+      - ${TOPCOAT_NODE_DATA:-node-data}:/data
+    # keep the node from taking the host's memory: the embedding model needs well under 2 GB
+    mem_limit: ${TOPCOAT_NODE_MEM_LIMIT:-4g}
+
+volumes:
+  node-data:

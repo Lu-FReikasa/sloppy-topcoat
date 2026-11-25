@@ -1,0 +1,104 @@
+/* The file reader: a folder tree next to a text reader. Plain frames, a monospace face, the marked
+   lines in the colour of the development program. */
+
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: 100%;
+  min-height: 0;
+}
+.files-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.files-head h1 {
+  margin: 0;
+  font-size: 1rem;
+}
+.files-panes {
+  display: grid;
+  grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr);
+  gap: 0.6rem;
+  flex: 1;
+  min-height: 0;
+}
+@media (max-width: 40rem) {
+  .files-panes {
+    grid-template-columns: 1fr;
+  }
+}
+.files-treepane,
+.files-reader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-height: 0;
+  min-width: 0;
+}
+.files-filter {
+  width: 100%;
+  box-sizing: border-box;
+}
+.files-tree,
+.files-code {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  overflow: auto;
+  flex: 1;
+  min-height: 8rem;
+}
+.files-tree:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.files-row {
+  cursor: pointer;
+  padding-top: 0.08rem;
+  padding-bottom: 0.08rem;
+  padding-right: 0.4rem;
+  white-space: nowrap;
+}
+.files-row:hover {
+  background: var(--track);
+}
+.files-dir {
+  font-weight: 600;
+}
+.files-cursor {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.files-mark {
+  display: inline-block;
+  width: 0.9rem;
+  text-align: center;
+  opacity: 0.8;
+}
+.files-readerhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.files-line {
+  display: flex;
+  white-space: pre;
+  min-width: max-content;
+}
+.files-ln {
+  flex: none;
+  width: 3.4rem;
+  padding-right: 0.6rem;
+  text-align: right;
+  color: var(--muted);
+  user-select: none;
+}
+.files-marked {
+  background: color-mix(in srgb, var(--app-dev, #2aa9c9) 22%, transparent);
+  box-shadow: inset 3px 0 0 var(--app-dev, #2aa9c9);
+}

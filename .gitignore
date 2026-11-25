@@ -1,0 +1,47 @@
+# secrets and local config
+.env
+*.env
+!*.env.example
+*.pem
+*.key
+config.local.*
+node-data/
+hub/.tls/
+
+# models and large files
+*.gguf
+*.safetensors
+models/
+
+# python
+__pycache__/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# go
+node/bin/
+*.exe
+
+# web
+node_modules/
+web/dist/
+
+# editors / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# local dev data (fake node data dirs)
+.dev/
+deploy/certs/
+
+# a `go build` inside node/cmd/topcoat-node writes the binary here
+node/cmd/topcoat-node/topcoat-node
+node/cmd/topcoat-node/topcoat-node.exe
+
+# real data must never land in the repo: database dumps, chat exports, agent session transcripts
+*.dump
+*_export.csv
+*_session.md

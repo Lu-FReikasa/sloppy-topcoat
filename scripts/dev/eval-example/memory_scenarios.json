@@ -1,0 +1,70 @@
+{
+  "_comment": "SYNTHETIC scenarios for part C. {run} is replaced by the run id, so the notes of a run can be told apart and removed afterwards.",
+  "memory_scenarios": [
+    {
+      "id": "contradiction-asks",
+      "steps": [
+        {
+          "say": "Please remember: the eval fixture {run} listens on port 7421.",
+          "expect": {
+            "note": {"contains": ["7421"], "status": "active", "evidence_in": ["live", "doc", "assumption"]}
+          }
+        },
+        {
+          "say": "Hmm, I think the eval fixture {run} listens on port 7422.",
+          "expect": {
+            "contradiction": {"old": ["7421"], "new": ["7422"], "outcome": "clarify"}
+          }
+        }
+      ]
+    },
+    {
+      "id": "explicit-correction",
+      "steps": [
+        {
+          "say": "Please remember: the backup of {run} runs at 03:15.",
+          "expect": {"note": {"contains": ["03:15"]}}
+        },
+        {
+          "say": "Correction: the backup of {run} runs at 04:45, not at 03:15.",
+          "expect": {
+            "contradiction": {"old": ["03:15"], "new": ["04:45"], "outcome": "clarify_or_replace"}
+          }
+        }
+      ]
+    },
+    {
+      "id": "withdraw-by-chat",
+      "steps": [
+        {
+          "say": "Please remember: the contact room of {run} is B-17.",
+          "expect": {"note": {"contains": ["B-17"]}}
+        },
+        {
+          "say": "Forget what I told you about the contact room of {run}, that was wrong.",
+          "expect": {"forgotten": ["B-17"]}
+        },
+        {
+          "ask": "Which room is the contact room of {run}?",
+          "new_chat": true,
+          "expect": {"answer": {"must_not": ["B-17"]}}
+        }
+      ]
+    },
+    {
+      "id": "delete-via-api",
+      "steps": [
+        {
+          "say": "Please remember: the spare disk of {run} is labelled Z9Q.",
+          "expect": {"note": {"contains": ["Z9Q"]}}
+        },
+        {"delete_note": {"contains": ["Z9Q"]}, "expect": {"forgotten": ["Z9Q"]}},
+        {
+          "ask": "What is the label of the spare disk of {run}?",
+          "new_chat": true,
+          "expect": {"answer": {"must_not": ["Z9Q"]}}
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+name: llama.cpp pins
+
+# Downloads every pinned official llama.cpp artifact and verifies the SHA-256 values
+# recorded in node/internal/llamacpp/releases.json. Runs only when the pins change
+# (the archives are large) or on demand.
+on:
+  pull_request:
+    paths:
+      - node/internal/llamacpp/releases.json
+      - node/scripts/verify-llamacpp-pins.py
+      - .github/workflows/llamacpp-pins.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify llama.cpp artifact checksums
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 node/scripts/verify-llamacpp-pins.py

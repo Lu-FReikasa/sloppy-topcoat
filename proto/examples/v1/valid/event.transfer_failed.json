@@ -1,0 +1,18 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "7b1e9f00-0000-4000-8000-000000000703",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "kind": "transfer_progress",
+    "data": {
+      "transfer_id": "3c1f0a52-8f4e-4d2b-9a07-5b6c1e2d4f90",
+      "role": "receive",
+      "status": "failed",
+      "transferred_bytes": 0,
+      "total_bytes": 4683073056,
+      "error_code": "no_route",
+      "error": "no candidate address answered"
+    }
+  }
+}

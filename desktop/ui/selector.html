@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Topcoat</title>
+<link rel="stylesheet" href="selector.css">
+</head>
+<body>
+<main id="pick">
+  <input id="q" type="text" placeholder="Programm …" autocomplete="off" spellcheck="false" aria-label="Programm suchen">
+  <ul id="list" role="listbox"></ul>
+  <p class="hint">Enter öffnet · Esc schließt · <button id="cfg" type="button">Hub-Adresse</button></p>
+</main>
+<form id="setup" hidden>
+  <h1>Topcoat</h1>
+  <label for="hub">Adresse des Hubs</label>
+  <input id="hub" type="url" placeholder="https://hub.example.lan:8443" required>
+  <p id="err" class="err" role="alert"></p>
+  <button type="submit">Speichern</button>
+</form>
+<script src="selector.js"></script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v1/action_result.schema.json",
+  "title": "action_result",
+  "description": "Direction: node -> hub.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 1
+    },
+    "type": {
+      "const": "action_result"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "result": {},
+        "error": {
+          "$ref": "common.schema.json#/$defs/error"
+        }
+      },
+      "if": {
+        "properties": {
+          "ok": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "error"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "error"
+          ]
+        }
+      }
+    }
+  },
+  "required": [
+    "re"
+  ]
+}

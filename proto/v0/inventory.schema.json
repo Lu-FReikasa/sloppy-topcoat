@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v0/inventory.schema.json",
+  "title": "inventory",
+  "description": "Direction: node -> hub.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 0
+    },
+    "type": {
+      "const": "inventory"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hardware",
+        "runner",
+        "models",
+        "loaded"
+      ],
+      "properties": {
+        "hardware": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cpu",
+            "ram_total_mb",
+            "gpus"
+          ],
+          "properties": {
+            "cpu": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "model",
+                "cores"
+              ],
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "cores": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "threads": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "logical processors"
+                },
+                "performance_cores": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "physical performance cores (all cores on non-hybrid CPUs)"
+                },
+                "efficiency_cores": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "physical efficiency cores (hybrid CPUs)"
+                }
+              }
+            },
+            "ram_total_mb": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "gpus": {
+              "type": "array",
+              "items": {
+                "$ref": "common.schema.json#/$defs/gpu"
+              }
+            }
+          }
+        },
+        "runner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "available"
+          ],
+          "properties": {
+            "type": {
+              "$ref": "common.schema.json#/$defs/runner_type"
+            },
+            "available": {
+              "type": "boolean"
+            },
+            "detail": {
+              "type": "string"
+            },
+            "backend": {
+              "$ref": "common.schema.json#/$defs/backend"
+            },
+            "llamacpp_release": {
+              "type": "string"
+            },
+            "threads": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "thread count used for CPU work"
+            }
+          }
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/model"
+          }
+        },
+        "loaded": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/loaded_model"
+          }
+        }
+      }
+    }
+  }
+}

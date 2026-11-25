@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v1/event.schema.json",
+  "title": "event",
+  "description": "Direction: node -> hub.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 1
+    },
+    "type": {
+      "const": "event"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "data"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "model_loaded",
+            "model_unloaded",
+            "model_load_failed",
+            "model_load_retry",
+            "model_load_cancelled",
+            "game_detected",
+            "game_ended",
+            "download_progress",
+            "state_changed",
+            "error",
+            "benchmark_started",
+            "benchmark_result",
+            "benchmark_error",
+            "benchmark_finished",
+            "runtime_installed",
+            "auto_reload_paused",
+            "paused",
+            "resumed",
+            "sleeping",
+            "update_staging",
+            "update_staged",
+            "update_applied",
+            "update_failed",
+            "transfer_ready",
+            "transfer_progress"
+          ]
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

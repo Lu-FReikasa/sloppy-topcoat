@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v0/action.schema.json",
+  "title": "action",
+  "description": "Direction: hub -> node. Args are validated by the node per action; unknown names are rejected with not_allowed.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 0
+    },
+    "type": {
+      "const": "action"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "args"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+        },
+        "args": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

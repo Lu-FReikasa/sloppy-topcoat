@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v0/hello.schema.json",
+  "title": "hello",
+  "description": "Direction: node -> hub.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 0
+    },
+    "type": {
+      "const": "hello"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_id",
+        "agent_version",
+        "protocol_version",
+        "config_hash"
+      ],
+      "properties": {
+        "node_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "agent_version": {
+          "type": "string"
+        },
+        "protocol_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "config_hash": {
+          "oneOf": [
+            {
+              "$ref": "common.schema.json#/$defs/sha256_hex"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "hash of the cached config, null if none"
+        }
+      }
+    }
+  }
+}

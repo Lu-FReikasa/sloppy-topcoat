@@ -1,0 +1,16 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "7b1e9f00-0000-4000-8000-000000000003",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "kind": "benchmark_error",
+    "data": {
+      "benchmark_id": "7b1e9f00-0000-4000-8000-0000000000aa",
+      "model": "Qwen3-30B-A3B-Instruct-2507-Q4_K_M",
+      "backend": "vulkan",
+      "threads": 4,
+      "error": "exit status 1: ggml_vulkan: Device memory allocation failed"
+    }
+  }
+}

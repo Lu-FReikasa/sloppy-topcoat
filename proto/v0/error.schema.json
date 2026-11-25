@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v0/error.schema.json",
+  "title": "error",
+  "description": "Direction: hub -> node. Protocol-level error, e.g. upgrade_required or invalid_message. May carry re.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 0
+    },
+    "type": {
+      "const": "error"
+    },
+    "body": {
+      "$ref": "common.schema.json#/$defs/error"
+    }
+  }
+}

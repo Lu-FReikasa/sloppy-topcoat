@@ -1,0 +1,70 @@
+{
+  "v": 1,
+  "type": "config",
+  "id": "7b1e9f00-0000-4000-8000-000000000001",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "config_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "config": {
+      "roles": [
+        "dev"
+      ],
+      "runner": {
+        "type": "none"
+      },
+      "allowed_actions": [
+        "capability.invoke"
+      ],
+      "heartbeat_interval_seconds": 10,
+      "idle_ttl_seconds": 900,
+      "watcher": {
+        "grace_seconds": 5,
+        "rules": [
+          {
+            "process": "game.exe"
+          }
+        ]
+      },
+      "capabilities": [
+        "repo.sync",
+        "repo.status",
+        "repo.list",
+        "repo.read",
+        "repo.search",
+        "repo.diff",
+        "repo.start",
+        "repo.edit",
+        "repo.write",
+        "repo.apply_patch",
+        "repo.reset",
+        "repo.test"
+      ],
+      "tools": {
+        "workshop": {
+          "dir": "/var/lib/topcoat-node/workshop",
+          "allowed_hosts": [
+            "github.com"
+          ],
+          "max_repo_mb": 500,
+          "runner": {
+            "type": "docker",
+            "docker_host": "unix:///run/topcoat-workshop/docker.sock",
+            "host_dir": "/srv/topcoat-workshop",
+            "images": {
+              "make-check": "topcoat-ws-build:1",
+              "pytest": "python:3.12-slim",
+              "rm-rf": "x"
+            },
+            "network": "workshop-net",
+            "network_templates": [
+              "pytest"
+            ],
+            "memory_mb": 2048,
+            "cpu_milli": 2000,
+            "timeout_seconds": 600
+          }
+        }
+      }
+    }
+  }
+}

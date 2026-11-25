@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "_comment": "The first-start questionnaire (E3-06, 11d): three scenes with three answers in different tones, six short questions with defaults, and the two sample sentences of the preview. Texts are data: edit here, not in code. A scene answer names the persona template whose role it stands for; the choice is the most-voted role (ties: butler, friend, copilot), none fits = neutral.",
+  "roles": ["butler", "friend", "copilot"],
+  "none_role": "neutral",
+  "scenes": [
+    {
+      "id": "plex",
+      "question": {"de": "Läuft Plex?", "en": "Is Plex running?"},
+      "answers": [
+        {"id": "a", "role": "butler", "text": {
+          "de": "Ja, Plex läuft. Er rechnet nur gerade Serienmarker, ein ordentlicher Fleißarbeiter, aber ein bisschen laut.",
+          "en": "Yes, Plex is running. It is just computing series markers, a diligent worker, if a bit loud."}},
+        {"id": "b", "role": "friend", "text": {
+          "de": "Läuft. Nur ausgelastet, er berechnet gerade Intro-Marker. Heißt: kann kurz hakeln, ist aber nix Kaputtes.",
+          "en": "Running. Just busy, it is computing intro markers right now. Meaning: it may stutter briefly, but nothing is broken."}},
+        {"id": "c", "role": "copilot", "text": {
+          "de": "Plex läuft. Hohe CPU durch Marker-Berechnung, kein Defekt.",
+          "en": "Plex is running. High CPU from marker computation, no fault."}}
+      ]
+    },
+    {
+      "id": "network",
+      "question": {"de": "Warum ist das Netz heute so langsam?", "en": "Why is the network so slow today?"},
+      "answers": [
+        {"id": "a", "role": "butler", "text": {
+          "de": "Das kann ich noch nicht sagen. Ich schaue zuerst auf den Router und die Leitung und sage dir gleich, was ich gefunden habe.",
+          "en": "I cannot say yet. I will look at the router and the line first and tell you right away what I found."}},
+        {"id": "b", "role": "friend", "text": {
+          "de": "Gute Frage, keine Ahnung, bevor ich nachgeschaut hab. Ich guck erst auf den Router, dann auf die Leitung, und erzähl dir dann, was los ist.",
+          "en": "Good question, no idea before I have looked. I will check the router first, then the line, and tell you what is going on."}},
+        {"id": "c", "role": "copilot", "text": {
+          "de": "Noch unklar. Prüfe jetzt Router-Last und Leitungsqualität; Ergebnis folgt.",
+          "en": "Not clear yet. Checking router load and line quality now; result follows."}}
+      ]
+    },
+    {
+      "id": "everything",
+      "question": {"de": "Mach mal alles neu.", "en": "Redo everything."},
+      "answers": [
+        {"id": "a", "role": "butler", "text": {
+          "de": "Verzeihung, „alles“ ist ein großes Wort. Meinst du alle Container auf einem Server, oder einen bestimmten Dienst? Ich frage lieber einmal zu viel als einmal zu wenig.",
+          "en": "Pardon me, “everything” is a big word. Do you mean all containers on one server, or a particular service? I would rather ask once too often than once too rarely."}},
+        {"id": "b", "role": "friend", "text": {
+          "de": "Hui, „alles“ klingt nach Ärger. Was genau: ein Dienst, ein Server oder wirklich das ganze Haus? Dann sag ich dir auch, wer davon was merken würde.",
+          "en": "Whoa, “everything” sounds like trouble. What exactly: one service, one server or really the whole house? Then I will also tell you who would notice what."}},
+        {"id": "c", "role": "copilot", "text": {
+          "de": "Das ist nicht eindeutig. Welche Dienste oder welcher Host? Ich nenne dir danach die Auswirkungen.",
+          "en": "That is not clear. Which services or which host? I will then tell you the impact."}}
+      ]
+    }
+  ],
+  "questions": [
+    {"id": "address", "default": "du", "options": [
+      {"value": "du", "label": {"de": "du", "en": "informal (du)"}},
+      {"value": "sie", "label": {"de": "Sie", "en": "formal (Sie)"}}],
+     "text": {"de": "Wie sollen wir uns anreden?", "en": "How should the assistant address you?"}},
+    {"id": "humor", "default": "1", "options": [
+      {"value": "0", "label": {"de": "kein Humor", "en": "no humor"}},
+      {"value": "1", "label": {"de": "ab und zu trocken", "en": "dry now and then"}},
+      {"value": "2", "label": {"de": "gern verspielt", "en": "playful"}}],
+     "text": {"de": "Wie viel Humor?", "en": "How much humor?"}},
+    {"id": "length", "default": "short", "options": [
+      {"value": "short", "label": {"de": "kurz, Details auf Nachfrage", "en": "short, details on request"}},
+      {"value": "long", "label": {"de": "ausführlich mit Begründung", "en": "detailed with reasoning"}}],
+     "text": {"de": "Wie lang sollen Antworten sein?", "en": "How long should answers be?"}},
+    {"id": "transparency", "default": "true", "options": [
+      {"value": "true", "label": {"de": "sagen, was du tust und warum, in einem Satz", "en": "say what you do and why, in one sentence"}},
+      {"value": "false", "label": {"de": "nur das Ergebnis", "en": "just the result"}}],
+     "text": {"de": "Soll der Assistent erklären, was er tut?", "en": "Should the assistant explain what it does?"}},
+    {"id": "ask", "default": "ask_first", "options": [
+      {"value": "ask_first", "label": {"de": "bei Unklarem erst nachfragen", "en": "ask first when unclear"}},
+      {"value": "read_first", "label": {"de": "erst lesend nachsehen, dann fragen", "en": "look (read-only) first, then ask"}}],
+     "text": {"de": "Was bei unklaren Aufträgen?", "en": "What for unclear requests?"}},
+    {"id": "emojis", "default": "false", "options": [
+      {"value": "false", "label": {"de": "nein", "en": "no"}},
+      {"value": "true", "label": {"de": "ja, sparsam", "en": "yes, sparingly"}}],
+     "text": {"de": "Emojis?", "en": "Emojis?"}}
+  ],
+  "samples": {
+    "butler": {
+      "de": ["Der Backup-Job ist durch. Er hat sich dabei nur ein wenig Zeit gelassen, ganz wie man es von einem gründlichen Mann erwartet.", "Das weiß ich noch nicht. Ich sehe kurz nach und melde mich mit dem Ergebnis."],
+      "en": ["The backup job is done. It merely took its time, as one expects from a thorough fellow.", "I do not know yet. I will take a quick look and report back with the result."]
+    },
+    "friend": {
+      "de": ["Backup ist durch. Hat ein bisschen gedauert, aber alles da.", "Keine Ahnung, ich guck kurz nach und sag dir dann Bescheid."],
+      "en": ["Backup is done. Took a while, but everything is there.", "No idea, I will take a quick look and let you know."]
+    },
+    "copilot": {
+      "de": ["Backup abgeschlossen. Dauer 14 Minuten, keine Fehler.", "Das ist noch offen. Ich prüfe es jetzt; Ergebnis folgt."],
+      "en": ["Backup finished. Duration 14 minutes, no errors.", "That is still open. Checking now; result follows."]
+    },
+    "neutral": {
+      "de": ["Das Backup ist abgeschlossen. Es gab keine Fehler.", "Das ist noch unklar. Ich prüfe es und melde mich mit dem Ergebnis."],
+      "en": ["The backup is finished. There were no errors.", "That is not clear yet. I will check and report back with the result."]
+    }
+  }
+}

@@ -1,0 +1,252 @@
+/* The inbox, the board and the tag of an application (docs/PLATFORM.md, 3.7).
+   One colour per application, the same everywhere: the tag, a left rule on an item, the chip of a
+   count. Square edges and a plain frame: a label, not a pill. */
+
+:root {
+  --app-chat: #2fa968;
+  --app-research: #d49a1f;
+  --app-dev: #2aa9c9;
+  --app-admin: #d1445a;
+  --app-project: #8a6cd1;
+}
+
+.app-tag {
+  display: inline-block;
+  padding: 0 0.4rem;
+  border: 1px solid var(--app-color, var(--border));
+  color: var(--app-color, var(--muted));
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.app-tag-chat {
+  --app-color: var(--app-chat);
+}
+.app-tag-research {
+  --app-color: var(--app-research);
+}
+.app-tag-dev {
+  --app-color: var(--app-dev);
+}
+.app-tag-admin {
+  --app-color: var(--app-admin);
+}
+.app-tag-project {
+  --app-color: var(--app-project);
+}
+
+.inbox,
+.board {
+  display: grid;
+  align-content: start;
+  gap: 0.6rem;
+  padding: 0.4rem;
+}
+.inbox-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.inbox-list,
+.board-list {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.inbox-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.2rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+.inbox-item.is-read {
+  color: var(--muted);
+}
+.inbox-item.is-urgent {
+  border-left-color: var(--bad);
+}
+.inbox-dot {
+  width: 1rem;
+  color: var(--accent);
+}
+.inbox-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chip.urgent {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+.inbox-reading {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.6rem;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+}
+.inbox-reading h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.inbox-summary {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.board-card {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.board-card h2 {
+  margin: 0 0 0.3rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.board-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+}
+.board-note .actions {
+  margin-left: auto;
+}
+.linklike {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.chat-window {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
+  height: 100%;
+}
+.chat-window-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.2rem 0.9rem;
+  padding: 0.1rem 0.4rem;
+}
+
+/* the picture of the empty chat window: quiet, monospaced, one colour */
+.talk-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  margin-top: 2rem;
+}
+.idle-art {
+  margin: 0;
+  color: var(--app-color, var(--ok));
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.1;
+  opacity: 0.65;
+  user-select: none;
+}
+
+/* the incognito folder: the same quiet look; what is burnt dissolves into ash */
+.incognito {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  padding: 0.4rem;
+}
+.incognito-bar,
+.incognito-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.incognito-tab {
+  display: grid;
+  gap: 0.4rem;
+}
+.incognito-messages {
+  display: grid;
+  gap: 0.4rem;
+  max-height: 22rem;
+  overflow: auto;
+}
+.burning {
+  min-height: 8rem;
+  margin: 0;
+  padding: 0.5rem;
+  color: var(--bad);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  opacity: 0.85;
+}
+
+.item-marks {
+  display: grid;
+  gap: 0.3rem;
+}
+.marks-list {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mark {
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.mark-postit {
+  background: color-mix(in srgb, #f2d24b 30%, var(--surface));
+  border-color: #c9a92c;
+}
+.mark-sticker {
+  display: inline-block;
+  justify-self: start;
+  border-radius: 999px;
+  border-color: var(--accent);
+}
+.mark-highlight .mark-text {
+  background: color-mix(in srgb, #f2d24b 55%, transparent);
+}
+.mark-done {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+.mark-kind {
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+.marks-add {
+  display: flex;
+  gap: 0.3rem;
+}
+.marks-add input {
+  flex: 1;
+}

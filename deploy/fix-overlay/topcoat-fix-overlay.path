@@ -1,0 +1,11 @@
+# The roll-out of an issue fix (ARCHITECTURE D104): the hub writes request/<id>/READY into the
+# spool, this unit starts the fixed script. Installed by deploy/fix-overlay/install.sh.
+[Unit]
+Description=sloppy-topcoat: roll out issue fixes the hub queued
+
+[Path]
+PathExistsGlob=@SPOOL@/request/*/READY
+Unit=topcoat-fix-overlay.service
+
+[Install]
+WantedBy=multi-user.target

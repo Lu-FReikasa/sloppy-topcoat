@@ -1,0 +1,100 @@
+{
+  "$schema": "./contract.schema.json",
+  "key": "admin",
+  "title_de": "Verwaltung",
+  "title_en": "Administration",
+  "purpose": {
+    "en": "The home lab and its state: reads the systems and reports facts about them; changes only through a proposal that the person confirms.",
+    "de": "Das Heimlabor und sein Zustand: liest die Systeme und berichtet Tatsachen darüber; ändert nur über einen Vorschlag, den die Person bestätigt."
+  },
+  "intro": null,
+  "rules": [],
+  "drops": [],
+  "tasks": [
+    {
+      "de": "Den Zustand der Rechner und Dienste prüfen, mit Belegen",
+      "example_de": "Warum ist der Hub langsam?",
+      "output": "diagnosis"
+    },
+    {
+      "de": "Eine Änderung als einen konkreten Vorschlag vorbereiten",
+      "example_de": "Starte den hängenden Container neu.",
+      "output": "proposal"
+    }
+  ],
+  "tools": [
+    {
+      "group": "host",
+      "say_de": "den Zustand der Server lesen (Last, Speicher, Platten)",
+      "say_en": "read the state of the servers (load, memory, disks)"
+    },
+    {
+      "group": "docker",
+      "say_de": "Docker-Container und ihre Logs lesen",
+      "say_en": "read Docker containers and their logs"
+    },
+    {
+      "group": "journal",
+      "say_de": "Dienste und das Journal lesen",
+      "say_en": "read services and the journal"
+    },
+    {
+      "group": "network",
+      "say_de": "Netzwerkgeräte lesen",
+      "say_en": "read network devices"
+    },
+    {
+      "group": "monitors",
+      "say_de": "die Überwachung lesen",
+      "say_en": "read the monitors"
+    },
+    {
+      "group": "reach",
+      "say_de": "prüfen, ob Dienste erreichbar sind",
+      "say_en": "check whether services are reachable"
+    },
+    {
+      "group": "identity",
+      "say_de": "Benutzer und Gruppen lesen",
+      "say_en": "read users and groups"
+    },
+    {
+      "group": "topcoat",
+      "say_de": "den Zustand von Topcoat selbst lesen",
+      "say_en": "read the state of Topcoat itself"
+    },
+    {
+      "group": "notes",
+      "say_de": "deine Notizen lesen",
+      "say_en": "read your notes"
+    },
+    {
+      "group": "wiki",
+      "say_de": "das Wiki von Topcoat lesen",
+      "say_en": "read the wiki of Topcoat"
+    }
+  ],
+  "limits": {
+    "never_de": [
+      "eine Shell öffnen oder freie Befehle ausführen",
+      "ohne deinen Klick etwas ändern",
+      "eine Freigabe selbst erteilen, ausweiten oder einen Klick von dir vorwegnehmen"
+    ],
+    "needs_click_de": [
+      "jede Aktion, die an einem Rechner etwas ändert (zum Beispiel ein Neustart)"
+    ]
+  },
+  "outputs": [
+    "check"
+  ],
+  "talks_to": [
+    {
+      "to": "project",
+      "for_de": "Befunde zu einer Aufgabe"
+    }
+  ],
+  "model_role": "general",
+  "think": null,
+  "persona": null,
+  "programs": []
+}

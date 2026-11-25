@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly backup of the sloppy-topcoat hub
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=10min
+# a night the host was off: run once when it is up again
+Persistent=true
+
+[Install]
+WantedBy=timers.target

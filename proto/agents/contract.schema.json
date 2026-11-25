@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "topcoat:agents/contract",
+  "title": "The contract of one employee (application): what it is for, what it may use, what it never does (plan 2026-11-24, B1, step 1.9)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {"type": "string"},
+    "key": {"enum": ["assistant", "research", "dev", "admin", "project"]},
+    "title_de": {"type": "string", "minLength": 1},
+    "title_en": {"type": "string", "minLength": 1},
+    "purpose": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"en": {"type": "string", "minLength": 1}, "de": {"type": "string", "minLength": 1}},
+      "required": ["en", "de"]
+    },
+    "intro": {
+      "description": "The role sentence of its agent prompt (English); null keeps the shared diagnosis prompt",
+      "type": ["string", "null"]
+    },
+    "rules": {
+      "description": "Its own bullets of 'How you work' (English), in place of the shared bullets it drops",
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "drops": {
+      "description": "How the shared bullets begin that are not for this role (bullets about machines)",
+      "type": "array",
+      "items": {"type": "string", "minLength": 3}
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "de": {"type": "string", "minLength": 1},
+          "example_de": {"type": "string", "minLength": 1},
+          "output": {"type": "string", "minLength": 1}
+        },
+        "required": ["de", "example_de", "output"]
+      }
+    },
+    "tools": {
+      "description": "Its tool groups (the ceiling of D69, ui/seeds.py) and 'internet', each said in a sentence",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "group": {"type": "string", "pattern": "^[a-z]+$"},
+          "say_de": {"type": "string", "minLength": 1},
+          "say_en": {"type": "string", "minLength": 1}
+        },
+        "required": ["group", "say_de", "say_en"]
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "never_de": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "needs_click_de": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      },
+      "required": ["never_de", "needs_click_de"]
+    },
+    "outputs": {
+      "description": "Names of the enforced answer forms it writes (proto/agents/outputs)",
+      "type": "array",
+      "items": {"enum": ["plan_v2", "verdict", "check", "investigate", "area"]}
+    },
+    "talks_to": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "to": {"enum": ["assistant", "research", "dev", "admin", "project"]},
+          "for_de": {"type": "string", "minLength": 1}
+        },
+        "required": ["to", "for_de"]
+      }
+    },
+    "model_role": {"enum": ["general", "coder", "reviewer", "worker"]},
+    "think": {"type": ["boolean", "null"]},
+    "persona": {"description": "A default persona (prepared, P3)", "type": ["string", "null"]},
+    "programs": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9_]+$"}}
+  },
+  "required": [
+    "key", "title_de", "title_en", "purpose", "intro", "rules", "drops", "tasks", "tools",
+    "limits", "outputs", "talks_to", "model_role", "think", "persona", "programs"
+  ]
+}

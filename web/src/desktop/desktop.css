@@ -1,0 +1,823 @@
+/* The desktop (docs/DESKTOP.md): one look. Every colour comes from one hue (--ws-hue, the person's
+   only appearance setting); each program has its own fixed hue (--pg-hue) for its title and its
+   button on the taskbar. The pages inside the programs follow through the variables they already
+   use (--bg, --surface, --text, ...). */
+
+.dt-root {
+  --ws-sat: 70%;
+  --bg: hsl(var(--ws-hue) calc(var(--ws-sat) * 0.34) 5%);
+  --surface: hsl(var(--ws-hue) calc(var(--ws-sat) * 0.3) 9%);
+  --text: hsl(var(--ws-hue) calc(var(--ws-sat) * 0.3) 84%);
+  --muted: hsl(var(--ws-hue) calc(var(--ws-sat) * 0.2) 58%);
+  --border: hsl(var(--ws-hue) calc(var(--ws-sat) * 0.44) 26%);
+  --accent: hsl(var(--ws-hue) var(--ws-sat) 64%);
+  --accent-text: hsl(var(--ws-hue) calc(var(--ws-sat) * 0.5) 6%);
+  --track: hsl(var(--ws-hue) calc(var(--ws-sat) * 0.3) 14%);
+  --ok: #7be08a;
+  --warn: #ffcb6b;
+  --bad: #ff6b6b;
+  --radius: 0;
+  color-scheme: dark;
+  font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  height: 100dvh;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.dt-note {
+  padding: 1rem;
+}
+
+.dt-banner {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.35rem 0.9rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---------- the stage: programs tiled by fractions ---------- */
+
+.dt-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  /* the windows' order (z-index) stays among the windows, under the taskbar and Clipper */
+  isolation: isolate;
+}
+
+.dt-program {
+  position: absolute;
+  box-sizing: border-box;
+  container-type: inline-size;
+  container-name: program;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.dt-program.dt-focused {
+  border-color: hsl(var(--pg-hue) 70% 60%);
+  z-index: 1;
+}
+
+.dt-titlebar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.25rem 0 0.6rem;
+  min-height: 1.9rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.dt-focused .dt-titlebar {
+  background: hsl(var(--pg-hue) 45% 16%);
+}
+
+.dt-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: hsl(var(--pg-hue) 70% 72%);
+}
+
+.dt-titlebar-buttons {
+  display: flex;
+  gap: 0.15rem;
+}
+
+/* a solo window of the desktop client: the system's window frame minimises, maximises and closes */
+.dt-solo .dt-titlebar-buttons {
+  display: none;
+}
+
+.dt-titlebar-buttons button {
+  min-width: 1.8rem;
+  height: 1.5rem;
+  padding: 0 0.3rem;
+  border-radius: 0;
+  line-height: 1;
+}
+
+.dt-program-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.dt-nav {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 11rem;
+  max-width: 35%;
+  padding: 0.35rem 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.dt-nav button {
+  text-align: left;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.3rem 0.6rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dt-nav button:hover {
+  color: var(--text);
+}
+
+.dt-nav button[aria-current="page"] {
+  color: var(--text);
+  border-left-color: hsl(var(--pg-hue) 70% 60%);
+  background: var(--bg);
+}
+
+.dt-view {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dt-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--muted);
+}
+
+/* a view inside a program: the whole of it, scrolling inside */
+.ws-page {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.75rem;
+}
+
+.ws-page:has(.chat) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  container-type: inline-size;
+  container-name: chatpage;
+}
+
+.ws-page .chat {
+  min-height: 0;
+}
+
+.ws-note,
+.ws-failed {
+  padding: 1rem;
+}
+
+.ws-admin-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.ws-admin-table th,
+.ws-admin-table td {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---------- the taskbar ---------- */
+
+.dt-taskbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.2rem;
+  padding: 0 0.4rem;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.dt-start {
+  font-weight: 600;
+}
+
+.dt-tasks {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.dt-taskbar button {
+  white-space: nowrap;
+}
+
+.dt-task {
+  /* one width for every button (2026-11-13): a document's long title is cut, the tooltip has it */
+  flex: 0 0 auto;
+  width: 9.5rem;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  overflow: hidden;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  background: transparent;
+}
+
+.dt-task.dt-open {
+  color: var(--text);
+  border-bottom-color: hsl(var(--pg-hue) 50% 35%);
+}
+
+.dt-task.dt-min {
+  opacity: 0.75;
+}
+
+.dt-task.dt-front {
+  border-bottom-color: hsl(var(--pg-hue) 70% 60%);
+  background: var(--bg);
+}
+
+.dt-icon {
+  color: hsl(var(--pg-hue, var(--ws-hue)) 70% 65%);
+}
+
+.dt-me {
+  position: relative;
+}
+
+.dt-me-menu {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  z-index: 70;
+  min-width: 14rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.dt-me-menu label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+}
+
+/* ---------- the command palette ---------- */
+
+.dt-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.dt-palette {
+  width: min(40rem, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.dt-palette input {
+  font-size: 1.05rem;
+  padding: 0.7rem 0.9rem;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg);
+}
+
+.dt-palette ul {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.dt-palette li {
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+.dt-palette li.dt-pal-current {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.dt-palette li.dt-pal-current .muted {
+  color: var(--accent-text);
+}
+
+/* the person asked their system for less motion: nothing moves, nothing pulses */
+@media (prefers-reduced-motion: reduce) {
+  .dt-root *,
+  .dt-root *::before,
+  .dt-root *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dt-program {
+    transition:
+      left 0.15s ease,
+      top 0.15s ease,
+      width 0.15s ease,
+      height 0.15s ease;
+  }
+}
+
+/* a narrow program (several tiled on a small screen): its navigation is a row above the view, so
+   the view keeps the whole width */
+@container program (max-width: 640px) {
+  .dt-program-body {
+    flex-direction: column;
+  }
+  .dt-nav {
+    flex-direction: row;
+    width: auto;
+    max-width: none;
+    padding: 0;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .dt-nav button {
+    flex: 0 0 auto;
+    overflow: visible;
+    text-overflow: clip;
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+    padding: 0.25rem 0.55rem;
+  }
+  .dt-nav button[aria-current="page"] {
+    border-bottom-color: hsl(var(--pg-hue) 70% 60%);
+  }
+}
+
+.dt-task .dt-icon {
+  flex: none;
+}
+.dt-task .dt-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* not much room on the taskbar: the programs by their sign, the name in the tooltip */
+@media (max-width: 1100px) {
+  .dt-taskbar .dt-label {
+    display: none;
+  }
+  .dt-task {
+    width: auto;
+  }
+}
+
+/* a narrow screen: one program at a time, the navigation above the view */
+@media (max-width: 760px) {
+  .dt-program-body {
+    flex-direction: column;
+  }
+  .dt-nav {
+    flex-direction: row;
+    width: auto;
+    max-width: none;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .conn-text {
+    display: none;
+  }
+}
+
+.overview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.overview-head h1 {
+  margin-bottom: 0.5rem;
+}
+
+/* a view made of tabs: the tabs, then the page of the tab */
+.tabbed > .inbox-tabs {
+  margin-bottom: 0.75rem;
+}
+
+/* ---------- what a theme may decide (docs/THEMES.md) ---------- */
+
+/* where the taskbar stands */
+.dt-root.dt-bar-top .dt-taskbar {
+  order: -1;
+  border-top: 0;
+  border-bottom: 1px solid var(--border);
+}
+.dt-root.dt-bar-top .dt-banner {
+  order: -2;
+}
+.dt-root.dt-bar-left,
+.dt-root.dt-bar-right {
+  flex-direction: row;
+}
+.dt-root.dt-bar-left .dt-taskbar,
+.dt-root.dt-bar-right .dt-taskbar {
+  flex-direction: column;
+  align-items: stretch;
+  width: 12rem;
+  min-height: 0;
+  padding: 0.4rem;
+  border-top: 0;
+  overflow-y: auto;
+}
+.dt-root.dt-bar-left .dt-taskbar {
+  order: -1;
+  border-right: 1px solid var(--border);
+}
+.dt-root.dt-bar-right .dt-taskbar {
+  border-left: 1px solid var(--border);
+}
+.dt-root.dt-bar-left .dt-tasks,
+.dt-root.dt-bar-right .dt-tasks {
+  flex-direction: column;
+  overflow-x: visible;
+}
+.dt-root.dt-bar-left .dt-stage,
+.dt-root.dt-bar-right .dt-stage {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.dt-root.dt-bar-hidden .dt-taskbar {
+  display: none;
+}
+
+/* how things move: a program that opens (the length is the theme's --dt-ms) */
+@keyframes dt-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes dt-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(1.2rem);
+  }
+}
+@keyframes dt-flicker-in {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.8;
+  }
+  45% {
+    opacity: 0.2;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+.dt-root[data-motion="fade"] .dt-program {
+  animation: dt-fade-in var(--dt-ms, 120ms) ease-out;
+}
+.dt-root[data-motion="slide"] .dt-program {
+  animation: dt-slide-in var(--dt-ms, 160ms) ease-out;
+}
+.dt-root[data-motion="flicker"] .dt-program {
+  animation: dt-flicker-in var(--dt-ms, 180ms) steps(5, end);
+}
+@keyframes dt-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+.dt-root[data-motion="zoom"] .dt-program {
+  animation: dt-zoom-in var(--dt-ms, 160ms) ease-out;
+}
+
+/* how things go: a program that closes or is minimised carries .dt-closing for the theme's length
+   (Desktop.tsx waits that long), the overlay of the desktop client .dt-leaving before it hides and
+   .dt-arriving when it comes back. A theme names a preset (motion.close, motion.overlay) or writes
+   its own animation for these classes. Each leaving one ends where it stops (forwards). */
+@keyframes dt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes dt-slide-out {
+  to {
+    opacity: 0;
+    transform: translateY(1.2rem);
+  }
+}
+@keyframes dt-flicker-out {
+  0% {
+    opacity: 1;
+  }
+  40% {
+    opacity: 0.2;
+  }
+  55% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes dt-zoom-out {
+  to {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+.dt-root[data-close="fade"] .dt-program.dt-closing {
+  animation: dt-fade-out var(--dt-ms, 120ms) ease-in forwards;
+}
+.dt-root[data-close="slide"] .dt-program.dt-closing {
+  animation: dt-slide-out var(--dt-ms, 160ms) ease-in forwards;
+}
+.dt-root[data-close="flicker"] .dt-program.dt-closing {
+  animation: dt-flicker-out var(--dt-ms, 180ms) steps(5, end) forwards;
+}
+.dt-root[data-close="zoom"] .dt-program.dt-closing {
+  animation: dt-zoom-out var(--dt-ms, 160ms) ease-in forwards;
+}
+.dt-root[data-overlay-motion="fade"].dt-arriving {
+  animation: dt-fade-in var(--dt-ms, 120ms) ease-out;
+}
+.dt-root[data-overlay-motion="slide"].dt-arriving {
+  animation: dt-slide-in var(--dt-ms, 160ms) ease-out;
+}
+.dt-root[data-overlay-motion="flicker"].dt-arriving {
+  animation: dt-flicker-in var(--dt-ms, 180ms) steps(5, end);
+}
+.dt-root[data-overlay-motion="zoom"].dt-arriving {
+  animation: dt-zoom-in var(--dt-ms, 160ms) ease-out;
+}
+.dt-root[data-overlay-motion="fade"].dt-leaving {
+  animation: dt-fade-out var(--dt-ms, 120ms) ease-in forwards;
+}
+.dt-root[data-overlay-motion="slide"].dt-leaving {
+  animation: dt-slide-out var(--dt-ms, 160ms) ease-in forwards;
+}
+.dt-root[data-overlay-motion="flicker"].dt-leaving {
+  animation: dt-flicker-out var(--dt-ms, 180ms) steps(5, end) forwards;
+}
+.dt-root[data-overlay-motion="zoom"].dt-leaving {
+  animation: dt-zoom-out var(--dt-ms, 160ms) ease-in forwards;
+}
+/* a window on its way out takes no more clicks */
+.dt-program.dt-closing {
+  pointer-events: none;
+}
+
+/* floating programs: the one in front stands on top of the others */
+.dt-root .dt-program.dt-focused {
+  z-index: 2;
+}
+
+/* the overlay of the desktop client (`?overlay=1`): the page lets the blurred, darkened screen
+   through (the window's acrylic effect); only the programs, the taskbar and Clipper stand on it */
+html.tc-overlay,
+html.tc-overlay body {
+  background: transparent;
+}
+.dt-root.dt-overlay {
+  position: relative;
+  /* a tint of its own, so the screen behind is dark even where the window effect is missing */
+  background: rgb(0 0 0 / 0.38);
+}
+.dt-root.dt-overlay .dt-program {
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.55);
+}
+.dt-root.dt-overlay .dt-taskbar {
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+}
+.dt-root.dt-overlay .dt-empty {
+  background: transparent;
+}
+.dt-root.dt-overlay .clipper {
+  position: absolute;
+  right: 16px;
+  bottom: 3.4rem;
+}
+
+/* the overlay's free windows: the title bar moves them, the edges size them */
+.dt-root.dt-overlay .dt-titlebar {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+html.tc-dragging,
+html.tc-dragging * {
+  cursor: grabbing;
+  user-select: none;
+}
+.dt-grip {
+  position: absolute;
+  z-index: 3;
+  touch-action: none;
+}
+.dt-grip-n,
+.dt-grip-s {
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+.dt-grip-e,
+.dt-grip-w {
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  cursor: ew-resize;
+}
+.dt-grip-n { top: -3px; }
+.dt-grip-s { bottom: -3px; }
+.dt-grip-e { right: -3px; }
+.dt-grip-w { left: -3px; }
+.dt-grip-ne,
+.dt-grip-nw,
+.dt-grip-se,
+.dt-grip-sw {
+  width: 12px;
+  height: 12px;
+}
+.dt-grip-ne { top: -4px; right: -4px; cursor: nesw-resize; }
+.dt-grip-sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
+.dt-grip-nw { top: -4px; left: -4px; cursor: nwse-resize; }
+.dt-grip-se { bottom: -4px; right: -4px; cursor: nwse-resize; }
+/* a window that moves follows the pointer at once, not with the tiling's easing */
+.dt-root.dt-overlay .dt-program {
+  transition: none;
+}
+.dt-pin {
+  filter: grayscale(1);
+}
+.dt-pin:hover {
+  filter: none;
+}
+/* a native window of the desktop client (solo) has the system's title bar: no second one */
+.dt-solo .dt-titlebar {
+  display: none;
+}
+
+/* the overlay spans all screens (one window): the primary screen's part holds the taskbar, the
+   hint and Clipper; the programs float over the whole stage */
+.dt-root.dt-overlay .dt-stage {
+  position: absolute;
+  inset: 0;
+}
+.dt-screen {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.dt-screen > * {
+  pointer-events: auto;
+}
+.dt-screen > .clipper {
+  pointer-events: none;
+}
+.dt-screen > .dt-banner {
+  margin-bottom: auto;
+}
+/* what stands fixed in the middle of the window stands in the middle of the primary screen */
+html.tc-overlay .dt-palette-backdrop,
+html.tc-overlay .dialog-backdrop {
+  inset: auto;
+  left: var(--scr-l, 0);
+  top: var(--scr-t, 0);
+  width: var(--scr-w, 100vw);
+  height: var(--scr-h, 100vh);
+}
+html.tc-overlay .tool-picker-panel {
+  left: calc(var(--scr-l, 0px) + var(--scr-w, 100vw) / 2);
+  top: calc(var(--scr-t, 0px) + var(--scr-h, 100vh) / 2);
+}
+
+/* the frame meter (Ctrl+Shift+F): measures, never takes a click */
+.dt-meter {
+  position: fixed;
+  /* on the primary screen: the overlay window's own corner may lie where no screen is */
+  top: calc(var(--scr-t, 0px) + 6px);
+  left: calc(var(--scr-l, 0px) + 6px);
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.7rem;
+  max-width: 34rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.72);
+  color: #d8f5d0;
+  font: 12px/1.35 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  pointer-events: none;
+}
+.dt-meter .warn {
+  color: #ffc857;
+}
+.dt-meter .bad {
+  color: #ff6b6b;
+}
+
+/* a window being moved or sized: no blurred shadow to redraw on every frame, and its own layer */
+html.tc-dragging .dt-program {
+  box-shadow: none !important;
+}
+.dt-program.dt-moving {
+  will-change: transform;
+}
+
+/* the desktop client's settings (only inside the client) */
+.client-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.4rem 0;
+}
+.client-key kbd {
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+[data-testid="client-settings"] label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.4rem 0;
+}
+
+/* where a window lands when let go: a snap zone or a moved divider (2026-11-12) */
+.dt-snap-preview {
+  position: absolute;
+  z-index: 9000;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  pointer-events: none;
+}
+
+/* Clipper's folded-out talk takes the right part of the window's frame (talkPlace.ts) */
+.dt-program-body {
+  margin-right: calc(var(--talk-share, 0) * 100%);
+}

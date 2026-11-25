@@ -1,0 +1,228 @@
+{
+  "description": "The modules (views) of the web build (web/src/layout/modules/meta.ts), as far as the hub needs to know them: which ids a program may list, which need the admin role, which need a tool group. web/src/layout/modules/registry.test.ts checks that the two lists agree. A module that is not listed is refused in a program.",
+  "v": 1,
+  "modules": [
+    {
+      "id": "page.home",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.inbox",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.incognito",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.handovers",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.chat",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.chat.research",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.chat.dev",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.chat.admin",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.chat.project",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.tasks",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.library",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.archive",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.document",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.wiki",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.sheets",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.program",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.memory",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.project",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.knowledge",
+      "kind": "page",
+      "admin": false,
+      "needs": "notes"
+    },
+    {
+      "id": "page.research",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.instructions",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.settings",
+      "kind": "page",
+      "admin": false
+    },
+    {
+      "id": "page.overview",
+      "kind": "page",
+      "admin": true
+    },
+    {
+      "id": "page.node",
+      "kind": "page",
+      "admin": true
+    },
+    {
+      "id": "page.models",
+      "kind": "page",
+      "admin": true
+    },
+    {
+      "id": "page.model",
+      "kind": "page",
+      "admin": true
+    },
+    {
+      "id": "page.scheduling",
+      "kind": "page",
+      "admin": true
+    },
+    {
+      "id": "page.applications",
+      "kind": "page",
+      "admin": true
+    },
+    {
+      "id": "page.task_kinds",
+      "kind": "page",
+      "admin": true
+    },
+    {
+      "id": "page.releases",
+      "kind": "page",
+      "admin": true
+    },
+    {
+      "id": "page.params",
+      "kind": "page",
+      "admin": true
+    },
+    {
+      "id": "page.programs",
+      "kind": "page",
+      "admin": true
+    },
+    {
+      "id": "page.inventory",
+      "kind": "page",
+      "admin": true,
+      "needs": "host"
+    },
+    {
+      "id": "page.identity",
+      "kind": "page",
+      "admin": true,
+      "needs": "identity"
+    },
+    {
+      "id": "page.repos",
+      "kind": "page",
+      "admin": true,
+      "needs": "workshop"
+    },
+    {
+      "id": "page.workshop",
+      "kind": "page",
+      "admin": true,
+      "needs": "workshop"
+    },
+    {
+      "id": "page.files",
+      "kind": "page",
+      "admin": true,
+      "needs": "workshop"
+    },
+    {
+      "id": "page.care",
+      "kind": "page",
+      "admin": true
+    },
+    {
+      "id": "page.sources",
+      "kind": "page",
+      "admin": true,
+      "needs": "notes"
+    },
+    {
+      "id": "page.access",
+      "kind": "page",
+      "admin": true
+    },
+    {
+      "id": "layout.workspaces",
+      "kind": "widget",
+      "admin": true
+    },
+    {
+      "id": "page.themes",
+      "kind": "page",
+      "admin": true
+    },
+    {
+      "id": "page.theme-workshop",
+      "kind": "page",
+      "admin": true
+    }
+  ]
+}

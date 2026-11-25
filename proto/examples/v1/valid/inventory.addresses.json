@@ -1,0 +1,71 @@
+{
+  "v": 1,
+  "type": "inventory",
+  "id": "7b1e9f00-0000-4000-8000-000000000708",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "hardware": {
+      "cpu": {
+        "model": "Intel(R) Core(TM) i7-1255U",
+        "cores": 10,
+        "threads": 12,
+        "performance_cores": 2,
+        "efficiency_cores": 8
+      },
+      "ram_total_mb": 32768,
+      "gpus": [
+        {
+          "index": 0,
+          "name": "Intel(R) Iris(R) Xe Graphics",
+          "vendor": "intel",
+          "vram_total_mb": 128,
+          "integrated": true,
+          "shared_total_mb": 16305
+        }
+      ],
+      "disk_total_mb": 953869,
+      "disk_free_mb": 412345,
+      "network": [
+        {
+          "name": "eth0",
+          "mac": "02:00:00:00:00:01",
+          "kind": "ethernet"
+        },
+        {
+          "name": "wlan0",
+          "mac": "02:00:00:00:00:02",
+          "kind": "wifi"
+        }
+      ],
+      "addresses": [
+        "10.0.0.20",
+        "fd00::20"
+      ]
+    },
+    "runner": {
+      "type": "llamaserver",
+      "available": true,
+      "backend": "vulkan",
+      "llamacpp_release": "b11223",
+      "threads": 6
+    },
+    "models": [
+      {
+        "name": "qwen2.5-1.5b-instruct-q4_k_m",
+        "size_bytes": 1117320736,
+        "format": "gguf"
+      }
+    ],
+    "loaded": [
+      {
+        "name": "qwen2.5-1.5b-instruct-q4_k_m",
+        "vram_used_mb": 1400,
+        "context_length": 4096,
+        "pid": 4242,
+        "port": 41001,
+        "backend": "vulkan",
+        "ram_used_mb": 350
+      }
+    ]
+  }
+}

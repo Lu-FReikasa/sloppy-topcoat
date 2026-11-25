@@ -1,0 +1,25 @@
+{
+  "comment": "Pinned official llama.cpp release artifacts (https://github.com/ggml-org/llama.cpp/releases). SHA-256 values are verified by .github/workflows/llamacpp-pins.yml. Add a release here to let the hub pin it via config.runner.llamacpp_release.",
+  "default": "b11223",
+  "base_url": "https://github.com/ggml-org/llama.cpp/releases/download",
+  "releases": {
+    "b11223": {
+      "builds": [
+        {"os": "windows", "backend": "vulkan", "assets": [
+          {"name": "llama-b11223-bin-win-vulkan-x64.zip", "sha256": "b450e71cfb2204955db784590af51b3f81fbc3bde0c5687f7a85c89edc977fd4"}]},
+        {"os": "windows", "backend": "cpu", "assets": [
+          {"name": "llama-b11223-bin-win-cpu-x64.zip", "sha256": "ce7449915ae43a574e0bd6fbe70a9722e57e901fd9e318a4338fbbf0872ad6d3"}]},
+        {"os": "windows", "backend": "cuda", "assets": [
+          {"name": "llama-b11223-bin-win-cuda-12.4-x64.zip", "sha256": "469c7fe904021e825369a4567ead94a4bf08784d319947512c0242dbea0c3aca"},
+          {"name": "cudart-llama-bin-win-cuda-12.4-x64.zip", "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6"}]},
+        {"os": "linux", "backend": "cpu", "assets": [
+          {"name": "llama-b11223-bin-ubuntu-x64.tar.gz", "sha256": "9ce07ebd35ccdbae598ef34d21607564c4a21956cf075409f82e4f4fe871ea5e"}]},
+        {"os": "linux", "backend": "vulkan", "assets": [
+          {"name": "llama-b11223-bin-ubuntu-vulkan-x64.tar.gz", "sha256": "d4505b5752a967e070fb418ec1d365d4448d692eccea1d7d4d0a6e75b7300025"}]},
+        {"os": "linux", "backend": "cuda", "assets": [
+          {"name": "llama-b11223-bin-ubuntu-cuda-12.8-x64.tar.gz", "sha256": "66290e1ab6841163b9c6a3acbeffc56197e17cade008e05f2e68039db66c2bd8"},
+          {"name": "cudart-llama-b11223-bin-ubuntu-cuda-12.8-x64.tar.gz", "sha256": "ccd457a5835f30f46d0ffc36de07bfa6f78f5cac1ccea563644150ff7c79447e"}]}
+      ]
+    }
+  }
+}

@@ -1,0 +1,62 @@
+# Dev stack: Postgres 16 + pgvector, hub (HTTPS + the built GUI on :8443), web dev server
+# with hot reload on :5173.
+#   cp deploy/dev.env.example deploy/dev.env   # then edit
+#   make dev
+# Nodes connect to https://<dev host>:8443 and pin the hub CA shown in the GUI (D11).
+name: topcoat-dev
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: topcoat
+      POSTGRES_PASSWORD: ${TOPCOAT_DB_PASSWORD:?set TOPCOAT_DB_PASSWORD in deploy/dev.env}
+      POSTGRES_DB: topcoat
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U topcoat -d topcoat"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  hub:
+    build:
+      context: ..
+      dockerfile: hub/Dockerfile
+    environment:
+      TOPCOAT_DATABASE_URL: postgresql+psycopg://topcoat:${TOPCOAT_DB_PASSWORD}@db:5432/topcoat
+      TOPCOAT_DEV_ADMIN_TOKEN: ${TOPCOAT_DEV_ADMIN_TOKEN:?set TOPCOAT_DEV_ADMIN_TOKEN in deploy/dev.env}
+      TOPCOAT_TLS_MODE: ${TOPCOAT_TLS_MODE:-auto}
+      TOPCOAT_TLS_HOSTNAMES: ${TOPCOAT_TLS_HOSTNAMES:?set TOPCOAT_TLS_HOSTNAMES in deploy/dev.env}
+      TOPCOAT_PUBLIC_URL: ${TOPCOAT_PUBLIC_URL:-}
+    ports:
+      - "8443:8443"
+    volumes:
+      - hub-tls:/data/tls
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    image: node:22-alpine
+    working_dir: /web
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    environment:
+      HUB_URL: https://hub:8443
+    volumes:
+      - ../web:/web
+      - web-node-modules:/web/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - hub
+
+volumes:
+  db-data:
+  hub-tls:
+  web-node-modules:

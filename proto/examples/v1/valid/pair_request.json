@@ -1,0 +1,8 @@
+{
+  "code": "ABCD-1234",
+  "name": "node-amd",
+  "os": "windows",
+  "arch": "amd64",
+  "public_key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "agent_version": "0.1.0"
+}

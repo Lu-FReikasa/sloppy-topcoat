@@ -1,0 +1,14 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "7b1e9f00-0000-4000-8000-000000000034",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "kind": "model_load_cancelled",
+    "data": {
+      "model": "Qwen3-30B-A3B-Instruct-2507-Q4_K_M",
+      "reason": "unload_all",
+      "after_seconds": 41
+    }
+  }
+}

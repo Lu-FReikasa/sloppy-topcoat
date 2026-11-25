@@ -1,0 +1,17 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "7b1e9f00-0000-4000-8000-000000000031",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "kind": "paused",
+    "data": {
+      "reasons": [
+        "input",
+        "battery"
+      ],
+      "models": 1,
+      "streams": 1
+    }
+  }
+}

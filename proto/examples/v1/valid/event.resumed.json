@@ -1,0 +1,15 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "7b1e9f00-0000-4000-8000-000000000032",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "kind": "resumed",
+    "data": {
+      "paused_seconds": 184,
+      "reasons": [
+        "input"
+      ]
+    }
+  }
+}

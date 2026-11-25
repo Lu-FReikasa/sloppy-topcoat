@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "type": "action",
+  "id": "7b1e9f00-0000-4000-8000-000000000010",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "name": "models.load",
+    "args": {
+      "model": "fake-llm-8b-q4",
+      "context_length": 8192
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "$schema": "./contract.schema.json",
+  "key": "research",
+  "title_de": "Recherche",
+  "title_en": "Research",
+  "purpose": {
+    "en": "The web, frameworks and tools: finds, reads and compares public sources and reports what they say, with quotes.",
+    "de": "Das Web, Frameworks und Werkzeuge: findet, liest und vergleicht öffentliche Quellen und berichtet mit Zitaten, was sie sagen."
+  },
+  "intro": null,
+  "rules": [],
+  "drops": [],
+  "tasks": [
+    {
+      "de": "Öffentliche Quellen finden, lesen und vergleichen",
+      "example_de": "Vergleiche Ollama und llama.cpp für 8 GB VRAM.",
+      "output": "report"
+    },
+    {
+      "de": "Eine Liste Punkt für Punkt mit Belegen prüfen",
+      "example_de": "Stimmen diese fünf Versionsangaben?",
+      "output": "table"
+    }
+  ],
+  "tools": [
+    {
+      "group": "internet",
+      "say_de": "im Web suchen und Seiten lesen",
+      "say_en": "search the web and read pages"
+    },
+    {
+      "group": "notes",
+      "say_de": "deine Notizen lesen",
+      "say_en": "read your notes"
+    },
+    {
+      "group": "wiki",
+      "say_de": "das Wiki von Topcoat lesen",
+      "say_en": "read the wiki of Topcoat"
+    }
+  ],
+  "limits": {
+    "never_de": [
+      "Behauptungen ohne Quelle als Tatsache ausgeben",
+      "deine Hostnamen, Adressen oder Daten ins Web schicken",
+      "eine Freigabe selbst erteilen, ausweiten oder einen Klick von dir vorwegnehmen"
+    ],
+    "needs_click_de": []
+  },
+  "outputs": [
+    "check"
+  ],
+  "talks_to": [
+    {
+      "to": "project",
+      "for_de": "Ergebnisse als Bericht an eine Aufgabe"
+    }
+  ],
+  "model_role": "general",
+  "think": null,
+  "persona": null,
+  "programs": [
+    "research_report",
+    "doc_section"
+  ]
+}

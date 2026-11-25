@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v1/proxy_request.schema.json",
+  "title": "proxy_request",
+  "description": "Direction: hub -> node. Forward one HTTP request to the loopback llama-server of a loaded model (E1-05). Needs the action models.proxy in allowed_actions.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 1
+    },
+    "type": {
+      "const": "proxy_request"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stream_id",
+        "model",
+        "method",
+        "path",
+        "headers",
+        "body"
+      ],
+      "properties": {
+        "stream_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "chosen by the hub, unique per request"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST"
+          ]
+        },
+        "path": {
+          "enum": [
+            "/v1/chat/completions",
+            "/v1/completions",
+            "/v1/embeddings",
+            "/v1/models"
+          ]
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "maxProperties": 16,
+          "description": "only content-type and accept are forwarded"
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 1500000,
+          "contentEncoding": "base64",
+          "description": "base64 of the request body (empty for GET)"
+        }
+      }
+    }
+  }
+}

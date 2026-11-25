@@ -1,0 +1,38 @@
+{
+  "v": 1,
+  "type": "config",
+  "id": "7b1e9f00-0000-4000-8000-000000000001",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "config_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "config": {
+      "roles": [
+        "tools"
+      ],
+      "runner": {
+        "type": "none"
+      },
+      "allowed_actions": [
+        "capability.invoke"
+      ],
+      "heartbeat_interval_seconds": 10,
+      "idle_ttl_seconds": 900,
+      "watcher": {
+        "grace_seconds": 5,
+        "rules": [
+          {
+            "process": "game.exe"
+          }
+        ]
+      },
+      "capabilities": [
+        "docker.ps",
+        "shell.read"
+      ],
+      "tools": {
+        "docker_host": "tcp://127.0.0.1:2375",
+        "shell_socket": "/run/topcoat-readshell.sock"
+      }
+    }
+  }
+}

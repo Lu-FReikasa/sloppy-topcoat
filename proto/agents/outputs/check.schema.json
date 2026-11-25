@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "topcoat:agents/outputs/check",
+  "title": "A check of a text against its question (the block 'check')",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "issues": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "ok",
+    "issues"
+  ]
+}

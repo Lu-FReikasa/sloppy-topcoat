@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v1/queued_events.schema.json",
+  "title": "queued_events",
+  "description": "Direction: node -> hub. Events collected while the hub was unreachable, oldest first. Each keeps its original id and ts.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 1
+    },
+    "type": {
+      "const": "queued_events"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "events"
+      ],
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "event.schema.json"
+          },
+          "maxItems": 1000
+        }
+      }
+    }
+  }
+}

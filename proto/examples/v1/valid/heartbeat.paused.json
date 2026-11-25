@@ -1,0 +1,23 @@
+{
+  "v": 1,
+  "type": "heartbeat",
+  "id": "7b1e9f00-0000-4000-8000-000000000013",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "state": "paused",
+    "ram_used_mb": 9000,
+    "gpus": [
+      {
+        "index": 0,
+        "vram_used_mb": 800
+      }
+    ],
+    "loaded": [
+      {
+        "name": "qwen2.5-7b-instruct-q4_k_m",
+        "vram_used_mb": 6100,
+        "context_length": 8192
+      }
+    ]
+  }
+}

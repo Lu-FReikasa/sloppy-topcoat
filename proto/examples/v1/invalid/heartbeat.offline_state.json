@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "type": "heartbeat",
+  "id": "7b1e9f00-0000-4000-8000-000000000001",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "state": "offline",
+    "ram_used_mb": 1,
+    "gpus": [],
+    "loaded": []
+  }
+}

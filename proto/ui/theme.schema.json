@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://topcoat.invalid/ui/theme.schema.json",
+  "title": "A theme of the desktop (docs/THEMES.md)",
+  "description": "Data, never code: how the programs are laid out, where the taskbar stands and what it holds, what a program's title bar has, how things move, and an extra style sheet. The hub checks a theme against this file and against the style sheet rules (hub/src/topcoat_hub/ui/themes.py); the web build keeps its own copy of the lists (web/src/desktop/theme.ts) and web/src/desktop/theme.shared.test.ts checks that they agree.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["key", "name", "layout", "bar", "chrome", "motion"],
+  "properties": {
+    "key": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,39}$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+    "base": { "enum": ["terminal", "leitstand", "schreibtisch"] },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "enum": ["tile", "columns", "rows", "focus", "cascade"] } }
+    },
+    "bar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["position", "items"],
+      "properties": {
+        "position": { "enum": ["bottom", "top", "left", "right", "hidden"] },
+        "items": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["start", "programs", "clock", "status", "me"] }
+        }
+      }
+    },
+    "chrome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["buttons", "titlebar"],
+      "properties": {
+        "buttons": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["minimise", "maximise", "close"] }
+        },
+        "titlebar": { "enum": ["top", "hidden"] }
+      }
+    },
+    "motion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["style", "ms"],
+      "properties": {
+        "style": { "enum": ["none", "fade", "slide", "flicker", "zoom"] },
+        "close": { "enum": ["none", "fade", "slide", "flicker", "zoom"] },
+        "overlay": { "enum": ["none", "fade", "slide", "flicker", "zoom"] },
+        "ms": { "type": "integer", "minimum": 0, "maximum": 2000 }
+      }
+    },
+    "css": { "type": "string", "maxLength": 40000 }
+  }
+}

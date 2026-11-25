@@ -1,0 +1,933 @@
+/* The Projekte page: three panes like a file explorer; one column at phone width. */
+
+.project {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
+  gap: 1rem;
+  padding: 1rem;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.project-projects,
+.project-tree {
+  min-width: 0;
+}
+
+.project h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+}
+
+.project h3 {
+  font-size: 0.95rem;
+  margin: 0.75rem 0 0.4rem;
+}
+
+.project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.project-row:hover,
+.project-row.is-selected {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.project-row > div {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.project-open {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-number {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  min-width: 3.5rem;
+  opacity: 0.8;
+}
+
+.project-icon {
+  width: 1rem;
+  text-align: center;
+}
+
+.project-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-toggle {
+  width: 1.25rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  flex: none;
+}
+
+.project-muted {
+  opacity: 0.7;
+  font-size: 0.85rem;
+}
+
+.project-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.project-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.project-description {
+  white-space: pre-wrap;
+}
+
+.project-form {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.75rem 0;
+}
+
+.project-form label {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+}
+
+.project-inline {
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  align-items: center;
+}
+
+.project-detail {
+  border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+}
+
+.project-scope table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.project-scope th,
+.project-scope td {
+  text-align: left;
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+
+.project-error {
+  color: #c0392b;
+}
+
+.project-ok {
+  color: #27ae60;
+}
+
+@media (max-width: 760px) {
+  .project {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 1rem;
+  }
+
+  .project-inline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --- PPH-04 04e: views, filter, chips, table, board, detail fields ------------------------------ */
+
+.project-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.5rem;
+  margin: 0.4rem 0;
+}
+
+.project-bar input:not([type="checkbox"]),
+.project-bar select {
+  min-width: 0;
+}
+
+.project-bar > input:not([type="checkbox"]):not([type="number"]) {
+  flex: 1 1 12rem;
+}
+
+.project-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0.5rem 0;
+}
+
+.project-switch .is-selected {
+  background: color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.project-filterbar {
+  margin: 0.25rem 0 0.75rem;
+}
+
+.project-help {
+  white-space: pre-wrap;
+  font-size: 0.8rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  overflow-wrap: anywhere;
+}
+
+.project-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.project-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0 0.45rem;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.project-chip button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 0.1rem;
+}
+
+.project-priority {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0 0.3rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.project-priority.p4,
+.project-priority.p5 {
+  color: #c0392b;
+}
+
+.project-due {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.project-due.is-overdue {
+  color: #c0392b;
+  opacity: 1;
+}
+
+.project-donebox {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+}
+
+.project-donelabel,
+.project-donespace {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  min-height: 1.6rem;
+}
+
+.project-card .project-open {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.project-card .project-number {
+  min-width: 0;
+  margin-right: 0.4rem;
+}
+
+/* a list row at phone width: the meta wraps under the title instead of pushing the page wide */
+.project-row {
+  flex-wrap: wrap;
+}
+
+.project-tablewrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.project-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.project-table th,
+.project-table td {
+  text-align: left;
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  vertical-align: top;
+}
+
+.project-table th button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.project-table tr.is-selected {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.project-board-wrap {
+  max-width: 100%;
+}
+
+/* the board scrolls inside its own container, never the page */
+.project-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(13rem, 1fr);
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  max-width: 100%;
+}
+
+.project-column {
+  min-width: 0;
+  padding: 0.4rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.project-column.is-over {
+  outline: 2px dashed currentColor;
+}
+
+.project-column.is-full {
+  background: color-mix(in srgb, #c0392b 12%, transparent);
+}
+
+.project-column header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.5rem;
+}
+
+.project-column h3 {
+  margin: 0;
+}
+
+.project-column ul {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.project-wip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.project-wip input {
+  width: 3.2rem;
+}
+
+.project-card {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 6px;
+  background: var(--surface, Canvas);
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.project-card.is-selected {
+  border-color: currentColor;
+}
+
+.project-card.is-dragging {
+  opacity: 0.5;
+}
+
+.project-cardmeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.project-extra {
+  margin: 0.75rem 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 6px;
+}
+
+.project-extra legend {
+  font-size: 0.85rem;
+  padding: 0 0.3rem;
+}
+
+.project-extra label {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+  margin: 0.3rem 0;
+}
+
+.project-extra label.project-bar {
+  display: flex;
+}
+
+.project-preview {
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  overflow-wrap: anywhere;
+}
+
+.project-bodyfield textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.project-today ul {
+  margin-bottom: 0.75rem;
+}
+
+@media (max-width: 760px) {
+  /* a finger needs 40 px: buttons, fields and the tap area of a checkbox */
+  .project button,
+  .project select,
+  .project input:not([type="checkbox"]),
+  .project-donelabel,
+  .project-donespace {
+    min-height: 40px;
+  }
+
+  .project button {
+    min-width: 40px;
+  }
+
+  .project-donelabel,
+  .project-donespace {
+    min-width: 40px;
+  }
+
+  .project-toggle {
+    min-width: 40px;
+  }
+
+  /* the page itself never scrolls sideways: wide things scroll in their own container */
+  .project,
+  .project-tree {
+    overflow-x: hidden;
+  }
+
+  .project-board {
+    grid-auto-columns: minmax(78%, 1fr);
+    scroll-snap-type: x proximity;
+  }
+
+  .project-column {
+    scroll-snap-align: start;
+  }
+
+  .project-open {
+    flex-basis: 60%;
+  }
+}
+
+/* --- PPH-04 04f: the Akte, history, trash, change sets ----------------------------------------- */
+
+.project-row.is-replaced .project-name {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.project-events {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.project-event {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.6rem;
+  align-items: baseline;
+  padding: 0.3rem 0.4rem;
+  border-left: 3px solid color-mix(in srgb, currentColor 30%, transparent);
+  font-size: 0.9rem;
+}
+
+.project-event time {
+  opacity: 0.7;
+  font-size: 0.8rem;
+}
+
+.project-event-label {
+  font-weight: 600;
+}
+
+.project-fact {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+
+.project-diff pre {
+  margin: 0.15rem 0;
+  padding: 0.2rem 0.4rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+}
+
+.project-diff-del {
+  background: color-mix(in srgb, #c0392b 18%, transparent);
+}
+
+.project-diff-ins {
+  background: color-mix(in srgb, #27ae60 18%, transparent);
+}
+
+.project-diff-equal {
+  opacity: 0.6;
+}
+
+.project-set {
+  margin: 0.75rem 0;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 6px;
+}
+
+.project-set header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.4rem;
+  align-items: baseline;
+}
+
+.project-set h3 {
+  margin: 0;
+}
+
+.project-setsummary {
+  margin: 0.4rem 0;
+}
+
+.project-setops {
+  margin: 0.5rem 0;
+  padding-left: 1.6rem;
+  text-align: left;
+}
+
+.project-setops > li {
+  margin: 0 0 0.75rem;
+}
+
+/* checkbox, verb and title on one line that wraps under the title, never centred */
+.project-setops label.project-sethead {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  justify-items: start;
+  gap: 0.5rem;
+  text-align: left;
+  width: 100%;
+}
+
+.project-setverb {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.project-settitle {
+  overflow-wrap: anywhere;
+}
+
+.project-setneeded {
+  margin: 0.1rem 0 0;
+  font-size: 0.8rem;
+}
+
+.project-setdetail {
+  margin: 0.3rem 0 0;
+  text-align: left;
+}
+
+.project-setdetail > p {
+  margin: 0 0 0.25rem;
+}
+
+.project-setchange > div {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  gap: 0.5rem;
+  margin: 0.15rem 0;
+}
+
+.project-setchange dt {
+  opacity: 0.7;
+}
+
+.project-setchange dd {
+  margin: 0;
+}
+
+.project-settext {
+  margin: 0.2rem 0;
+  padding: 0.4rem 0.55rem;
+  max-height: 16rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: 0.85rem;
+  border-left: 3px solid color-mix(in srgb, currentColor 30%, transparent);
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.project-setold {
+  opacity: 0.7;
+}
+
+.project-warn {
+  color: var(--warn, #b58100);
+}
+
+.project-linkbutton {
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.8;
+}
+
+.project-setlines {
+  margin: 0.1rem 0 0.4rem;
+  padding-left: 1rem;
+  list-style: none;
+  font-size: 0.8rem;
+}
+
+/* --- PPH-04 04i: calendar and Gantt ------------------------------------------------------------- */
+
+/* wide things scroll inside their own container, never the page */
+.project-calendar {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.project-calgrid {
+  min-width: 34rem;
+}
+
+.project-calhead,
+.project-calweek {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.project-calhead span {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  padding: 0.2rem 0.3rem;
+}
+
+.project-calcell {
+  min-height: 5.5rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.project-calcell.is-outside {
+  opacity: 0.55;
+}
+
+.project-calcell.is-today {
+  outline: 2px solid currentColor;
+}
+
+.project-calcell.is-over {
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  outline: 2px dashed currentColor;
+}
+
+.project-caldate {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.project-calcell ul,
+.project-calundated {
+  list-style: none;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.project-chiptask {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0 0.3rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  font-size: 0.8rem;
+  cursor: grab;
+  touch-action: pan-y;
+  min-width: 0;
+}
+
+.project-chiptask.is-start {
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, currentColor 40%, transparent);
+  cursor: default;
+}
+
+.project-chiptask.is-done .project-open {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.project-chiptask.is-selected {
+  outline: 1px solid currentColor;
+}
+
+.project-chiptask.is-dragging {
+  opacity: 0.5;
+}
+
+.project-chiptask .project-open {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-ganttwrap {
+  display: flex;
+  max-width: 100%;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.project-ganttlabels {
+  flex: none;
+  width: 12rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  box-sizing: content-box;
+  border-right: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.project-ganttlabels li {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 0.3rem;
+  box-sizing: border-box;
+}
+
+.project-ganttlabels li.is-selected {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.project-ganttscroll {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.project-ganttscroll svg {
+  display: block;
+  color: inherit;
+}
+
+.gantt-grid {
+  stroke: currentColor;
+  opacity: 0.15;
+}
+
+.gantt-month {
+  fill: currentColor;
+  font-size: 11px;
+}
+
+.gantt-day {
+  fill: currentColor;
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+.gantt-today {
+  stroke: #c0392b;
+  stroke-width: 1.5;
+}
+
+.gantt-arrow {
+  stroke: currentColor;
+  opacity: 0.6;
+}
+
+.gantt-bar {
+  cursor: grab;
+  fill: currentColor;
+  opacity: 0.55;
+}
+
+.gantt-bar:focus-visible,
+.gantt-bar.is-selected {
+  opacity: 0.9;
+  outline: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.gantt-bar.is-done {
+  opacity: 0.25;
+}
+
+.gantt-summary {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.gantt-edge {
+  fill: currentColor;
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.gantt-milestone polygon {
+  fill: #e67e22;
+}
+
+@media (max-width: 760px) {
+  .project-ganttlabels {
+    width: 7rem;
+  }
+
+  .project-calcell {
+    min-height: 4.5rem;
+  }
+}
+
+/* iterations of a task (IterationPanel.tsx) */
+.project-iterations {
+  border-top: 1px solid var(--border);
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+}
+.project-iterations h4 {
+  margin: 0 0 0.35rem;
+}
+.project-iteration-list {
+  margin: 0 0 0.5rem;
+  padding-left: 1.2rem;
+}
+.project-requirements ul {
+  margin: 0.25rem 0;
+  padding-left: 1.2rem;
+}
+.project-requirements button.link {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 0.2rem;
+}
+
+/* an issue's fixes (IssuePanel.tsx) */
+.project-issue {
+  border-top: 1px solid var(--border);
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+}
+.project-fixes {
+  padding-left: 1.2rem;
+}
+.project-diff {
+  max-height: 20rem;
+  overflow: auto;
+  font-size: 0.85em;
+  white-space: pre;
+}

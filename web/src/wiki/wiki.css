@@ -1,0 +1,384 @@
+/* The wiki (WikiPage.tsx): the pages on the left, the open page as a document in the middle, its
+   contents on the right when the window is wide. The layout follows the window's width (a
+   container query), not the screen's: a wiki window on the desktop can be narrow. The document
+   keeps the theme's colours but is set in a reading font and a reading width; a theme may set
+   --wiki-font to change that. */
+
+.wiki-shell {
+  container-type: inline-size;
+}
+
+.wiki {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.wiki-nav-title {
+  font-size: 1.2rem;
+  margin: 0 0 0.75rem;
+}
+
+.wiki-nav-section h2 {
+  margin: 1rem 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.wiki-nav-section ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wiki-nav-section a {
+  display: block;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+  line-height: 1.3;
+}
+
+.wiki-nav-section a:hover {
+  background: var(--track);
+}
+
+.wiki-nav-section a[aria-current="page"] {
+  background: var(--track);
+  box-shadow: inset 3px 0 0 var(--accent);
+  font-weight: 600;
+}
+
+.wiki-pick {
+  margin-top: 3rem;
+}
+
+/* --- the document -------------------------------------------------------------------------- */
+
+.wiki-doc {
+  min-width: 0;
+  max-width: 50rem;
+  padding: 1.75rem 2rem 2.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  font-family: var(--wiki-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.wiki-head {
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.wiki-head h1 {
+  margin: 0 0 0.4rem;
+  font-size: 1.75rem;
+  line-height: 1.25;
+}
+
+.wiki-meta,
+.wiki-made,
+.wiki-old {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.wiki-old {
+  color: var(--warn);
+}
+
+.wiki-body .markdown-doc h2 {
+  margin: 2rem 0 0.6rem;
+  padding-bottom: 0.25rem;
+  font-size: 1.3rem;
+  border-bottom: 1px solid var(--border);
+  scroll-margin-top: 1rem;
+}
+
+.wiki-body .markdown-doc h3 {
+  margin: 1.4rem 0 0.4rem;
+  font-size: 1.08rem;
+}
+
+.wiki-body .markdown-doc p,
+.wiki-body .markdown-doc ul,
+.wiki-body .markdown-doc ol {
+  margin: 0 0 0.9rem;
+}
+
+.wiki-body .markdown-doc code {
+  font-size: 0.86em;
+}
+
+.markdown-doc sup.cite {
+  margin-left: 0.1rem;
+  font-size: 0.7em;
+  line-height: 0;
+}
+
+.markdown-doc sup.cite a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.markdown-doc sup.cite a:hover {
+  text-decoration: underline;
+}
+
+.mermaid-diagram {
+  display: block;
+  max-width: 100%;
+  margin: 1rem auto;
+  padding: 0.75rem;
+  background: #ffffff;
+  border-radius: 6px;
+}
+
+/* the sources and what was removed: smaller, after the text */
+.wiki-sources {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.wiki-sources h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+}
+
+.wiki-sources ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wiki-sources li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.2rem 0;
+  scroll-margin-top: 1rem;
+}
+
+.wiki-sources li:target {
+  background: var(--track);
+}
+
+.wiki-ref {
+  flex: none;
+  min-width: 2.5rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.wiki-removed,
+.wiki-versions {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.wiki-removed summary,
+.wiki-versions summary {
+  cursor: pointer;
+}
+
+.wiki-versions ol {
+  margin: 0.5rem 0;
+  padding-left: 1.2rem;
+}
+
+.wiki-versions li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.15rem 0;
+}
+
+/* the contents of the page */
+.wiki-toc {
+  display: none;
+  font-size: 0.85rem;
+}
+
+.wiki-toc h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.wiki-toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--border);
+}
+
+.wiki-toc a {
+  display: block;
+  padding: 0.2rem 0 0.2rem 0.75rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.wiki-toc a:hover {
+  color: var(--text);
+}
+
+@container (min-width: 760px) {
+  .wiki {
+    grid-template-columns: 14rem minmax(0, 1fr);
+  }
+  .wiki-nav {
+    position: sticky;
+    top: 0;
+  }
+}
+
+@container (min-width: 1180px) {
+  .wiki {
+    grid-template-columns: 14rem minmax(0, 50rem) 12rem;
+  }
+  .wiki-toc {
+    display: block;
+    position: sticky;
+    top: 0;
+  }
+}
+
+@container (max-width: 520px) {
+  .wiki-doc {
+    padding: 1rem;
+  }
+}
+
+/* the tree: folders that open and close, pages to drag onto a folder (like the file explorer) */
+.wiki-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 0.5rem;
+}
+.wiki-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0 0 0.6rem;
+}
+.wiki-cat {
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  background: transparent;
+  color: inherit;
+}
+button.wiki-cat[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg, #fff);
+}
+.wiki-tree,
+.wiki-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wiki-folder {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+.wiki-folder.wiki-drop {
+  background: var(--track);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.wiki-folder-toggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.3rem 0.4rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wiki-count {
+  margin-left: 0.4rem;
+  font-weight: 400;
+  font-size: 0.75rem;
+}
+.wiki-folder-edit {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  opacity: 0;
+}
+.wiki-folder:hover .wiki-folder-edit,
+.wiki-folder-edit:focus-visible {
+  opacity: 1;
+}
+.wiki-rename {
+  flex: 1 1 auto;
+}
+.wiki-rename input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.wiki-tree a {
+  display: block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+  line-height: 1.3;
+  cursor: grab;
+}
+.wiki-tree a:hover {
+  background: var(--track);
+}
+.wiki-tree a[aria-current="page"] {
+  background: var(--track);
+  box-shadow: inset 3px 0 0 var(--accent);
+  font-weight: 600;
+}
+.wiki-hint {
+  margin-top: 0.6rem;
+}
+.wiki-crumbs {
+  margin: 0 0 0.2rem;
+}
+.wiki-order {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 34rem;
+  margin: 0.6rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.wiki-order label {
+  display: grid;
+  gap: 0.2rem;
+}
+.wiki-order-buttons {
+  display: flex;
+  gap: 0.5rem;
+}

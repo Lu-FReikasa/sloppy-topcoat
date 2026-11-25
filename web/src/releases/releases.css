@@ -1,0 +1,12 @@
+.releases { display: grid; gap: 0.75rem; }
+.release-start { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: end; }
+.release-start label, .release-sign label { display: grid; gap: 0.2rem; }
+.release-builds { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
+.release-builds button { width: 100%; text-align: left; min-height: 40px; }
+.release-builds .is-selected { outline: 2px solid currentColor; }
+.state-failed { color: var(--danger, #b00020); }
+.state-published, .state-built { color: var(--ok, #1b7f3b); }
+.release-detail, .release-sign { border: 1px solid var(--border, #8884); border-radius: 6px; padding: 0.75rem; display: grid; gap: 0.5rem; }
+.release-changes, .release-detail pre { max-height: 16rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.release-artifacts { border-collapse: collapse; width: 100%; }
+.release-artifacts th, .release-artifacts td { text-align: left; padding: 0.2rem 0.5rem; overflow-wrap: anywhere; }

@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "type": "proxy_chunk",
+  "id": "7b1e9f00-0000-4000-8000-000000000502",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "stream_id": "7b1e9f00-0000-4000-8000-00000000abcd",
+    "seq": 0,
+    "data": "ZGF0YTogeyJjaG9pY2VzIjpbeyJkZWx0YSI6eyJjb250ZW50IjoiSGFsbG8ifX1dfQoK",
+    "status": 200,
+    "content_type": "text/event-stream"
+  }
+}

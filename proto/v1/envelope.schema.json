@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v1/envelope.schema.json",
+  "title": "Message envelope (every node <-> hub message)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "v",
+    "type",
+    "id",
+    "ts",
+    "body"
+  ],
+  "properties": {
+    "v": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Protocol version"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "hello",
+        "config",
+        "inventory",
+        "heartbeat",
+        "action",
+        "action_result",
+        "event",
+        "queued_events",
+        "error",
+        "proxy_request",
+        "proxy_chunk",
+        "proxy_end",
+        "proxy_status",
+        "proxy_cancel"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "re": {
+      "type": "string",
+      "format": "uuid",
+      "description": "id of the request this message answers"
+    },
+    "body": {
+      "type": "object"
+    }
+  }
+}

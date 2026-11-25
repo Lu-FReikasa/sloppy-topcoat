@@ -1,0 +1,14 @@
+{
+  "v": 0,
+  "type": "proxy_request",
+  "id": "7b1e9f00-0000-4000-8000-000000000507",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "stream_id": "7b1e9f00-0000-4000-8000-00000000abcd",
+    "model": "m",
+    "method": "DELETE",
+    "path": "/v1/models",
+    "headers": {},
+    "body": ""
+  }
+}

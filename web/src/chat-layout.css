@@ -1,0 +1,289 @@
+/* Layout of the chat page (chat layout study): the list of conversations and the head of an open
+   conversation. It follows the width of the chat page itself, not the window: with a menu rail
+   next to it, a half-wide browser leaves the page far narrower than the window suggests.
+   `html[data-chatlist]` (chat/chatlist.ts) picks one of three variants of the list. */
+
+.app:has(.chat) .content {
+  container-type: inline-size;
+  container-name: chatpage;
+}
+
+/* ---------- the list: grouped by day ---------- */
+
+.chat {
+  grid-template-columns: clamp(13rem, 26%, 17rem) minmax(0, 1fr);
+}
+
+.chat-list {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.chat-groups {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-right: 0.15rem;
+}
+
+.chat-group-title {
+  margin: 0 0 0.25rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.chat-list .chat-group ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: visible;
+}
+
+.chat-list li a {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: 40px;
+  padding: 0.4rem 0.6rem;
+  white-space: normal;
+  overflow: hidden;
+}
+
+.chat-list li {
+  max-width: none;
+}
+
+.chat-list li a {
+  border: 1px solid transparent;
+}
+
+.chat-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+.chat-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.chat-list li.active a .chat-meta {
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* ---------- variant "dicht": one line per entry, the time on the right ---------- */
+
+html[data-chatlist="dicht"] .chat-list li a {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+html[data-chatlist="dicht"] .chat-title {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+html[data-chatlist="dicht"] .chat-meta {
+  flex: none;
+}
+
+html[data-chatlist="dicht"] .chat-count {
+  display: none;
+}
+
+/* ---------- variant "karten": without an open conversation the list is the page ---------- */
+
+html[data-chatlist="karten"] .chat-nosel {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto;
+  align-content: start;
+  min-height: 0;
+}
+
+html[data-chatlist="karten"] .chat-nosel .chat-main {
+  display: none;
+}
+
+html[data-chatlist="karten"] .chat-nosel .chat-list {
+  overflow: visible;
+}
+
+html[data-chatlist="karten"] .chat-nosel .chat-list > button,
+html[data-chatlist="karten"] .chat-nosel .chat-list > input {
+  width: 100%;
+  max-width: 28rem;
+}
+
+html[data-chatlist="karten"] .chat-nosel .chat-groups {
+  overflow-y: visible;
+}
+
+html[data-chatlist="karten"] .chat-nosel .chat-group ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.5rem;
+}
+
+html[data-chatlist="karten"] .chat-nosel .chat-list li a {
+  min-height: 4.5rem;
+  justify-content: space-between;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* ---------- a narrow chat page: the list becomes a strip above the chat ---------- */
+
+@container chatpage (max-width: 52rem) {
+  .chat:not(.chat-nosel),
+  html[data-chatlist]:not([data-chatlist="karten"]) .chat-nosel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0.5rem;
+    min-height: 40rem;
+  }
+
+  .chat:not(.chat-nosel) .chat-list,
+  html[data-chatlist]:not([data-chatlist="karten"]) .chat-nosel .chat-list {
+    display: grid;
+    grid-template-columns: minmax(7rem, 12rem) minmax(0, 1fr);
+    gap: 0.4rem;
+  }
+
+  .chat:not(.chat-nosel) .chat-list > p,
+  .chat:not(.chat-nosel) .chat-groups {
+    grid-column: 1 / -1;
+  }
+
+  /* one row of cards: the group headings give way, the order stays (newest first) */
+  .chat:not(.chat-nosel) .chat-groups {
+    flex-direction: row;
+    gap: 0.4rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .chat:not(.chat-nosel) .chat-group,
+  .chat:not(.chat-nosel) .chat-group ul {
+    display: contents;
+  }
+
+  .chat:not(.chat-nosel) .chat-group-title {
+    display: none;
+  }
+
+  .chat:not(.chat-nosel) .chat-list li {
+    flex: 0 0 10rem;
+  }
+
+  /* a low strip: the title on one line, so the chat keeps its height */
+  .chat:not(.chat-nosel) .chat-title {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+  }
+
+  .chat:not(.chat-nosel) .chat-list li a {
+    padding: 0.25rem 0.6rem;
+  }
+
+  .chat:not(.chat-nosel) .chat-meta {
+    display: none;
+  }
+
+  .chat:not(.chat-nosel) .chat-list li a {
+    height: 100%;
+    border: 1px solid var(--border);
+  }
+
+  .conversation {
+    gap: 0.35rem;
+  }
+
+  .conversation-head {
+    gap: 0.3rem 0.5rem;
+  }
+
+  /* the head of the conversation: the title on its own row, model and node share the next one */
+  .conversation-head h1 {
+    flex: 1 1 100%;
+  }
+
+  .conversation-head .picker {
+    flex: 1 1 12rem;
+  }
+
+  .conversation-head .picker select {
+    flex: 1 1 auto;
+  }
+}
+
+/* the application entries of the chat list: the same rows as the conversations */
+.chat-list li button.chat-entry {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 36px;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-list li button.chat-entry:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.chat-list li button.chat-entry[aria-pressed="true"] {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  border-color: color-mix(in srgb, currentColor 25%, transparent);
+}
+
+/* the chat window takes the accent of the application whose tab is open */
+.chat-window[data-app] {
+  box-shadow: inset 0 3px 0 var(--chat-accent);
+}
+
+.chat-window[data-app] .chat-window-bar .linklike {
+  color: var(--chat-accent);
+}
+
+/* the usual step count of a check, a mark on its bar (2026-11-13) */
+.activity-progress {
+  position: relative;
+}
+.activity-progress-mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--muted);
+}

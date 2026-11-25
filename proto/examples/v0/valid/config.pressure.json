@@ -1,0 +1,76 @@
+{
+  "v": 0,
+  "type": "config",
+  "id": "7b1e9f00-0000-4000-8000-000000000003",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "config_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "config": {
+      "roles": [
+        "gpu"
+      ],
+      "runner": {
+        "type": "llamaserver",
+        "model_dirs": [],
+        "backend": "auto",
+        "llamacpp_release": "b11223",
+        "threads": 6
+      },
+      "allowed_actions": [
+        "models.list",
+        "models.load",
+        "models.unload",
+        "models.download",
+        "models.delete",
+        "node.benchmark"
+      ],
+      "heartbeat_interval_seconds": 10,
+      "idle_ttl_seconds": 1800,
+      "watcher": {
+        "grace_seconds": 5,
+        "cooldown_seconds": 60,
+        "rules": [
+          {
+            "process": "game.exe"
+          },
+          {
+            "path_prefix": "D:\\SteamLibrary\\steamapps\\common\\"
+          }
+        ]
+      },
+      "capabilities": [],
+      "residents": [
+        {
+          "model": "qwen2.5-7b-instruct-q4_k_m",
+          "context_length": 8192,
+          "priority": 80,
+          "auto_reload": true
+        },
+        {
+          "model": "llama-3.2-3b-instruct-q4_k_m",
+          "priority": 20,
+          "auto_reload": false
+        }
+      ],
+      "pressure": {
+        "enabled": true,
+        "poll_seconds": 2,
+        "sustain_seconds": 3,
+        "unload_below_free_mb": 1024,
+        "margin_mb": 1024,
+        "reload_after_seconds": 60,
+        "reload_headroom_mb": 2048,
+        "reload_max_foreign_gpu_util": 30,
+        "min_off_seconds": 120,
+        "reload_while_rule_matches": false,
+        "foreign_shared_trigger_mb": 1024,
+        "ram": {
+          "enabled": false,
+          "unload_below_free_mb": 2048,
+          "margin_mb": 1024,
+          "reload_headroom_mb": 1024
+        }
+      }
+    }
+  }
+}

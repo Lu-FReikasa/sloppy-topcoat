@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v0/heartbeat.schema.json",
+  "title": "heartbeat",
+  "description": "Direction: node -> hub.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 0
+    },
+    "type": {
+      "const": "heartbeat"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "ram_used_mb",
+        "gpus",
+        "loaded"
+      ],
+      "properties": {
+        "state": {
+          "$ref": "common.schema.json#/$defs/node_state"
+        },
+        "ram_used_mb": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gpus": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/gpu_usage"
+          }
+        },
+        "loaded": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/loaded_model"
+          }
+        },
+        "loading": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "models the node is loading right now (E1-05: the hub waits for them instead of loading elsewhere)"
+        }
+      }
+    }
+  }
+}

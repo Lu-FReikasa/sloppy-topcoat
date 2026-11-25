@@ -1,0 +1,1552 @@
+{
+  "description": "The messages the applications send each other (brief PPH-05-messages-chains-mandates, section 3). The hub reads this file; the web build keeps a copy of the types and edges (web/src/project/messages.ts) and web/src/project/messages.shared.test.ts checks that they agree. A type, an edge or a payload that is not listed here is refused; nothing runs on free text.",
+  "v": 1,
+  "applications": {
+    "project": {
+      "contract": "../agents/project.json"
+    },
+    "research": {
+      "contract": "../agents/research.json"
+    },
+    "dev": {
+      "contract": "../agents/dev.json"
+    },
+    "admin": {
+      "contract": "../agents/admin.json"
+    }
+  },
+  "states": [
+    "draft",
+    "awaiting_click",
+    "sent",
+    "queued",
+    "running",
+    "waiting",
+    "delivered",
+    "reviewing",
+    "accepted",
+    "revised",
+    "rejected",
+    "failed",
+    "stopped"
+  ],
+  "types": [
+    {
+      "type": "project.request",
+      "from": [
+        "project"
+      ],
+      "to": [
+        "research",
+        "dev",
+        "admin"
+      ],
+      "trust": "own",
+      "needs_review": false,
+      "effect": "queue_task",
+      "schema_version": 1,
+      "label": {
+        "en": "Request",
+        "de": "Anfrage"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "depth": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "min_sources": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "min_hosts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "source_kinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "must_cover": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "expected": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "format": {
+            "enum": [
+              "brief",
+              "guide",
+              "comparison"
+            ]
+          },
+          "budget": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "steps": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "round": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "in_reply_to": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "topic"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "project.order",
+      "from": [
+        "project"
+      ],
+      "to": [
+        "dev"
+      ],
+      "trust": "own",
+      "needs_review": false,
+      "effect": "mandate",
+      "schema_version": 1,
+      "label": {
+        "en": "Order",
+        "de": "Auftrag"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "enum": [
+              "create_prototype",
+              "fix"
+            ]
+          },
+          "repo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "spec": {
+            "type": "object",
+            "properties": {
+              "goal": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "expected": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "maxItems": 50
+              },
+              "constraints": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "maxItems": 50
+              },
+              "out_of_scope": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "maxItems": 50
+              }
+            },
+            "required": [
+              "goal"
+            ],
+            "additionalProperties": false
+          },
+          "acceptance": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "reply_to": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "round": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "previous_result": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "action",
+          "repo",
+          "branch",
+          "spec"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "project.review",
+      "from": [
+        "project"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "own",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Review",
+        "de": "Prüfung"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "verdict": {
+            "enum": [
+              "accept",
+              "revise",
+              "reject"
+            ]
+          },
+          "criteria": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "met": {
+                  "type": "boolean"
+                },
+                "note": {
+                  "type": "string",
+                  "maxLength": 1000
+                }
+              },
+              "required": [
+                "item",
+                "met"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "reasons": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "followups": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "verdict",
+          "reasons"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "project.note",
+      "from": [
+        "project"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "own",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Note",
+        "de": "Notiz"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": true
+      }
+    },
+    {
+      "type": "project.question",
+      "from": [
+        "project"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "own",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Question",
+        "de": "Frage"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": true
+      }
+    },
+    {
+      "type": "project.decision",
+      "from": [
+        "project"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "own",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Decision",
+        "de": "Entscheidung"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": true
+      }
+    },
+    {
+      "type": "project.document",
+      "from": [
+        "project"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "own",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Document",
+        "de": "Dokument"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": true
+      }
+    },
+    {
+      "type": "project.fact",
+      "from": [
+        "project"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "own",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Fact",
+        "de": "Tatsache"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "statement": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "as_of": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [],
+        "additionalProperties": true
+      }
+    },
+    {
+      "type": "research.result",
+      "from": [
+        "research"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "foreign",
+      "needs_review": true,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Research result",
+        "de": "Ergebnis der Recherche"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 6000
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "quote": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                },
+                "source_url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                },
+                "source_host": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                "retrieved_at": {
+                  "type": "string",
+                  "maxLength": 40
+                }
+              },
+              "required": [
+                "claim",
+                "quote",
+                "source_url"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 100
+          },
+          "coverage": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "findings": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "maxItems": 100
+                },
+                "note": {
+                  "type": "string",
+                  "maxLength": 1000
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            }
+          },
+          "open_points": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "as_of": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "summary",
+          "findings"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "dev.result",
+      "from": [
+        "dev"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "system",
+      "needs_review": true,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Development result",
+        "de": "Ergebnis der Entwicklung"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 6000
+          },
+          "branch": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "head": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "diff_stat": {
+            "type": "object",
+            "properties": {
+              "files": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "insertions": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "deletions": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "tests": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "not_run"
+                ]
+              },
+              "summary": {
+                "type": "string",
+                "maxLength": 4000
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "acceptance": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "met": {
+                  "type": "boolean"
+                },
+                "evidence": {
+                  "type": "string",
+                  "maxLength": 2000
+                }
+              },
+              "required": [
+                "item",
+                "met"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "path": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "lines": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "quote": {
+                  "type": "string",
+                  "maxLength": 2000
+                }
+              },
+              "required": [
+                "claim"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 100
+          },
+          "open_points": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "as_of": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "admin.result",
+      "from": [
+        "admin"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "system",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Administration result",
+        "de": "Ergebnis der Administration"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 6000
+          },
+          "findings": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "quote": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "source": {
+                  "type": "string",
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "claim"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "open_points": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "as_of": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "research.failure",
+      "from": [
+        "research"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "foreign",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Research failure",
+        "de": "Fehlschlag (Recherche)"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "enum": [
+              "node_away",
+              "no_budget",
+              "no_sources",
+              "tool_errors",
+              "refused",
+              "other"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "research.clarification",
+      "from": [
+        "research"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "foreign",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Research needs more information",
+        "de": "Rückfrage (Recherche)"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "questions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "research.changelog",
+      "from": [
+        "research"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "foreign",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Research changelog",
+        "de": "Änderungsprotokoll (Recherche)"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "what": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "by": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "before": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "after": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "result": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "as_of": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "what"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "research.proposal",
+      "from": [
+        "research"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "foreign",
+      "needs_review": false,
+      "effect": "stage",
+      "schema_version": 1,
+      "label": {
+        "en": "Research proposal",
+        "de": "Vorschlag (Recherche)"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "why": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "dev.failure",
+      "from": [
+        "dev"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "system",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Development failure",
+        "de": "Fehlschlag (Entwicklung)"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "enum": [
+              "node_away",
+              "no_budget",
+              "no_sources",
+              "tool_errors",
+              "refused",
+              "other"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "dev.clarification",
+      "from": [
+        "dev"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "system",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Development needs more information",
+        "de": "Rückfrage (Entwicklung)"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "questions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "dev.changelog",
+      "from": [
+        "dev"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "system",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Development changelog",
+        "de": "Änderungsprotokoll (Entwicklung)"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "what": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "by": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "before": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "after": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "result": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "as_of": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "what"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "dev.proposal",
+      "from": [
+        "dev"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "system",
+      "needs_review": false,
+      "effect": "stage",
+      "schema_version": 1,
+      "label": {
+        "en": "Development proposal",
+        "de": "Vorschlag (Entwicklung)"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "why": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "admin.failure",
+      "from": [
+        "admin"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "system",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Administration failure",
+        "de": "Fehlschlag (Administration)"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "enum": [
+              "node_away",
+              "no_budget",
+              "no_sources",
+              "tool_errors",
+              "refused",
+              "other"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "admin.clarification",
+      "from": [
+        "admin"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "system",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Administration needs more information",
+        "de": "Rückfrage (Administration)"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "questions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "admin.changelog",
+      "from": [
+        "admin"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "system",
+      "needs_review": false,
+      "effect": "none",
+      "schema_version": 1,
+      "label": {
+        "en": "Administration changelog",
+        "de": "Änderungsprotokoll (Administration)"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "what": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "by": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "before": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "after": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "result": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "as_of": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "what"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "admin.proposal",
+      "from": [
+        "admin"
+      ],
+      "to": [
+        "project"
+      ],
+      "trust": "system",
+      "needs_review": false,
+      "effect": "stage",
+      "schema_version": 1,
+      "label": {
+        "en": "Administration proposal",
+        "de": "Vorschlag (Administration)"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "why": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "dev.request",
+      "from": [
+        "dev"
+      ],
+      "to": [
+        "research",
+        "admin",
+        "project"
+      ],
+      "trust": "system",
+      "needs_review": false,
+      "effect": "queue_task",
+      "schema_version": 1,
+      "label": {
+        "en": "Request from Development",
+        "de": "Anfrage der Entwicklung"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "depth": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "min_sources": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "min_hosts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "source_kinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "must_cover": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "expected": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "format": {
+            "enum": [
+              "brief",
+              "guide",
+              "comparison"
+            ]
+          },
+          "budget": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "steps": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "round": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "in_reply_to": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "topic"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "admin.request",
+      "from": [
+        "admin"
+      ],
+      "to": [
+        "research"
+      ],
+      "trust": "system",
+      "needs_review": false,
+      "effect": "queue_task",
+      "schema_version": 1,
+      "label": {
+        "en": "Request from Administration",
+        "de": "Anfrage der Administration"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "depth": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "min_sources": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "min_hosts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "source_kinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "must_cover": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "expected": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "format": {
+            "enum": [
+              "brief",
+              "guide",
+              "comparison"
+            ]
+          },
+          "budget": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "steps": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "round": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "in_reply_to": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "topic"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "v": 0,
+  "type": "heartbeat",
+  "id": "7b1e9f00-0000-4000-8000-000000000001",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "state": "available",
+    "ram_used_mb": 9000,
+    "gpus": [
+      {
+        "index": 0,
+        "vram_used_mb": 6900
+      }
+    ],
+    "loaded": [
+      {
+        "name": "fake-llm-8b-q4",
+        "vram_used_mb": 6100
+      }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "cpu": { "model": "Fake CPU 8-Core", "cores": 8 },
+  "ram_total_mb": 32768,
+  "ram_used_mb": 9000,
+  "gpus": [
+    { "name": "Fake GPU 16G", "vendor": "amd", "vram_total_mb": 16384, "vram_base_used_mb": 800 }
+  ],
+  "models": [
+    { "name": "fake-llm-3b-q8", "size_bytes": 3400000000, "format": "gguf", "vram_mb": 3600 },
+    { "name": "fake-llm-8b-q4", "size_bytes": 4920000000, "format": "gguf", "vram_mb": 6100 },
+    { "name": "fake-llm-14b-q4", "size_bytes": 8990000000, "format": "gguf", "vram_mb": 9800 }
+  ],
+  "runner_available": true,
+  "loaded": []
+}

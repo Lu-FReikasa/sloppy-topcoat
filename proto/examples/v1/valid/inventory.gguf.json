@@ -1,0 +1,47 @@
+{
+  "v": 1,
+  "type": "inventory",
+  "id": "7b1e9f00-0000-4000-8000-000000000001",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "hardware": {
+      "cpu": {
+        "model": "Fake CPU 8-Core",
+        "cores": 8
+      },
+      "ram_total_mb": 32768,
+      "gpus": []
+    },
+    "runner": {
+      "type": "llamaserver",
+      "available": true
+    },
+    "models": [
+      {
+        "name": "chat-model-8b-q4",
+        "size_bytes": 4920000000,
+        "format": "gguf",
+        "own": true,
+        "gguf": {
+          "architecture": "qwen3",
+          "context_length": 40960,
+          "embedding_length": 4096,
+          "chat_template": true
+        }
+      },
+      {
+        "name": "embed-model-q8",
+        "size_bytes": 610000000,
+        "format": "gguf",
+        "own": true,
+        "gguf": {
+          "architecture": "bert",
+          "context_length": 8192,
+          "embedding_length": 1024,
+          "pooling_type": 2
+        }
+      }
+    ],
+    "loaded": []
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "v": 0,
+  "type": "hello",
+  "id": "7b1e9f00-0000-4000-8000-000000000001",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "agent_version": "0.1.0",
+    "protocol_version": 0,
+    "config_hash": null
+  }
+}

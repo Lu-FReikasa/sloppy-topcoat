@@ -1,0 +1,222 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.8.17"
+  GOLANGCI_LINT_VERSION: "v2.14.0"
+
+jobs:
+  hub:
+    name: hub (ruff + pytest)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: topcoat
+          POSTGRES_PASSWORD: topcoat
+          POSTGRES_DB: topcoat_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U topcoat -d topcoat_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TOPCOAT_TEST_DATABASE_URL: postgresql+psycopg://topcoat:topcoat@localhost:5432/topcoat_test
+      TOPCOAT_DATABASE_URL: postgresql+psycopg://topcoat:topcoat@localhost:5432/topcoat_test
+    defaults:
+      run:
+        working-directory: hub
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - name: migrations up/down and models in sync
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+          uv run alembic downgrade base
+      - run: uv run pytest -v -n auto
+
+  node:
+    name: node (go test + golangci-lint + cross-compile)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: node
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: node/go.mod
+          cache-dependency-path: node/go.sum
+      - run: go vet ./...
+      - run: go test -race ./...
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: node
+      - name: vet + lint for windows
+        run: |
+          GOOS=windows go vet ./...
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: node
+        env:
+          GOOS: windows
+      - name: cross-compile (no CGO)
+        env:
+          CGO_ENABLED: "0"
+        run: ../scripts/build-node-release.sh "ci-${GITHUB_SHA::7}" bin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: topcoat-node
+          path: node/bin/
+          retention-days: 7
+
+  node-windows:
+    # Runs the unit tests on Windows, including the real Win32 code paths
+    # (DXGI/PDH, Toolhelp process list, processor topology, job objects).
+    name: node (go test on windows)
+    runs-on: windows-2025
+    defaults:
+      run:
+        working-directory: node
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: node/go.mod
+          cache-dependency-path: node/go.sum
+      - run: go test ./...
+        env:
+          CGO_ENABLED: "0"
+
+  image:
+    # Builds hub/Dockerfile exactly as published and smoke-tests it over TLS.
+    name: hub image (docker build + smoke test)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f hub/Dockerfile -t topcoat-hub:ci .
+      - name: smoke test (TLS auto, migrations, GUI)
+        run: scripts/smoke-test-hub-image.sh topcoat-hub:ci
+
+  web:
+    name: web (eslint + vitest + build)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  e2e:
+    name: integration (hub + two fake nodes)
+    runs-on: ubuntu-24.04
+    needs: [hub, node]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: topcoat
+          POSTGRES_PASSWORD: topcoat
+          POSTGRES_DB: topcoat_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U topcoat -d topcoat_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TOPCOAT_TEST_DATABASE_URL: postgresql+psycopg://topcoat:topcoat@localhost:5432/topcoat_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: node/go.mod
+          cache-dependency-path: node/go.sum
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.12"
+          enable-cache: true
+      - name: build node
+        working-directory: node
+        run: CGO_ENABLED=0 go build -o bin/topcoat-node ./cmd/topcoat-node
+      - name: run integration test
+        working-directory: hub
+        run: |
+          uv sync --frozen
+          TOPCOAT_NODE_BIN="$GITHUB_WORKSPACE/node/bin/topcoat-node" uv run pytest -m integration -v -s
+
+  publish:
+    # Channel "test" (ARCHITECTURE D13): every green push to main publishes the hub image
+    # and the node binaries. Pull requests never publish.
+    name: publish channel test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [hub, node, node-windows, web, e2e, image]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # replace the "test" pre-release
+      packages: write   # push to ghcr.io
+    concurrency:
+      group: publish-test
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: node/go.mod
+          cache-dependency-path: node/go.sum
+      - name: node binaries
+        working-directory: node
+        env:
+          CGO_ENABLED: "0"
+        run: ../scripts/build-node-release.sh "test-${GITHUB_SHA::7}" dist
+      - name: hub image -> ghcr.io
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/sloppy-topcoat-hub"
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build -f hub/Dockerfile \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            -t "$image:test" -t "$image:sha-${GITHUB_SHA::7}" .
+          docker push "$image:test"
+          docker push "$image:sha-${GITHUB_SHA::7}"
+      - name: node binaries -> pre-release "test"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete test --yes --cleanup-tag || true
+          gh release create test --prerelease --target "$GITHUB_SHA" \
+            --title "Channel test (${GITHUB_SHA::7})" \
+            --notes "Built from ${GITHUB_SHA} on main. Hub image: ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/sloppy-topcoat-hub:test. Check downloads with SHA256SUMS." \
+            node/dist/topcoat-node-linux-amd64 node/dist/topcoat-node-windows-amd64.exe node/dist/SHA256SUMS

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v1/proxy_status.schema.json",
+  "title": "proxy_status",
+  "description": "Direction: node -> hub. A request that is being answered stands still because the node froze its model for the person using the machine (state 'paused'), or goes on again ('running'). The hub forwards it to the chat and does not treat the silence as a timeout (E2-05 B).",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 1
+    },
+    "type": {
+      "const": "proxy_status"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stream_id",
+        "state"
+      ],
+      "properties": {
+        "stream_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "chosen by the hub, unique per request"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "paused",
+            "running"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "input",
+              "cpu_load",
+              "battery"
+            ]
+          },
+          "description": "why the node paused (state 'paused' only)"
+        }
+      }
+    }
+  }
+}

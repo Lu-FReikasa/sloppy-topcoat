@@ -1,0 +1,43 @@
+# The build service of a node (NS-01, ARCHITECTURE D80). UNVERIFIED on real hardware.
+# It runs as its own user, with rootless Docker, in its own directory; the node's socket is
+# /run/topcoat-node/build.sock and belongs to this user. The service holds no signing key and no
+# credentials for the hub: the node uploads what it makes.
+#
+# Install (as root, once):
+#   useradd --system --create-home --home-dir /srv/topcoat/build --shell /usr/sbin/nologin topcoat-build
+#   loginctl enable-linger topcoat-build           # rootless Docker keeps running without a login
+#   (set up rootless Docker for topcoat-build: dockerd-rootless-setuptool.sh install)
+#   install -d -o root -g root -m 0750 /run/topcoat-node   # the node creates it on start as well
+#   cp topcoat-build.service /etc/systemd/system/ && systemctl daemon-reload
+#   systemctl enable --now topcoat-build
+[Unit]
+Description=Topcoat build service
+After=network-online.target topcoat-node.service
+Wants=topcoat-node.service
+
+[Service]
+User=topcoat-build
+Group=topcoat-build
+# the sources: a release repository of its own, a mirror of the development repository, or both
+# (fill in; the hub only chooses between the two names, never an address)
+ExecStart=/usr/local/bin/topcoat-node service build \
+  --socket /run/topcoat-node/build.sock \
+  --work /srv/topcoat/build \
+  --release-repo /srv/topcoat/release.git \
+  --dev-mirror https://git.example.lan/topcoat-dev.git \
+  --update-keys REPLACE_WITH_THE_BASE64_PUBLIC_UPDATE_KEY
+Restart=always
+RestartSec=5
+Environment=DOCKER_HOST=unix:///run/user/%U/docker.sock
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/topcoat/build
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

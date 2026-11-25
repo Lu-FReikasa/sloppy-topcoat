@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "topcoat:agents/outputs/plan_v2",
+  "title": "A fix plan in steps, each place named by a symbol (plan step 1.10, 1.12)",
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string"
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "where": {
+            "enum": [
+              "in",
+              "before",
+              "after",
+              "end"
+            ]
+          },
+          "anchor": {
+            "type": "string"
+          },
+          "do": {
+            "type": "string"
+          },
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "required": [
+          "path",
+          "symbol",
+          "where",
+          "do"
+        ]
+      }
+    },
+    "test": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "do": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "do"
+      ]
+    }
+  },
+  "required": [
+    "summary",
+    "steps",
+    "test"
+  ]
+}

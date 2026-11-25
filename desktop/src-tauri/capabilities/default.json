@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "selector",
+  "description": "Only the local selector window may call the client's commands; the hub's pages get no IPC.",
+  "windows": ["selector"],
+  "permissions": ["core:default"]
+}

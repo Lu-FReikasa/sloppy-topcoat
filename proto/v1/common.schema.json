@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v1/common.schema.json",
+  "title": "Shared definitions",
+  "$defs": {
+    "node_state": {
+      "type": "string",
+      "enum": [
+        "available",
+        "busy_gaming",
+        "degraded",
+        "yielded",
+        "paused"
+      ],
+      "description": "State reported by the node. 'yielded' = models were unloaded because other programs needed the memory (E1-06). 'paused' = the node froze its models for the person using the machine (E2-05 B, D24) and takes no new work. 'offline' is hub-side only and never sent."
+    },
+    "error_code": {
+      "type": "string",
+      "enum": [
+        "not_allowed",
+        "invalid_args",
+        "not_implemented",
+        "runner_error",
+        "busy",
+        "timeout",
+        "node_offline",
+        "upgrade_required",
+        "invalid_message",
+        "internal",
+        "not_loaded",
+        "insufficient_memory",
+        "insufficient_disk",
+        "canceled",
+        "interrupted",
+        "capability_failed",
+        "private_data"
+      ]
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/error_code"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "gpu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "name",
+        "vendor",
+        "vram_total_mb"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "name": {
+          "type": "string"
+        },
+        "vendor": {
+          "type": "string",
+          "enum": [
+            "nvidia",
+            "amd",
+            "intel",
+            "other"
+          ]
+        },
+        "vram_total_mb": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "integrated": {
+          "type": "boolean",
+          "description": "iGPU / APU sharing system memory"
+        },
+        "shared_total_mb": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "system memory the GPU may use (reported separately from dedicated VRAM)"
+        }
+      }
+    },
+    "gpu_usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "vram_used_mb"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "vram_used_mb": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "shared_used_mb": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gpu_util": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "utilisation of the whole GPU in percent (all programs), when known"
+        },
+        "foreign_vram_used_mb": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "VRAM used by other programs (all usage minus this node's model processes), when known"
+        },
+        "foreign_gpu_util": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "GPU utilisation of other programs in percent, when known"
+        },
+        "foreign_shared_max_mb": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "largest shared (system) GPU memory use of a single other program, when known: an application that did not fit into VRAM (E1-06 unmet demand)"
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "description": "A model available on the node's disk / in the runner catalogue.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "format": {
+          "type": "string",
+          "description": "e.g. gguf, mlx"
+        },
+        "own": {
+          "type": "boolean",
+          "description": "true = the file is in the node's own <data dir>/models (the hub can move or delete it); false = in a configured model_dirs entry (read-only for the hub); absent = not reported"
+        },
+        "gguf": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "what a GGUF file states about itself in its header; absent = not read or not a GGUF file. The hub derives the kind of the model from it.",
+          "properties": {
+            "architecture": {
+              "type": "string",
+              "description": "general.architecture, e.g. llama, qwen3, bert, clip"
+            },
+            "context_length": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "the context the model was trained for; absent = not stated"
+            },
+            "embedding_length": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "the width of the model (the size of an embedding vector); absent = not stated"
+            },
+            "pooling_type": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "1 mean, 2 cls, 3 last token (an embedding model), 4 rank (a reranker); absent = none, which is what a chat model has"
+            },
+            "chat_template": {
+              "type": "boolean",
+              "description": "true = the file carries a chat template; absent = no"
+            }
+          }
+        }
+      }
+    },
+    "loaded_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vram_used_mb": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "context_length": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "context of ONE slot: what a single request may use"
+        },
+        "n_parallel": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "number of llama-server slots (-np); absent = 1"
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "loopback port of the llama-server process"
+        },
+        "backend": {
+          "$ref": "#/$defs/backend"
+        },
+        "ram_used_mb": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "measured resident memory of the process"
+        }
+      }
+    },
+    "runner_type": {
+      "type": "string",
+      "enum": [
+        "llamaserver",
+        "fake",
+        "none"
+      ]
+    },
+    "sha256_hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "backend": {
+      "type": "string",
+      "enum": [
+        "cuda",
+        "vulkan",
+        "cpu"
+      ],
+      "description": "llama.cpp backend of a node-managed build"
+    }
+  }
+}

@@ -1,0 +1,243 @@
+/* The calm chat window of a program (TalkPage): one conversation, the stream of its messages and the
+   composer. Built on the variables of the desktop (desktop/desktop.css). */
+
+.talk {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.talk-stream {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0; /* a long line in an answer must never widen the window */
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.25rem 0.1rem 0.75rem;
+}
+
+.talk-row {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.talk-msg {
+  min-width: 0;
+  max-width: min(78%, 40rem);
+  padding: 0.55rem 0.85rem;
+  border-radius: calc(var(--radius, 12px) + 4px);
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.talk-msg .code-block,
+.talk-msg .code-block pre {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.talk-msg > :first-child {
+  margin-top: 0;
+}
+
+.talk-msg > :last-child {
+  margin-bottom: 0;
+}
+
+.talk-user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: var(--accent-text);
+  white-space: pre-wrap;
+  border-bottom-right-radius: 0.35rem;
+}
+
+.talk-assistant {
+  align-self: flex-start;
+  width: 100%; /* every answer has the same width, the longest line scrolls inside its code block */
+  max-width: min(100%, 52rem);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 0.35rem;
+}
+
+.talk-empty,
+.talk-thinking {
+  align-self: center;
+  margin: 1rem 0;
+}
+
+.talk-calm {
+  align-self: flex-start;
+  margin: 0.1rem 0.3rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.talk-evidence {
+  align-self: flex-start;
+  margin-left: 0.3rem;
+}
+
+.talk-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 0;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.talk-mark:hover,
+.talk-mark[aria-expanded="true"] {
+  border-color: var(--border);
+}
+
+.talk-mark-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--off, #8a93a0);
+}
+
+.talk-mark-ok .talk-mark-dot {
+  background: var(--ok, #3aa76d);
+}
+
+.talk-mark-waiting .talk-mark-dot {
+  background: #e2c13b;
+}
+
+.talk-mark-hint .talk-mark-dot {
+  background: #e08a3a;
+}
+
+.talk-mark-error .talk-mark-dot {
+  background: var(--bad, #d6584f);
+}
+
+.talk-sheet {
+  margin-top: 0.3rem;
+  max-width: 32rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 12px);
+  font-size: 0.85rem;
+}
+
+.talk-sheet ul {
+  margin: 0.2rem 0 0.4rem 1.1rem;
+  padding: 0;
+}
+
+.talk-sheet p {
+  margin: 0 0 0.4rem;
+}
+
+.talk-jump {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 4.6rem;
+  min-height: 0;
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+
+.talk-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius, 12px) + 6px);
+}
+
+.talk-composer button {
+  min-height: 2.4rem;
+  border-radius: 999px;
+  padding: 0 1rem;
+}
+
+@media (max-width: 700px) {
+
+  .talk-msg {
+    max-width: 90%;
+  }
+
+  .talk-assistant {
+    max-width: 100%;
+  }
+}
+
+.talk-report > summary {
+  cursor: pointer;
+  color: var(--muted, #888);
+}
+.talk-report[open] > summary {
+  margin-bottom: 0.5rem;
+}
+
+/* what can be done with the last answer, and the few choices of a conversation */
+.talk-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+.talk-options > summary {
+  cursor: pointer;
+  color: var(--muted, #888);
+  font-size: 0.85em;
+}
+.talk-options-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+/* The line under a message: time, number, two ways to point at it. The buttons show on hover and
+   keyboard focus only; where there is no hover (touch) they stay visible. */
+.message-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.message-line button {
+  visibility: hidden;
+  font-size: inherit;
+}
+
+.talk-row:hover .message-line button,
+.message-line:focus-within button {
+  visibility: visible;
+}
+
+@media (hover: none) {
+  .message-line button {
+    visibility: visible;
+  }
+}

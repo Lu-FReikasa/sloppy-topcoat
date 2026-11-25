@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://topcoat.example.lan/proto/plugin/manifest.schema.json",
+  "title": "Topcoat plug-in manifest (D105)",
+  "description": "An application as data: instructions, tool ceiling, views of fixed types, commands and menus. A plug-in brings no code into the hub or the GUI.",
+  "type": "object",
+  "required": ["id", "version", "title_key"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,39}$" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "requires_core": { "type": "string", "maxLength": 40 },
+    "builtin": { "type": "boolean", "description": "shipped with the hub; cannot be removed" },
+    "title_key": { "type": "string", "maxLength": 80 },
+    "icon": { "type": "string", "maxLength": 40 },
+    "requires_role": { "enum": ["admin", null] },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "instructions": { "type": "string", "maxLength": 20000, "description": "AGENT.md: duties, areas, rules" },
+        "tools_ceiling": { "type": "array", "items": { "type": "string", "maxLength": 80 }, "maxItems": 200 },
+        "persona": { "type": "string", "maxLength": 40 }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "description": "kinds of steps a check of this application may be planned in (Phase 1)",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,39}$" },
+      "maxItems": 30
+    },
+    "programs": { "type": "array", "items": { "type": "string", "maxLength": 80 }, "maxItems": 50 },
+    "views": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{1,59}$" },
+          "type": { "enum": ["chat", "list", "table", "form", "report", "board", "tree", "module"] },
+          "source": { "type": "string", "maxLength": 120 },
+          "title_key": { "type": "string", "maxLength": 80 }
+        }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": ["id", "label_key", "action"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{1,79}$" },
+          "label_key": { "type": "string", "maxLength": 80 },
+          "action": {
+            "type": "object",
+            "required": ["kind"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "enum": ["open_program", "open_view", "new_chat"] },
+              "program": { "type": "string", "maxLength": 40 },
+              "view": { "type": "string", "maxLength": 60 }
+            }
+          },
+          "shortcut": { "type": "string", "maxLength": 40 },
+          "requires_role": { "enum": ["admin", null] }
+        }
+      }
+    },
+    "menus": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "window": { "type": "array", "items": { "type": "string" }, "maxItems": 40 },
+        "tray": { "type": "array", "items": { "type": "string" }, "maxItems": 20 },
+        "context": { "type": "array", "items": { "type": "string" }, "maxItems": 20 }
+      }
+    },
+    "settings_schema": { "type": "object" },
+    "i18n": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "en": { "type": "object" }, "de": { "type": "object" } }
+    }
+  }
+}

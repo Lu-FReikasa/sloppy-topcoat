@@ -1,0 +1,239 @@
+{
+  "_comment": "SYNTHETIC cases for part B. notes are numbered N1.. in this order; contradicting_notes are 1-based indexes of the notes that really contradict the answer.",
+  "review_cases": [
+    {
+      "id": "incomplete-notes-bind",
+      "kind": "incomplete_notes",
+      "question": "On which address does llama-server listen on a node?",
+      "answer": "On a node the llama-server binds to the loopback address 127.0.0.1 only.",
+      "notes": [
+        "node-amd has an AMD GPU with 16 GB VRAM.",
+        "The nightly backup runs at 03:15."
+      ],
+      "expected": "ok"
+    },
+    {
+      "id": "incomplete-notes-port",
+      "kind": "incomplete_notes",
+      "question": "How do I check which model is loaded on node-amd?",
+      "answer": "Open the Nodes page in the hub GUI and look at the loaded models of node-amd.",
+      "notes": [
+        "The hub listens on port 8443."
+      ],
+      "expected": "ok"
+    },
+    {
+      "id": "incomplete-notes-none",
+      "kind": "incomplete_notes",
+      "question": "Which protocol does a node use to reach the hub?",
+      "answer": "A node opens an outbound TLS connection to the hub and keeps one session open. The node itself opens no listening port.",
+      "notes": [],
+      "expected": "ok"
+    },
+    {
+      "id": "contradicted-vram",
+      "kind": "contradicted",
+      "question": "How much VRAM does node-amd have?",
+      "answer": "node-amd has 8 GB of VRAM.",
+      "notes": [
+        "The hub listens on port 8443.",
+        "node-amd has 16 GB of VRAM."
+      ],
+      "expected": "error",
+      "expect_claim": "8 GB",
+      "contradicting_notes": [
+        2
+      ]
+    },
+    {
+      "id": "contradicted-backup",
+      "kind": "contradicted",
+      "question": "When does the backup run?",
+      "answer": "The nightly backup of node-amd runs at 05:40 every day.",
+      "notes": [
+        "The nightly backup of node-amd runs at 03:15.",
+        "node-nvidia has 24 GB of VRAM."
+      ],
+      "expected": "error",
+      "expect_claim": "05:40",
+      "contradicting_notes": [
+        1
+      ]
+    },
+    {
+      "id": "matching-vram",
+      "kind": "matching",
+      "question": "How much VRAM does node-nvidia have?",
+      "answer": "node-nvidia has 24 GB of VRAM.",
+      "notes": [
+        "node-nvidia has 24 GB of VRAM."
+      ],
+      "expected": "ok"
+    },
+    {
+      "id": "matching-port",
+      "kind": "matching",
+      "question": "Which port does the hub use?",
+      "answer": "The hub accepts connections on port 8443.",
+      "notes": [
+        "The hub listens on port 8443.",
+        "The nightly backup runs at 03:15."
+      ],
+      "expected": "ok"
+    },
+    {
+      "id": "incomplete-notes-ram",
+      "kind": "incomplete_notes",
+      "question": "How much RAM does node-amd have?",
+      "answer": "node-amd has 32 GB of system RAM.",
+      "notes": [
+        "node-amd has an AMD GPU with 16 GB of VRAM."
+      ],
+      "expected": "ok"
+    },
+    {
+      "id": "incomplete-notes-backup-target",
+      "kind": "incomplete_notes",
+      "question": "Where does the nightly backup write its files?",
+      "answer": "The backup writes its archive into the backup folder on the hub host.",
+      "notes": [
+        "The nightly backup of node-amd runs at 03:15.",
+        "The hub listens on port 8443."
+      ],
+      "expected": "ok"
+    },
+    {
+      "id": "incomplete-notes-database",
+      "kind": "incomplete_notes",
+      "question": "Which database does the hub use?",
+      "answer": "The hub stores everything in PostgreSQL.",
+      "notes": [
+        "The hub listens on port 8443."
+      ],
+      "expected": "ok"
+    },
+    {
+      "id": "incomplete-notes-other-host",
+      "kind": "incomplete_notes",
+      "question": "Does node-laptop have a dedicated GPU?",
+      "answer": "No, node-laptop has no dedicated GPU.",
+      "notes": [
+        "node-amd has an AMD GPU with 16 GB of VRAM.",
+        "node-nvidia has 24 GB of VRAM."
+      ],
+      "expected": "ok"
+    },
+    {
+      "id": "contradicted-port",
+      "kind": "contradicted",
+      "question": "Which port does the hub use?",
+      "answer": "The hub accepts connections on port 8080.",
+      "notes": [
+        "The nightly backup runs at 03:15.",
+        "The hub listens on port 8443."
+      ],
+      "expected": "error",
+      "expect_claim": "8080",
+      "contradicting_notes": [
+        2
+      ]
+    },
+    {
+      "id": "contradicted-gpu-vendor",
+      "kind": "contradicted",
+      "question": "Which GPU does node-nvidia have?",
+      "answer": "node-nvidia has an AMD GPU.",
+      "notes": [
+        "node-nvidia has an NVIDIA GPU with 24 GB of VRAM.",
+        "node-amd has an AMD GPU with 16 GB of VRAM."
+      ],
+      "expected": "error",
+      "expect_claim": "AMD GPU",
+      "contradicting_notes": [
+        1
+      ]
+    },
+    {
+      "id": "contradicted-one-of-two-claims",
+      "kind": "contradicted",
+      "question": "Give me the hub port and the backup time.",
+      "answer": "The hub listens on port 8443 and the nightly backup of node-amd runs at 01:00.",
+      "notes": [
+        "The hub listens on port 8443.",
+        "The nightly backup of node-amd runs at 03:15."
+      ],
+      "expected": "error",
+      "expect_claim": "01:00",
+      "contradicting_notes": [
+        2
+      ]
+    },
+    {
+      "id": "contradicted-bind-address",
+      "kind": "contradicted",
+      "question": "On which address does llama-server listen on a node?",
+      "answer": "On a node the llama-server listens on 0.0.0.0.",
+      "notes": [
+        "llama-server on a node binds to 127.0.0.1 only.",
+        "The hub listens on port 8443."
+      ],
+      "expected": "error",
+      "expect_claim": "0.0.0.0",
+      "contradicting_notes": [
+        1
+      ]
+    },
+    {
+      "id": "matching-paraphrase",
+      "kind": "matching",
+      "question": "When does the backup of node-amd run?",
+      "answer": "The nightly backup of node-amd starts a quarter past three at night.",
+      "notes": [
+        "The nightly backup of node-amd runs at 03:15."
+      ],
+      "expected": "ok"
+    },
+    {
+      "id": "matching-two-notes",
+      "kind": "matching",
+      "question": "What hardware does node-amd have?",
+      "answer": "node-amd has an AMD GPU with 16 GB of VRAM.",
+      "notes": [
+        "node-amd has an AMD GPU.",
+        "node-amd has 16 GB of VRAM."
+      ],
+      "expected": "ok"
+    },
+    {
+      "id": "incomplete-notes-services-1",
+      "kind": "incomplete_notes",
+      "question": "What runs on node-alpha?",
+      "answer": "The hub and its PostgreSQL database run in containers on node-alpha.",
+      "notes": [
+        "node-alpha is the server that hosts the production hub."
+      ],
+      "expected": "ok"
+    },
+    {
+      "id": "incomplete-notes-services-2",
+      "kind": "incomplete_notes",
+      "question": "What runs on node-alpha?",
+      "answer": "The reverse proxy for the GUI does not run on the hub host but on a separate machine.",
+      "notes": [
+        "The hub listens on port 8443.",
+        "node-alpha is the server that hosts the production hub."
+      ],
+      "expected": "ok"
+    },
+    {
+      "id": "incomplete-notes-services-3",
+      "kind": "incomplete_notes",
+      "question": "What runs on node-amd?",
+      "answer": "On node-amd the model server runs next to the node program and talks to it over loopback.",
+      "notes": [
+        "node-amd is the gaming PC of the operator."
+      ],
+      "expected": "ok"
+    }
+  ]
+}

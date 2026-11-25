@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "topcoat:agents/outputs/area",
+  "title": "Round 0 of an issue's investigation: the part of the repository it is about (step 1.15)",
+  "type": "object",
+  "properties": {
+    "area": {
+      "enum": [
+        "hub",
+        "web",
+        "proto",
+        "docs",
+        "desktop",
+        "node",
+        "unknown"
+      ]
+    },
+    "files": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "string"
+      }
+    },
+    "symbols": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "string"
+      }
+    },
+    "why": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "area",
+    "files",
+    "symbols",
+    "why"
+  ]
+}

@@ -1,0 +1,285 @@
+/* ---------- the desk (Schreibtisch) -------------------------------------------------------------
+   The third look, back from the desk shell of the layout prototypes: programs are slips of paper on
+   a cutting mat. The mat takes its colour from the person's hue; every program has its own paper
+   (the inbox a yellow legal pad, Development a ledger, Administration a carbon copy …) and carries
+   its pages in dark ink, a slip lies a little askew and is held by a strip of tape; the one in
+   front lies flat and higher. The taskbar is the desk's edge with its ruler. */
+
+.dt-look-schreibtisch {
+  --mat: hsl(var(--ws-hue) calc(var(--ws-sat) * 0.4) 21%);
+  --mat-line: rgba(255, 255, 255, 0.075);
+  --mat-major: rgba(255, 255, 255, 0.15);
+  --bg: hsl(var(--ws-hue) calc(var(--ws-sat) * 0.3) 7%);
+  --surface: hsl(var(--ws-hue) calc(var(--ws-sat) * 0.3) 11%);
+  --text: #e8ece8;
+  --muted: #a3ada5;
+  --border: hsl(var(--ws-hue) calc(var(--ws-sat) * 0.3) 25%);
+  --accent: #f1c84c;
+  --accent-text: #17191b;
+  --type: "Special Elite", "Courier New", Courier, monospace;
+  --typed: "Courier Prime", "Courier New", Courier, monospace;
+  font-family: var(--typed);
+}
+
+.dt-look-schreibtisch .dt-lamp {
+  display: none;
+}
+
+/* the cutting mat */
+.dt-look-schreibtisch .dt-stage {
+  background-color: var(--mat);
+  background-image:
+    linear-gradient(var(--mat-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mat-major) 1px, transparent 1px),
+    linear-gradient(var(--mat-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mat-line) 1px, transparent 1px);
+  background-size:
+    120px 120px,
+    120px 120px,
+    24px 24px,
+    24px 24px;
+  box-shadow: inset 0 6px 0 rgba(0, 0, 0, 0.25);
+}
+
+/* a slip: its own paper, dark ink, a little askew (and a little smaller, so the mat shows) */
+.dt-look-schreibtisch .dt-program {
+  --ink: #1b2230;
+  --paper: #f6f6f2;
+  border: 0;
+  color: var(--ink);
+  background: var(--paper);
+  box-shadow:
+    2px 3px 0 rgba(0, 0, 0, 0.32),
+    0 0 0 1px rgba(0, 0, 0, 0.12);
+  transform: rotate(var(--rot, 0deg)) scale(0.965);
+  font-family: var(--typed);
+  color-scheme: light;
+  /* what the pages inside read */
+  --bg: transparent;
+  --surface: rgba(255, 255, 255, 0.55);
+  --text: #1b2230;
+  --muted: #5b6470;
+  --border: rgba(27, 34, 48, 0.32);
+  --accent: #a61e1e;
+  --accent-text: #fbfbf7;
+  --track: rgba(27, 34, 48, 0.12);
+  --ok: #1f6d3a;
+  --warn: #8a5a00;
+  --bad: #a61e1e;
+}
+
+/* the one in front lies flat and higher; a maximised one covers the desk */
+.dt-look-schreibtisch .dt-program.dt-focused {
+  transform: rotate(0deg) scale(0.975);
+  box-shadow:
+    5px 8px 0 rgba(0, 0, 0, 0.32),
+    0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.dt-look-schreibtisch .dt-program.dt-maxi {
+  transform: scale(0.99);
+}
+
+/* a strip of tape at the top */
+.dt-look-schreibtisch .dt-program::before {
+  content: "";
+  position: absolute;
+  top: -9px;
+  left: calc(50% - 38px);
+  width: 76px;
+  height: 18px;
+  background: rgba(232, 232, 214, 0.62);
+  transform: rotate(var(--tape, -3deg));
+  pointer-events: none;
+  z-index: 2;
+}
+
+.dt-look-schreibtisch .dt-titlebar,
+.dt-look-schreibtisch .dt-focused .dt-titlebar {
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem 0.25rem;
+  color: var(--ink);
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--type);
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.dt-look-schreibtisch .dt-code {
+  color: #a61e1e;
+  font-family: var(--type);
+}
+
+.dt-look-schreibtisch .dt-title,
+.dt-look-schreibtisch .dt-program .dt-icon {
+  color: var(--ink);
+}
+
+.dt-look-schreibtisch .dt-titlebar-buttons button {
+  border: 1px dashed rgba(27, 34, 48, 0.55);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 0 0.4rem;
+  font-family: var(--type);
+}
+
+.dt-look-schreibtisch .dt-titlebar-buttons button:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.dt-look-schreibtisch .dt-program :focus-visible {
+  outline: 2px solid #a61e1e;
+  outline-offset: 1px;
+}
+
+.dt-look-schreibtisch .dt-program-body,
+.dt-look-schreibtisch .dt-nav {
+  background: transparent;
+  border-color: var(--border);
+}
+
+.dt-look-schreibtisch .dt-nav button {
+  color: var(--muted);
+  font-family: var(--type);
+}
+
+.dt-look-schreibtisch .dt-nav button[aria-current="page"] {
+  color: var(--ink);
+  border-color: #a61e1e;
+  background: rgba(166, 30, 30, 0.07);
+}
+
+.dt-look-schreibtisch .ws-page h1,
+.dt-look-schreibtisch .ws-page h2,
+.dt-look-schreibtisch .ws-page h3 {
+  font-family: var(--type);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+
+/* the paper of each program */
+.dt-look-schreibtisch .dt-program[data-paper="legal"] {
+  background: #efe398
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 21px,
+      rgba(60, 100, 160, 0.2) 21px 22px
+    );
+}
+
+.dt-look-schreibtisch .dt-program[data-paper="plain"] {
+  background: #f7f7f3;
+}
+
+.dt-look-schreibtisch .dt-program[data-paper="card"] {
+  background: #fbfbf7
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 21px,
+      rgba(60, 100, 160, 0.16) 21px 22px
+    );
+}
+
+.dt-look-schreibtisch .dt-program[data-paper="card"] .dt-titlebar {
+  border-bottom: 2px solid rgba(180, 40, 40, 0.6);
+}
+
+.dt-look-schreibtisch .dt-program[data-paper="ledger"] {
+  background: #dde5ee;
+  background-image:
+    linear-gradient(rgba(40, 70, 110, 0.13) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(40, 70, 110, 0.13) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.dt-look-schreibtisch .dt-program[data-paper="carbon"] {
+  background: #cfdff0;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(30, 60, 130, 0.08) 0 2px,
+    transparent 2px 5px
+  );
+}
+
+.dt-look-schreibtisch .dt-program[data-paper="green"] {
+  background: repeating-linear-gradient(
+    0deg,
+    #e6f1e2 0 22px,
+    #f5faf3 22px 44px
+  );
+}
+
+/* the desk's edge: dark buttons, the ruler along the bottom */
+.dt-look-schreibtisch .dt-taskbar {
+  position: relative;
+  padding-bottom: 12px;
+  background: var(--bg);
+  border-top: 0;
+  font-family: var(--type);
+}
+
+.dt-look-schreibtisch .dt-taskbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 9px;
+  pointer-events: none;
+  background: #d8bf49
+    repeating-linear-gradient(90deg, #1a1a14 0 1px, transparent 1px 10px);
+  box-shadow: 0 -2px 0 rgba(0, 0, 0, 0.3);
+}
+
+.dt-look-schreibtisch .dt-task,
+.dt-look-schreibtisch .dt-start {
+  border-radius: 0;
+  background: #17191b;
+  color: #eceee9;
+  border: 1px solid #555a57;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--type);
+  font-size: 0.8rem;
+}
+
+.dt-look-schreibtisch .dt-task.dt-min {
+  opacity: 0.6;
+}
+
+.dt-look-schreibtisch .dt-task.dt-front,
+.dt-look-schreibtisch .dt-task:hover:not(:disabled) {
+  background: #e9eee8;
+  color: #17191b;
+}
+
+.dt-look-schreibtisch .dt-task .dt-icon {
+  color: inherit;
+}
+
+.dt-look-schreibtisch .dt-palette {
+  border-radius: 0;
+  box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.35);
+}
+
+/* a slip that lands on the desk */
+@media (prefers-reduced-motion: no-preference) {
+  .dt-look-schreibtisch .dt-program {
+    animation: dt-slip-land 0.45s cubic-bezier(0.2, 1.2, 0.4, 1) backwards;
+  }
+}
+
+@keyframes dt-slip-land {
+  from {
+    opacity: 0;
+    transform: translateY(-46px) rotate(calc(var(--rot, 0deg) * 5)) scale(0.965);
+  }
+
+  to {
+    opacity: 1;
+  }
+}

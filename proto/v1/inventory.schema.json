@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v1/inventory.schema.json",
+  "title": "inventory",
+  "description": "Direction: node -> hub.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 1
+    },
+    "type": {
+      "const": "inventory"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hardware",
+        "runner",
+        "models",
+        "loaded"
+      ],
+      "properties": {
+        "hardware": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cpu",
+            "ram_total_mb",
+            "gpus"
+          ],
+          "properties": {
+            "cpu": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "model",
+                "cores"
+              ],
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "cores": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "threads": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "logical processors"
+                },
+                "performance_cores": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "physical performance cores (all cores on non-hybrid CPUs)"
+                },
+                "efficiency_cores": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "physical efficiency cores (hybrid CPUs)"
+                }
+              }
+            },
+            "ram_total_mb": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "gpus": {
+              "type": "array",
+              "items": {
+                "$ref": "common.schema.json#/$defs/gpu"
+              }
+            },
+            "disk_total_mb": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "size of the drive that holds the model directory"
+            },
+            "disk_free_mb": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "free space of that drive (at the time of the inventory; refreshed after downloads and deletes)"
+            },
+            "network": {
+              "type": "array",
+              "description": "physical network interfaces (wired first): what Wake-on-LAN can reach; the hub keeps them while the node is off (E2-05 E)",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "mac",
+                  "kind"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "mac": {
+                    "type": "string",
+                    "pattern": "^([0-9a-f]{2}:){5}[0-9a-f]{2}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "ethernet",
+                      "wifi",
+                      "other"
+                    ]
+                  }
+                }
+              }
+            },
+            "addresses": {
+              "type": "array",
+              "description": "unicast IP addresses of this node (no loopback, no link-local); the candidates for a direct model transfer (E2-07, D51)",
+              "maxItems": 16,
+              "items": {
+                "type": "string",
+                "maxLength": 45
+              }
+            }
+          }
+        },
+        "runner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "available"
+          ],
+          "properties": {
+            "type": {
+              "$ref": "common.schema.json#/$defs/runner_type"
+            },
+            "available": {
+              "type": "boolean"
+            },
+            "detail": {
+              "type": "string"
+            },
+            "backend": {
+              "$ref": "common.schema.json#/$defs/backend"
+            },
+            "llamacpp_release": {
+              "type": "string"
+            },
+            "threads": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "thread count used for CPU work"
+            }
+          }
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/model"
+          }
+        },
+        "loaded": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/loaded_model"
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "capabilities this node build offers (E2-04); config.capabilities says which are switched on",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "description",
+              "read_only",
+              "input_schema"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+              },
+              "description": {
+                "type": "string"
+              },
+              "read_only": {
+                "type": "boolean",
+                "description": "true = changes nothing on the machine; only those run without a confirmation (D15)"
+              },
+              "scratch": {
+                "type": "boolean",
+                "description": "true = changes only the scratch area of a dev node (the workshop worktrees, D52): runs without a confirmation although it is not read-only; never together with read_only"
+              },
+              "manage": {
+                "type": "boolean",
+                "description": "true = a step the person starts on the hub's own page (a local repository of the dev workshop: create, branch, merge, publish, D76): run only by the action workshop.manage (or build.manage for the build service, NS-01), never offered to an assistant; never together with read_only or scratch"
+              },
+              "input_schema": {
+                "type": "object",
+                "description": "JSON Schema of the capability input"
+              }
+            }
+          }
+        },
+        "update": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "state of the update channel on this node (E2-06, D50): whether the build can verify updates and whether the privileged updater service is alive",
+          "required": [
+            "capable",
+            "updater"
+          ],
+          "properties": {
+            "capable": {
+              "type": "boolean",
+              "description": "the build carries at least one update key"
+            },
+            "updater": {
+              "type": "string",
+              "enum": [
+                "ok",
+                "missing",
+                "stale"
+              ],
+              "description": "ok: the updater service wrote its heartbeat recently; stale: an old heartbeat; missing: none (the updater service is not installed or not running)"
+            },
+            "updater_version": {
+              "type": "string",
+              "maxLength": 50,
+              "description": "the version the running updater service reports in its heartbeat; an updater older than the node may not apply a new build (then the program is installed once by hand)"
+            },
+            "channel": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,31}$"
+            },
+            "key_ids": {
+              "type": "array",
+              "maxItems": 2,
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{16}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "label": "thinking switch, gemma",
+  "cases": "quality_cases.json",
+  "models": ["gemma-4-12B@node-amd"],
+  "variants": [
+    {"name": "base", "extra": {}},
+    {"name": "nothink", "extra": {"chat_template_kwargs": {"enable_thinking": false}}}
+  ],
+  "repeats": 2,
+  "max_tokens": 1200,
+  "temperature": 0.2
+}

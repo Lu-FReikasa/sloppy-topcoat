@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v0/challenge_response.schema.json",
+  "title": "POST /api/node/challenge response",
+  "description": "Single-use nonce. The node signs 'topcoat-node-auth-v1\\n<node_id>\\n<nonce>' with its ed25519 key and sends 'Authorization: Topcoat-Ed25519 <node_id>.<nonce>.<signature, base64url>' on the WebSocket upgrade.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "nonce",
+    "expires_in"
+  ],
+  "properties": {
+    "nonce": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{32,128}$"
+    },
+    "expires_in": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "seconds until the nonce expires"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v1/pair_response.schema.json",
+  "title": "POST /api/node/pair response",
+  "description": "The node authenticates later with its ed25519 key (challenge_request/challenge_response); there is no bearer credential.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "node_id"
+  ],
+  "properties": {
+    "node_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

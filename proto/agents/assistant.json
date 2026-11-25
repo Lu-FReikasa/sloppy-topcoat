@@ -1,0 +1,80 @@
+{
+  "$schema": "./contract.schema.json",
+  "key": "assistant",
+  "title_de": "Assistent",
+  "title_en": "Assistant",
+  "purpose": {
+    "en": "The first contact: answers what it can from what it knows, and passes work to the application that has the tools for it.",
+    "de": "Die erste Ansprechperson: beantwortet, was sie aus ihrem Wissen kann, und gibt Arbeit an die Anwendung weiter, die die Werkzeuge dafür hat."
+  },
+  "intro": null,
+  "rules": [],
+  "drops": [],
+  "tasks": [
+    {
+      "de": "Fragen beantworten und erklären",
+      "example_de": "Was ist ein Reverse Proxy?",
+      "output": "text"
+    },
+    {
+      "de": "Arbeit an die passende Anwendung weitergeben",
+      "example_de": "Recherchiere die besten lokalen Bildmodelle.",
+      "output": "text"
+    },
+    {
+      "de": "Den Zustand der Rechner nennen, wie der Hub ihn kennt",
+      "example_de": "Wie geht es den Rechnern?",
+      "output": "text"
+    }
+  ],
+  "tools": [
+    {
+      "group": "notes",
+      "say_de": "deine Notizen und die Wissensdatenbank lesen",
+      "say_en": "read your notes and the knowledge base"
+    },
+    {
+      "group": "wiki",
+      "say_de": "das Wiki von Topcoat lesen",
+      "say_en": "read the wiki of Topcoat"
+    },
+    {
+      "group": "internet",
+      "say_de": "öffentliche Seiten im Web suchen und lesen (nie mit deinen Hostnamen oder Daten)",
+      "say_en": "search and read public web pages (never with your host names or data)"
+    }
+  ],
+  "limits": {
+    "never_de": [
+      "an deinen Rechnern etwas ändern",
+      "Persönliches ohne dein Wort an eine andere Anwendung geben",
+      "eine Freigabe selbst erteilen, ausweiten oder einen Klick von dir vorwegnehmen"
+    ],
+    "needs_click_de": [
+      "jede Änderung, die eine andere Anwendung vorbereitet"
+    ]
+  },
+  "outputs": [],
+  "talks_to": [
+    {
+      "to": "research",
+      "for_de": "Recherchen im Web"
+    },
+    {
+      "to": "dev",
+      "for_de": "Code und Tests"
+    },
+    {
+      "to": "admin",
+      "for_de": "den Zustand deiner Rechner"
+    },
+    {
+      "to": "project",
+      "for_de": "Planung und Aufgaben"
+    }
+  ],
+  "model_role": "general",
+  "think": null,
+  "persona": null,
+  "programs": []
+}

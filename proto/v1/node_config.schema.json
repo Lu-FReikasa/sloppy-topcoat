@@ -1,0 +1,675 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v1/node_config.schema.json",
+  "title": "Desired node configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "runner",
+    "allowed_actions",
+    "heartbeat_interval_seconds",
+    "idle_ttl_seconds",
+    "watcher",
+    "capabilities",
+    "roles"
+  ],
+  "properties": {
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "gpu",
+          "tools",
+          "dev",
+          "build"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "common.schema.json#/$defs/runner_type"
+        },
+        "model_dirs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "directories with GGUF files (llamaserver)"
+        },
+        "backend": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "cuda",
+            "vulkan",
+            "cpu"
+          ],
+          "description": "llama.cpp backend; auto = NVIDIA->cuda, AMD/Intel GPU->vulkan, else cpu"
+        },
+        "llamacpp_release": {
+          "type": "string",
+          "pattern": "^b[0-9]+$",
+          "description": "pinned llama.cpp release; must be known to the node (its built-in pin list). Absent = the node's default pin"
+        },
+        "threads": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024,
+          "description": "default CPU thread count (set from the benchmark's thread sweep)"
+        },
+        "default_context_length": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 1048576,
+          "description": "context length (llama-server -c) for loads that do not ask for one, unless a resident entry or model_context_lengths names one (default: the node's built-in 8192)"
+        },
+        "max_context_length": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 1048576,
+          "description": "the largest context per slot the node picks by itself for a load that asks for 'at least' a context (models.load min_context_length); default 32768. The node also never exceeds what the model was trained for"
+        },
+        "model_context_lengths": {
+          "type": "object",
+          "description": "context length per model name; wins over default_context_length, loses against a residents entry and an explicit models.load argument; {} = none",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 256,
+            "maximum": 1048576
+          }
+        },
+        "n_parallel": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "llama-server slots (-np) per model; default 1. The context length of a load is the context of ONE slot (-c = context x slots), so more slots cost KV memory and run long generations side by side; 1-2 suit background and agent use"
+        },
+        "model_n_parallel": {
+          "type": "object",
+          "description": "slots per model name; wins over n_parallel; {} = none",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16
+          }
+        },
+        "jinja": {
+          "type": "boolean",
+          "description": "llama-server --jinja (the model's own chat template engine, needed for native tool calls: OpenAI tools / tool_calls); default true, false = --no-jinja"
+        },
+        "model_jinja": {
+          "type": "object",
+          "description": "--jinja per model name; wins over jinja; {} = none",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "model_backends": {
+          "type": "object",
+          "description": "backend and GPU offload per model name (E2-05): e.g. a 7B on vulkan and a 30B on cpu. Absent or {} = the node's backend and llama.cpp's own fit to device memory",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "backend": {
+                "type": "string",
+                "enum": [
+                  "cuda",
+                  "vulkan",
+                  "cpu"
+                ],
+                "description": "backend for this model; each needed backend is installed once"
+              },
+              "gpu_layers": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000,
+                "description": "exact number of layers on the GPU (0 = none); absent = fit to the free device memory"
+              },
+              "no_host": {
+                "type": "boolean",
+                "description": "llama-server --no-host: no pinned host buffers of the GPU backend (an experiment for a partial offload on an iGPU with shared memory; unverified on real hardware)"
+              },
+              "n_cpu_moe": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000,
+                "description": "llama-server --n-cpu-moe: the expert weights of the first N layers of a Mixture-of-Experts model stay in the system RAM, the rest runs on the GPU (for a discrete GPU with less VRAM than the model needs); without gpu_layers all other layers go to the GPU without a fit; absent = off; unverified on real hardware"
+              }
+            }
+          }
+        },
+        "memory_guard": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "RAM check before a load: model + KV cache + overhead against free RAM (a shared iGPU counts as system memory)",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "refuse",
+                "warn",
+                "off"
+              ],
+              "description": "refuse (default): reject the load with insufficient_memory; warn: load and emit an error event; off"
+            },
+            "reserve_mb": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1048576,
+              "description": "RAM that must stay free after the load; 0 or absent = automatic, the larger of 4096 MB and 12 % of the RAM"
+            }
+          }
+        }
+      }
+    },
+    "allowed_actions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "description": "whitelist of action names this node may execute"
+    },
+    "heartbeat_interval_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 300
+    },
+    "idle_ttl_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "0 disables idle unload"
+    },
+    "watcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rules"
+      ],
+      "properties": {
+        "grace_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "process": {
+                "type": "string",
+                "minLength": 1,
+                "description": "executable name, case-insensitive"
+              },
+              "path_prefix": {
+                "type": "string",
+                "minLength": 1,
+                "description": "folder prefix of the executable path, case-insensitive (e.g. a Steam library)"
+              }
+            }
+          }
+        },
+        "cooldown_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "node stays busy_gaming this long after the last watched process ended (default 60)"
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "residents": {
+      "type": "array",
+      "description": "models the node keeps loaded whenever possible (E1-06); reloaded after VRAM pressure or a game when the GPU is free again",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "context_length": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "higher = yielded last and reloaded first (default 50)"
+          },
+          "auto_reload": {
+            "type": "boolean",
+            "description": "default true; the hub clears it on a manual unload and sets it again on a manual load"
+          }
+        }
+      }
+    },
+    "pressure": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "yield VRAM (and optionally RAM) when other programs need it, reload residents when it is free again (E1-06). Absent = disabled; missing fields take the defaults below",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "GPU VRAM pressure handling (default true when the object is present); only discrete GPUs are watched"
+        },
+        "poll_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "description": "sampling interval (default 2)"
+        },
+        "sustain_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600,
+          "description": "a pressure signal must hold this long before the first model is yielded (default 3)"
+        },
+        "unload_below_free_mb": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1048576,
+          "description": "yield when free VRAM falls below this (default 1024)"
+        },
+        "margin_mb": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1048576,
+          "description": "keep yielding until free VRAM >= unload_below_free_mb + margin_mb (default 1024)"
+        },
+        "reload_after_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400,
+          "description": "reload conditions must hold this long continuously (default 60)"
+        },
+        "reload_headroom_mb": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1048576,
+          "description": "free VRAM needed on top of the model's last measured VRAM to reload it (default 2048)"
+        },
+        "reload_max_foreign_gpu_util": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "no reload while other programs use more GPU than this, in percent (default 30)"
+        },
+        "min_off_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400,
+          "description": "minimum time between a yield (or game unload) and the next reload (default 120)"
+        },
+        "reload_while_rule_matches": {
+          "type": "boolean",
+          "description": "allow reloads while a watcher rule matches or its cooldown runs (default false)"
+        },
+        "foreign_shared_trigger_mb": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1048576,
+          "description": "unmet demand: a single other process using at least this much shared (system) GPU memory while free VRAM is below its shared use + margin_mb counts as pressure (default 1024; 0 = off)"
+        },
+        "ram": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "same handling on system RAM for models on the CPU backend (default disabled)",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "default false"
+            },
+            "unload_below_free_mb": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1048576,
+              "description": "yield CPU models when free RAM falls below this (default 2048)"
+            },
+            "margin_mb": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1048576,
+              "description": "keep yielding until free RAM >= unload_below_free_mb + margin_mb (default 1024)"
+            },
+            "reload_headroom_mb": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1048576,
+              "description": "free RAM needed on top of the model's size to reload it (default 1024)"
+            }
+          }
+        }
+      }
+    },
+    "yield": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "stepping back for the person using the machine (E2-05 B, D24). Absent = defaults: freezing is on for a node without a dedicated GPU and off with one; the lowest process priority is always on",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "freeze the model processes on user input, foreign CPU load or battery power (default: true without a dedicated GPU, false with one)"
+        },
+        "low_priority": {
+          "type": "boolean",
+          "description": "run llama-server and llama-bench at the lowest process priority (default true); applies to processes started afterwards"
+        },
+        "poll_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300,
+          "description": "how often the node looks (default 5)"
+        },
+        "idle_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400,
+          "description": "keyboard/mouse input younger than this means the user is here (default 60)"
+        },
+        "cpu_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "other programs using more than this share of the CPU for sustain_seconds count as load (default 60; 0 = signal off)"
+        },
+        "sustain_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600,
+          "description": "load must hold this long before the node freezes (default 5)"
+        },
+        "resume_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600,
+          "description": "a load pause ends after the load stayed below the threshold this long (default 30)"
+        },
+        "pause_on_battery": {
+          "type": "boolean",
+          "description": "freeze while the machine runs on battery (default true; no effect on machines without a battery)"
+        },
+        "unload_after_pause_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 604800,
+          "description": "a pause this long unloads the models (default 900; 0 = never)"
+        }
+      }
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "read-only capabilities of a tool node (E2-04)",
+      "properties": {
+        "docker_host": {
+          "type": "string",
+          "pattern": "^(unix:///.+|tcp://(127\\.0\\.0\\.1|localhost|\\[::1\\]):[0-9]{1,5})$",
+          "description": "Docker API: a unix socket or a read-only socket proxy on the loopback (default unix:///var/run/docker.sock)"
+        },
+        "docker_write_host": {
+          "type": "string",
+          "pattern": "^(unix:///.+|tcp://(127\\.0\\.0\\.1|localhost|\\[::1\\]):[0-9]{1,5})$",
+          "description": "a second Docker socket proxy that allows only POST /containers/{id}/restart (E3-01b); empty or missing = docker.restart is not offered"
+        },
+        "shell_socket": {
+          "type": "string",
+          "pattern": "^/.+",
+          "description": "unix socket of the readshell unit; shell.read (a shell that can only read, as an unprivileged OS user) is offered only where this is set"
+        },
+        "restart_containers": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9*?\\[\\]][A-Za-z0-9_.*?\\[\\]-]*$" },
+          "uniqueItems": true,
+          "description": "glob patterns of the container names a confirmed proposal may restart; empty or missing = none (default deny)"
+        },
+        "restart_units": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 256, "pattern": "^[A-Za-z0-9*?\\[\\]][A-Za-z0-9:_.@*?\\[\\]-]*$" },
+          "uniqueItems": true,
+          "description": "glob patterns of the systemd units a confirmed proposal may restart; empty or missing = none (default deny)"
+        },
+        "connectors_file": {
+          "type": "string",
+          "pattern": "^(/|[A-Za-z]:[\\\\/]).+",
+          "description": "path of the file on the tool node that holds the credentials of the connector capabilities (Uptime Kuma, Omada); only the path is configured, never the credentials. Default /etc/topcoat-node/connectors.json"
+        },
+        "compose_roots": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^/.+"
+          },
+          "uniqueItems": true,
+          "description": "the only directories compose and .env files are read from or listed; empty or missing releases none (default deny)"
+        },
+        "searxng_url": {
+          "type": "string",
+          "pattern": "^https?://[^/@\\s]+(/.*)?$",
+          "description": "the SearXNG instance web.search and web.images ask (the json format must be enabled there); empty or missing = neither is offered"
+        },
+        "private_names": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "description": "names of the operator (hosts, users, domains) that web.search, web.images, web.fetch and web.image refuse to send; the node also refuses its own host name and domain, IP and MAC addresses, e-mail addresses, internal-looking domains and secrets"
+        },
+        "web_fetch": {
+          "type": "boolean",
+          "description": "offer web.fetch, which reads public web pages a model names, and web.image, which fetches one picture for a report (private addresses are refused); default false"
+        },
+        "net_targets": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "host"],
+            "properties": {
+              "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$"},
+              "host": {"type": "string", "maxLength": 253},
+              "ports": {"type": "array", "maxItems": 20, "items": {"type": "integer", "minimum": 1, "maximum": 65535}},
+              "ping": {"type": "boolean"}
+            }
+          },
+          "description": "the hosts net.check pings (ping) and connects to (ports); configured here, never named by a caller; empty with no dns_names = net.check is not offered"
+        },
+        "dns_names": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {"type": "string", "maxLength": 253},
+          "uniqueItems": true,
+          "description": "names net.check resolves with the node's resolver"
+        },
+        "cert_targets": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {"type": "string", "maxLength": 260},
+          "uniqueItems": true,
+          "description": "host or host:port (default 443) whose TLS certificate certs.expiry reads; empty = certs.expiry is not offered"
+        },
+        "docs_roots": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(/|[A-Za-z]:[\\\\/]).+"
+          },
+          "uniqueItems": true,
+          "description": "the only directories the knowledge base reads Markdown and text files from (docs.list, docs.read); empty or missing releases none and the capabilities are not offered (default deny)"
+        },
+        "read_roots": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "string",
+            "maxLength": 512,
+            "pattern": "^(/|[A-Za-z]:[\\\\/]).+"
+          },
+          "uniqueItems": true,
+          "description": "the only directories files.list and files.read look into (HOST-01, D89); empty or missing releases none and the capabilities are not offered (default deny). Not a filesystem root, no UNC or device path. Files whose names mark them as secrets are refused even inside a root"
+        },
+        "docs_exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "extra globs (matched against every path segment, case-insensitive) added to the fixed exclude list of the knowledge base (*SENSIBEL*, *ZUGANGSDATEN*, *.key, *.pem, *.env, *password*, *secret* …); it never shortens that list"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300,
+          "description": "time limit of one capability call (default 20)"
+        },
+        "workshop": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "the repo.* capabilities of a dev node (E6-01 S1, D52): where the clones live, which hosts may be cloned from, how tests run. The repositories themselves (URL, branch, token) are never configured here; the hub hands them over with each call",
+          "properties": {
+            "dir": {"type": "string", "description": "absolute directory of the clones; default <data dir>/workshop"},
+            "allowed_hosts": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {"type": "string", "pattern": "^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$"},
+              "description": "the only hosts a repository URL may name; default github.com"
+            },
+            "max_repo_mb": {"type": "integer", "minimum": 0, "maximum": 20000, "description": "size limit of one clone (default 500)"},
+            "runner": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type"],
+              "description": "how repo.test runs a test template in a throw-away container; none or missing = repo.test is not offered",
+              "properties": {
+                "type": {"type": "string", "enum": ["none", "docker"]},
+                "docker_host": {"type": "string", "description": "unix:///path or tcp://127.0.0.1:port of a Docker (or Podman) API of its own"},
+                "host_dir": {"type": "string", "description": "the workshop directory as the Docker daemon sees it, when the node itself runs in a container"},
+                "images": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "make-check": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._/:@-]{0,255}$"},
+                    "npm-test": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._/:@-]{0,255}$"},
+                    "go-test": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._/:@-]{0,255}$"},
+                    "pytest": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._/:@-]{0,255}$"},
+                    "build-node": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._/:@-]{0,255}$", "description": "the Go image repo.build_node cross-builds the node in"},
+                    "browser": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._/:@-]{0,255}$", "description": "the image of the browser.* capabilities (deploy/workshop/browser): headless Chromium and its helper"}
+                  },
+                  "description": "test template -> image; a template without an image is refused"
+                },
+                "network": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$", "description": "Docker network for templates that must download packages; empty = no network"},
+                "network_templates": {
+                  "type": "array",
+                  "items": {"type": "string", "enum": ["make-check", "npm-test", "go-test", "pytest", "build-node"]},
+                  "description": "the templates that may use the network"
+                },
+                "memory_mb": {"type": "integer", "minimum": 0, "maximum": 65536},
+                "cpu_milli": {"type": "integer", "minimum": 0, "maximum": 64000, "description": "1000 = one CPU"},
+                "timeout_seconds": {"type": "integer", "minimum": 0, "maximum": 3600, "description": "hard upper limit of one run: repo.test 600 s by default, a background run (repo.test_start) 1800 s"},
+                "idle_seconds": {"type": "integer", "minimum": 0, "maximum": 3600, "description": "a background run (repo.test_start) that printed nothing new for this long is ended (default 180)"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "power": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "energy profile of the node (E2-05 E): what the node itself costs while it has nothing to do",
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": [
+            "performance",
+            "balanced",
+            "saver"
+          ],
+          "description": "performance: nothing is slowed down; balanced (default): polling backs off x3 while nothing is loaded; saver: x6 and the heartbeat x3 while idle"
+        },
+        "sleep_after_idle_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2592000,
+          "description": "put the machine to sleep after this long without work and without a user (default 0 = never); needs Wake-on-LAN to come back"
+        }
+      }
+    },
+    "update": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "update channel of the node (E2-06, D50)",
+      "properties": {
+        "channel": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,31}$",
+          "description": "the channel whose builds this node may install (default stable)"
+        }
+      }
+    },
+    "transfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "direct model transfer between nodes (E2-07, D51)",
+      "properties": {
+        "port_min": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "first port the single-use transfer socket may bind (default 47000)"
+        },
+        "port_max": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "last port of that range (default 47099)"
+        },
+        "ttl_seconds": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 86400,
+          "description": "how long the transfer socket stays open without a finished transfer (default 600)"
+        }
+      }
+    }
+  }
+}

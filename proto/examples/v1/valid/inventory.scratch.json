@@ -1,0 +1,60 @@
+{
+  "v": 1,
+  "type": "inventory",
+  "id": "7b1e9f00-0000-4000-8000-000000000001",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "hardware": {
+      "cpu": {
+        "model": "Fake CPU 8-Core",
+        "cores": 8
+      },
+      "ram_total_mb": 32768,
+      "gpus": [
+        {
+          "index": 0,
+          "name": "Fake GPU 16G",
+          "vendor": "amd",
+          "vram_total_mb": 16304
+        }
+      ]
+    },
+    "runner": {
+      "type": "fake",
+      "available": true
+    },
+    "models": [
+      {
+        "name": "fake-llm-8b-q4",
+        "size_bytes": 4920000000,
+        "format": "gguf"
+      }
+    ],
+    "loaded": [
+      {
+        "name": "fake-llm-8b-q4",
+        "vram_used_mb": 6100,
+        "context_length": 8192
+      }
+    ],
+    "capabilities": [
+      {
+        "name": "repo.read",
+        "description": "Read a text file of the worktree.",
+        "read_only": true,
+        "input_schema": {
+          "type": "object"
+        }
+      },
+      {
+        "name": "repo.edit",
+        "description": "Replace one exact piece of text in a file.",
+        "read_only": false,
+        "scratch": true,
+        "input_schema": {
+          "type": "object"
+        }
+      }
+    ]
+  }
+}

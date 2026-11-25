@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v0/message.schema.json",
+  "title": "Any node <-> hub message",
+  "oneOf": [
+    {
+      "$ref": "hello.schema.json"
+    },
+    {
+      "$ref": "config.schema.json"
+    },
+    {
+      "$ref": "inventory.schema.json"
+    },
+    {
+      "$ref": "heartbeat.schema.json"
+    },
+    {
+      "$ref": "action.schema.json"
+    },
+    {
+      "$ref": "action_result.schema.json"
+    },
+    {
+      "$ref": "event.schema.json"
+    },
+    {
+      "$ref": "queued_events.schema.json"
+    },
+    {
+      "$ref": "error.schema.json"
+    },
+    {
+      "$ref": "proxy_request.schema.json"
+    },
+    {
+      "$ref": "proxy_chunk.schema.json"
+    },
+    {
+      "$ref": "proxy_end.schema.json"
+    },
+    {
+      "$ref": "proxy_cancel.schema.json"
+    }
+  ]
+}

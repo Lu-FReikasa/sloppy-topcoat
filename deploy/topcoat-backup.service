@@ -1,0 +1,15 @@
+# Nightly backup of the hub (deploy/backup-hub.sh). Install, replacing /srv/topcoat with the
+# directory that holds docker-compose.yml and hub.env:
+#   sudo cp deploy/topcoat-backup.service deploy/topcoat-backup.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now topcoat-backup.timer
+[Unit]
+Description=Back up the sloppy-topcoat hub (database and TLS volume)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# the user that may run docker and owns the backup directory
+User=topcoat-admin
+Environment=TOPCOAT_BACKUP_DIR=/srv/topcoat/backup
+ExecStart=/srv/topcoat/deploy/backup-hub.sh

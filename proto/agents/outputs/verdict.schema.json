@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "topcoat:agents/outputs/verdict",
+  "title": "The second look at a plan: ok, or the concrete problems",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "problems": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "ok"
+  ]
+}

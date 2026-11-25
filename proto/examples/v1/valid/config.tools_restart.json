@@ -1,0 +1,47 @@
+{
+  "v": 1,
+  "type": "config",
+  "id": "7b1e9f00-0000-4000-8000-000000000001",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "config_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "config": {
+      "roles": [
+        "tools"
+      ],
+      "runner": {
+        "type": "none"
+      },
+      "allowed_actions": [
+        "capability.invoke",
+        "capability.execute"
+      ],
+      "heartbeat_interval_seconds": 10,
+      "idle_ttl_seconds": 900,
+      "watcher": {
+        "grace_seconds": 5,
+        "rules": [
+          {
+            "process": "game.exe"
+          }
+        ]
+      },
+      "capabilities": [
+        "docker.ps",
+        "docker.restart",
+        "service.restart"
+      ],
+      "tools": {
+        "docker_host": "tcp://127.0.0.1:2375",
+        "docker_write_host": "tcp://127.0.0.1:2376",
+        "restart_containers": [
+          "web",
+          "app-*"
+        ],
+        "restart_units": [
+          "nginx.service"
+        ]
+      }
+    }
+  }
+}

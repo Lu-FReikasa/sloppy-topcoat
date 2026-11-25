@@ -1,0 +1,353 @@
+/* Sheets (SheetsPage.tsx): the list and the research on the left, the open sheet on the right.
+   A part of the song has one colour in the flow and in the sheet (--part); the colours are mixed
+   from the theme's text colour so they read on light and dark themes. A theme may set
+   --sheet-font for the lyrics and --sheet-chord for the chords. */
+
+.sheets-shell {
+  container-type: inline-size;
+}
+
+.sheets {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@container (min-width: 760px) {
+  .sheets {
+    grid-template-columns: 17rem minmax(0, 1fr);
+  }
+}
+
+.sheets-title {
+  font-size: 1.2rem;
+  margin: 0 0 0.75rem;
+}
+
+.sheets-form {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+}
+
+.sheets-form h2 {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0.25rem 0 0;
+}
+
+.sheets-form textarea {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  white-space: pre;
+}
+
+.sheets-row {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.sheets-row > input {
+  flex: 1 1 8rem;
+}
+
+.sheets-jobs,
+.sheets-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.sheets-job {
+  padding: 0.4rem 0.5rem;
+  border-left: 3px solid var(--border, #8884);
+  margin-bottom: 0.35rem;
+}
+
+.sheets-job-running {
+  border-left-color: var(--accent, #7aa7ff);
+}
+
+.sheets-job-failed {
+  border-left-color: #e5534b;
+}
+
+.sheets-job-done {
+  border-left-color: #57ab5a;
+}
+
+.sheets-badge {
+  font-size: 0.7rem;
+  padding: 0 0.35rem;
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.sheets-list a {
+  display: grid;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.35rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.sheets-list a:hover,
+.sheets-list a[aria-current="page"] {
+  background: color-mix(in srgb, currentColor 9%, transparent);
+}
+
+.sheets-list-title {
+  font-weight: 600;
+}
+
+.sheets-filter {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.sheets-filter input,
+.sheets-filter select {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.sheets-group-head {
+  display: grid;
+  padding: 0.35rem 0.5rem 0.1rem;
+}
+
+.sheets-versions {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 0.75rem;
+}
+
+.sheets-list .sheets-versions a {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.2rem 0.5rem;
+}
+
+.sheets-version {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- the parts of a song: one hue each ------------------------------------------------------ */
+
+.sheet-kind-intro { --part: #8b949e; }
+.sheet-kind-verse { --part: #4c8ef7; }
+.sheet-kind-pre_chorus { --part: #2fb9a8; }
+.sheet-kind-chorus { --part: #f0883e; }
+.sheet-kind-bridge { --part: #a371f7; }
+.sheet-kind-solo { --part: #57ab5a; }
+.sheet-kind-riff { --part: #db61a2; }
+.sheet-kind-interlude { --part: #57ab5a; }
+.sheet-kind-outro { --part: #8b949e; }
+.sheet-kind-tab { --part: #8b949e; }
+.sheet-kind-other { --part: #8b949e; }
+
+/* --- the open sheet ------------------------------------------------------------------------- */
+
+.sheet-head {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.sheet-name {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.sheet-artist {
+  color: var(--muted);
+  margin-top: -0.35rem;
+}
+
+.sheet-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+}
+
+.sheet-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sheet-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.sheet-switch button[aria-pressed="true"] {
+  font-weight: 700;
+  outline: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+}
+
+.sheet-transpose {
+  min-width: 2rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet-flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sheet-flow-step a {
+  display: inline-block;
+  min-width: 2rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.35rem;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: inherit;
+  background: color-mix(in srgb, var(--part) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--part) 70%, transparent);
+}
+
+.sheet-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+
+.sheet-tabs button[aria-selected="true"] {
+  font-weight: 700;
+  border-bottom: 2px solid var(--accent, currentColor);
+}
+
+.sheet-body {
+  display: grid;
+  gap: 1rem;
+  font-family: var(--sheet-font, inherit);
+}
+
+.sheet-part {
+  padding: 0.35rem 0 0.35rem 0.75rem;
+  border-left: 4px solid var(--part);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--part) 10%, transparent), transparent 60%);
+  scroll-margin-top: 1rem;
+}
+
+.sheet-part-label {
+  margin: 0 0 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--part) 75%, currentColor);
+}
+
+.sheet-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  line-height: 1.25;
+  margin-bottom: 0.2rem;
+}
+
+.sheet-seg {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.sheet-chord {
+  font-weight: 700;
+  font-size: 0.92em;
+  color: var(--sheet-chord, color-mix(in srgb, var(--part) 60%, currentColor));
+  padding-right: 0.45em;
+  white-space: pre;
+}
+
+.sheet-text {
+  white-space: pre;
+}
+
+.sheet-line-chords .sheet-text {
+  display: none;
+}
+
+.sheet-line-chords .sheet-chord {
+  padding-right: 1.1em;
+}
+
+.sheet-repeat {
+  align-self: flex-start;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0 0.35rem;
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--part) 25%, transparent);
+}
+
+.sheet-comment {
+  font-style: italic;
+  color: var(--muted);
+  margin: 0.15rem 0;
+}
+
+.sheet-chordpro {
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+}
+
+.sheet-sources ul {
+  list-style: none;
+  padding: 0;
+}
+
+.sheet-sources li {
+  padding: 0.25rem 0;
+}
+
+.sheet-compare table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.sheet-compare td {
+  padding: 0.2rem 0.4rem;
+  vertical-align: top;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.sheet-diff h4 {
+  margin: 0.75rem 0 0.25rem;
+}
+
+.sheet-diff-chords h4,
+.sheet-diff-form h4 {
+  color: #e5534b;
+}
+
+.sheet-diff-chord_detail h4,
+.sheet-diff-chord_position h4 {
+  color: #d29922;
+}
+
+@media print {
+  .sheets-nav,
+  .sheet-controls,
+  .sheet-tabs {
+    display: none;
+  }
+}

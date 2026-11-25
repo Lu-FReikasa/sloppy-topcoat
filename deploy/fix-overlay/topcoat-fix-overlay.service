@@ -1,0 +1,13 @@
+# Runs deploy/fix-overlay/hub-fix-overlay.sh (installed as /usr/local/sbin/topcoat-fix-overlay)
+# for every request in the spool. Root, because the request files belong to the hub's user; the
+# script keeps the overlay owned by the deploy user and only reads what the hub wrote.
+[Unit]
+Description=sloppy-topcoat: roll out issue fixes onto the hub's overlay
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=TOPCOAT_DIR=@DIR@
+Environment=TOPCOAT_FIX_SPOOL=@SPOOL@
+ExecStart=/usr/local/sbin/topcoat-fix-overlay
+TimeoutStartSec=20min

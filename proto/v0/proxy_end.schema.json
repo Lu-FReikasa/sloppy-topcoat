@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v0/proxy_end.schema.json",
+  "title": "proxy_end",
+  "description": "Direction: node -> hub. End of a proxied response. Without chunks, status (and error) is the whole answer.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 0
+    },
+    "type": {
+      "const": "proxy_end"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stream_id",
+        "status"
+      ],
+      "properties": {
+        "stream_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "chosen by the hub, unique per request"
+        },
+        "status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "error": {
+          "$ref": "common.schema.json#/$defs/error"
+        }
+      }
+    }
+  }
+}

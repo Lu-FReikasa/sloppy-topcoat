@@ -1,0 +1,36 @@
+{
+  "description": "The applications (programs of the desktop) and what is the same everywhere about them: their key, their colour and how they are called in a sentence. The hub reads this file (hub/src/topcoat_hub/applications.py); the web build keeps its own copy of the keys and colours (web/src/chat/applications.ts), and web/src/chat/applications.shared.test.ts checks that the two agree. A new application starts here.",
+  "v": 1,
+  "applications": [
+    {
+      "key": "chat",
+      "accent": "#6ee27a",
+      "hue": 200,
+      "name": { "en": "Chat", "de": "Chat" }
+    },
+    {
+      "key": "research",
+      "accent": "#7aa7ff",
+      "hue": 275,
+      "name": { "en": "Research", "de": "Recherche" }
+    },
+    {
+      "key": "dev",
+      "accent": "#ffb86b",
+      "hue": 25,
+      "name": { "en": "Development", "de": "Entwicklung" }
+    },
+    {
+      "key": "admin",
+      "accent": "#e87aff",
+      "hue": 355,
+      "name": { "en": "Administration", "de": "Verwaltung" }
+    },
+    {
+      "key": "project",
+      "accent": "#6fd8d0",
+      "hue": 185,
+      "name": { "en": "Projects", "de": "Projekte" }
+    }
+  ]
+}

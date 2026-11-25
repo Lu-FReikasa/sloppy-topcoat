@@ -1,0 +1,35 @@
+{
+  "v": 1,
+  "type": "queued_events",
+  "id": "7b1e9f00-0000-4000-8000-000000000001",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "events": [
+      {
+        "v": 1,
+        "type": "event",
+        "id": "7b1e9f00-0000-4000-8000-000000000020",
+        "ts": "2026-01-01T11:59:00Z",
+        "body": {
+          "kind": "game_detected",
+          "data": {
+            "process": "game.exe"
+          }
+        }
+      },
+      {
+        "v": 1,
+        "type": "event",
+        "id": "7b1e9f00-0000-4000-8000-000000000021",
+        "ts": "2026-01-01T11:59:05Z",
+        "body": {
+          "kind": "model_unloaded",
+          "data": {
+            "model": "fake-llm-8b-q4",
+            "reason": "game"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "description": "Style sheets and whether a theme may carry them. The hub (ui/themes.py) and the web build (desktop/theme.ts) both check their rules against this list, so the two checks cannot drift apart.",
+  "cases": [
+    { "css": "--accent: hotpink;\n.dt-program { border-radius: 8px; }", "ok": true },
+    { "css": "@media (max-width: 600px) { .dt-task { padding: 0; } }", "ok": true },
+    { "css": "@keyframes wob { from { opacity: 0 } to { opacity: 1 } }", "ok": true },
+    { "css": ".a { background: url(data:image/png;base64,AAAA); }", "ok": true },
+    { "css": "/* a comment that says @import is only a comment */ .a { color: red; }", "ok": true },
+    { "css": "@import url(https://evil.example/x.css);", "ok": false },
+    { "css": "@im\\port 'x';", "ok": false },
+    { "css": "/* hidden */ @import 'x';", "ok": false },
+    { "css": "@charset 'utf-8';", "ok": false },
+    { "css": "@namespace svg url(http://www.w3.org/2000/svg);", "ok": false },
+    { "css": ".a { background: url(https://evil.example/x.png); }", "ok": false },
+    { "css": ".a { background: url('//evil.example/x.png'); }", "ok": false },
+    { "css": ".a { background: url(javascript:alert(1)); }", "ok": false },
+    { "css": ".a { background: url(data:text/html;base64,AAAA); }", "ok": false },
+    { "css": ".a { width: expression(alert(1)); }", "ok": false },
+    { "css": ".a { -moz-binding: url(x); }", "ok": false },
+    { "css": ".a { behavior: url(x.htc); }", "ok": false },
+    { "css": "</style><script>alert(1)</script>", "ok": false }
+  ]
+}

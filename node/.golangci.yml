@@ -1,0 +1,71 @@
+# golangci-lint v2 configuration (tested with v2.14.0).
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - bodyclose
+    - errorlint
+    - gosec
+    - misspell
+    - revive
+    - unconvert
+  settings:
+    misspell:
+      locale: US
+      ignore-rules:
+        - sensibel # German: the name of the folders the knowledge base must never read
+    revive:
+      rules:
+        - name: exported
+        - name: package-comments
+        - name: var-naming
+        - name: indent-error-flow
+        - name: errorf
+        - name: blank-imports
+        - name: context-as-argument
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: receiver-naming
+        - name: increment-decrement
+        - name: unused-parameter
+          disabled: true
+    gosec:
+      excludes:
+        # G304 (file path from variable): the node reads files only inside its
+        # own data dir or a fake profile path given on the command line by the admin.
+        - G304
+  exclusions:
+    generated: lax
+    presets:
+      - std-error-handling
+    rules:
+      # Tests use fixed temp paths, httptest servers and weak randomness freely.
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+      # Native API calls without CGO (Win32/COM via syscall, NVML via purego)
+      # need unsafe pointers and fixed-width conversions by definition; each
+      # such file is marked UNVERIFIED and reviewed by hand.
+      - path: (_windows\.go|nvml_linux\.go)$
+        linters:
+          - gosec
+        text: "G103|G115"
+      - path: pdh_parse\.go
+        linters:
+          - gosec
+        text: "G115"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - topcoat/node

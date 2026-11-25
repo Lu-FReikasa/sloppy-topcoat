@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v1/config.schema.json",
+  "title": "config",
+  "description": "Direction: hub -> node. config_hash is sha256 over the canonical JSON of config (keys sorted, no whitespace).",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 1
+    },
+    "type": {
+      "const": "config"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "config_hash",
+        "config"
+      ],
+      "properties": {
+        "config_hash": {
+          "$ref": "common.schema.json#/$defs/sha256_hex"
+        },
+        "config": {
+          "$ref": "node_config.schema.json"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "v": 1,
+  "type": "config",
+  "id": "7b1e9f00-0000-4000-8000-000000000012",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "config_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "config": {
+      "roles": [
+        "gpu"
+      ],
+      "runner": {
+        "type": "llamaserver",
+        "model_dirs": [],
+        "backend": "auto",
+        "llamacpp_release": "b11223",
+        "threads": 6,
+        "model_backends": {},
+        "model_context_lengths": {}
+      },
+      "allowed_actions": [
+        "models.list",
+        "models.load",
+        "models.unload",
+        "models.download",
+        "models.delete",
+        "node.benchmark"
+      ],
+      "heartbeat_interval_seconds": 10,
+      "idle_ttl_seconds": 1800,
+      "watcher": {
+        "grace_seconds": 5,
+        "cooldown_seconds": 60,
+        "rules": [
+          {
+            "process": "game.exe"
+          },
+          {
+            "path_prefix": "D:\\SteamLibrary\\steamapps\\common\\"
+          }
+        ]
+      },
+      "capabilities": []
+    }
+  }
+}

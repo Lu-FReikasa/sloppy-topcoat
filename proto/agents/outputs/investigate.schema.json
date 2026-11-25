@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "topcoat:agents/outputs/investigate",
+  "title": "A round of an issue's investigation: questions to Dev/Verwaltung, or the report",
+  "type": "object",
+  "properties": {
+    "questions": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "enum": [
+              "dev",
+              "admin"
+            ]
+          },
+          "question": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "to",
+          "question"
+        ]
+      }
+    },
+    "report": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "problem": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cause": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fix": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "steps": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "symbol": {
+                "type": "string"
+              },
+              "where": {
+                "enum": [
+                  "in",
+                  "before",
+                  "after",
+                  "end"
+                ]
+              },
+              "anchor": {
+                "type": "string"
+              },
+              "do": {
+                "type": "string"
+              },
+              "after": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              }
+            },
+            "required": [
+              "path",
+              "symbol",
+              "where",
+              "do"
+            ]
+          }
+        },
+        "test": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "do": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "do"
+          ]
+        }
+      },
+      "required": [
+        "title",
+        "problem",
+        "checks",
+        "cause",
+        "fix",
+        "summary",
+        "steps",
+        "test"
+      ]
+    }
+  }
+}

@@ -1,0 +1,85 @@
+# Hub for the release channel "test" (ARCHITECTURE D13): Postgres 16 + pgvector and the
+# published hub image, HTTPS on :8443 with the hub's own CA (TLS mode auto, D11).
+#   cp deploy/hub.env.example deploy/hub.env      # then edit
+#   docker login ghcr.io                          # once; the repository is private
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/hub.env up -d
+# Update to the newest test build:
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/hub.env pull
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/hub.env up -d
+name: topcoat
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: topcoat
+      POSTGRES_PASSWORD: ${TOPCOAT_DB_PASSWORD:?set TOPCOAT_DB_PASSWORD in deploy/hub.env}
+      POSTGRES_DB: topcoat
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U topcoat -d topcoat"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  hub:
+    image: ${TOPCOAT_IMAGE:-ghcr.io/lu-freikasa/sloppy-topcoat-hub:test}
+    environment:
+      # Time zone of the hub process: log times and the hour of the nightly memory care
+      # (TOPCOAT_MEMORY_CARE_HOUR) follow it. Stored timestamps stay UTC.
+      TZ: ${TOPCOAT_TZ:-Europe/Berlin}
+      TOPCOAT_DATABASE_URL: postgresql+psycopg://topcoat:${TOPCOAT_DB_PASSWORD}@db:5432/topcoat
+      TOPCOAT_DEV_ADMIN_TOKEN: ${TOPCOAT_DEV_ADMIN_TOKEN:?set TOPCOAT_DEV_ADMIN_TOKEN in deploy/hub.env}
+      TOPCOAT_TLS_MODE: ${TOPCOAT_TLS_MODE:-auto}
+      TOPCOAT_TLS_HOSTNAMES: ${TOPCOAT_TLS_HOSTNAMES:?set TOPCOAT_TLS_HOSTNAMES in deploy/hub.env}
+      # the hub's time zone (the taskbar clock of everyone who chose none); UTC when unset
+      TOPCOAT_HUB_TIMEZONE: ${TOPCOAT_HUB_TIMEZONE:-UTC}
+      TOPCOAT_TLS_CERT_FILE: ${TOPCOAT_TLS_CERT_FILE:-}
+      TOPCOAT_TLS_KEY_FILE: ${TOPCOAT_TLS_KEY_FILE:-}
+      TOPCOAT_TLS_CA_FILE: ${TOPCOAT_TLS_CA_FILE:-}
+      TOPCOAT_PUBLIC_URL: ${TOPCOAT_PUBLIC_URL:-}
+      # read once at start and turned into model roles (hub/src/topcoat_hub/node_policy.py,
+      # LEGACY_ENV); the roles are edited on the page "Models and roles", not here
+      TOPCOAT_GATEWAY_NODE_ORDER: ${TOPCOAT_GATEWAY_NODE_ORDER:-}
+      TOPCOAT_GATEWAY_BACKGROUND_NODES: ${TOPCOAT_GATEWAY_BACKGROUND_NODES:-}
+      TOPCOAT_GATEWAY_BACKGROUND_MODEL: ${TOPCOAT_GATEWAY_BACKGROUND_MODEL:-}
+      TOPCOAT_MAIN_THREAD_ENABLED: ${TOPCOAT_MAIN_THREAD_ENABLED:-false}
+      TOPCOAT_SEGMENT_IDLE_SECONDS: ${TOPCOAT_SEGMENT_IDLE_SECONDS:-1200}
+      TOPCOAT_CHAT_NODE_CHAIN: ${TOPCOAT_CHAT_NODE_CHAIN:-}
+      TOPCOAT_PROPOSALS_ENABLED: ${TOPCOAT_PROPOSALS_ENABLED:-false}
+      TOPCOAT_UPDATE_DIR: ${TOPCOAT_UPDATE_DIR:-/data/updates}
+      TOPCOAT_UPDATE_PUBKEYS: ${TOPCOAT_UPDATE_PUBKEYS:-}
+      TOPCOAT_EMBEDDING_MODEL: ${TOPCOAT_EMBEDDING_MODEL:-}
+      TOPCOAT_MEMORY_MODEL: ${TOPCOAT_MEMORY_MODEL:-}
+      TOPCOAT_REVIEW_MODEL: ${TOPCOAT_REVIEW_MODEL:-}
+      TOPCOAT_REVIEW_AFTER_ANSWER: ${TOPCOAT_REVIEW_AFTER_ANSWER:-true}
+      TOPCOAT_REVIEW_BEFORE_ANSWER_TOOLS: ${TOPCOAT_REVIEW_BEFORE_ANSWER_TOOLS:-repo.test_start,repo.apply_patch}
+      TOPCOAT_PRECHECK_TIMEOUT_SECONDS: ${TOPCOAT_PRECHECK_TIMEOUT_SECONDS:-240}
+      TOPCOAT_MEMORY_CONSOLIDATION_INTERVAL_SECONDS: ${TOPCOAT_MEMORY_CONSOLIDATION_INTERVAL_SECONDS:-1800}
+      TOPCOAT_MEMORY_IDLE_SECONDS: ${TOPCOAT_MEMORY_IDLE_SECONDS:-0}
+      TOPCOAT_AGENT_MIN_CONTEXT: ${TOPCOAT_AGENT_MIN_CONTEXT:-16384}
+      TOPCOAT_AGENT_AUTO_TOOL_GROUPS: ${TOPCOAT_AGENT_AUTO_TOOL_GROUPS:-true}
+      TOPCOAT_KNOWLEDGE_EXCLUDE: ${TOPCOAT_KNOWLEDGE_EXCLUDE:-}
+      TOPCOAT_KNOWLEDGE_REINDEX_SECONDS: ${TOPCOAT_KNOWLEDGE_REINDEX_SECONDS:-21600}
+      TOPCOAT_REDACT_DOMAINS: ${TOPCOAT_REDACT_DOMAINS:-}
+    ports:
+      - "8443:8443"
+    volumes:
+      # The hub CA. Losing this volume means every node has to pair again.
+      - hub-tls:/data/tls
+      # Signed node builds for the update channel (E2-06). Losing it only means publishing again.
+      - hub-updates:/data/updates
+      # TLS mode files: put certificate and key into deploy/certs/ and point
+      # TOPCOAT_TLS_CERT_FILE / TOPCOAT_TLS_KEY_FILE at /certs/<file>.
+      - ./certs:/certs:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  hub-tls:
+  hub-updates:

@@ -1,0 +1,18 @@
+{
+  "v": 0,
+  "type": "event",
+  "id": "7b1e9f00-0000-4000-8000-000000000002",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "kind": "benchmark_result",
+    "data": {
+      "benchmark_id": "7b1e9f00-0000-4000-8000-0000000000aa",
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "backend": "cpu",
+      "threads": 2,
+      "n_gpu_layers": 0,
+      "pp_tps": 85.5,
+      "tg_tps": 14.2
+    }
+  }
+}

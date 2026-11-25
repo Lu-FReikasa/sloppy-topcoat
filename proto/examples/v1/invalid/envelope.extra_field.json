@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "type": "hello",
+  "id": "7b1e9f00-0000-4000-8000-000000000001",
+  "ts": "2026-01-01T12:00:00Z",
+  "body": {
+    "node_id": "3f0c2a4e-8a51-4b7e-9a0e-1f2d3c4b5a60",
+    "agent_version": "0.1.0",
+    "protocol_version": 1,
+    "config_hash": null
+  },
+  "cmd": "x"
+}

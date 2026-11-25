@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sloppy-topcoat.example/proto/v1/proxy_cancel.schema.json",
+  "title": "proxy_cancel",
+  "description": "Direction: hub -> node. The client went away or the hub gave up: stop forwarding the stream.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "v": {
+      "const": 1
+    },
+    "type": {
+      "const": "proxy_cancel"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stream_id"
+      ],
+      "properties": {
+        "stream_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "chosen by the hub, unique per request"
+        }
+      }
+    }
+  }
+}

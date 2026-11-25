@@ -1,0 +1,44 @@
+{
+  "_comment": "SYNTHETIC facts: they show the format only. Keep your real facts file outside the repo and pass it with --facts.",
+  "questions": [
+    {
+      "id": "gpu-vendor-amd",
+      "question": "Which GPU vendor does node-amd have?",
+      "must": [["AMD", "Radeon"]],
+      "must_not": ["NVIDIA", "GeForce"],
+      "tags": ["hardware"]
+    },
+    {
+      "id": "vram-nvidia",
+      "question": "How much VRAM does node-nvidia have?",
+      "must": ["24", ["GB", "GiB"]],
+      "must_not": ["12 GB"],
+      "tags": ["hardware"]
+    },
+    {
+      "id": "hub-port",
+      "question": "On which port does the hub accept node connections?",
+      "must": ["8443"],
+      "tags": ["network"]
+    },
+    {
+      "id": "model-bind",
+      "question": "On which address does llama-server listen on a node?",
+      "must": ["127.0.0.1"],
+      "must_not": ["0.0.0.0"],
+      "tags": ["security", "network"]
+    },
+    {
+      "id": "backup-time",
+      "question": "At what time does the nightly backup of node-amd run?",
+      "must": [["03:15", "3:15"]],
+      "tags": ["schedule"]
+    },
+    {
+      "id": "no-invented-host",
+      "question": "Which IP address has node-mars?",
+      "must_not": ["10.0.0."],
+      "tags": ["hallucination"]
+    }
+  ]
+}
