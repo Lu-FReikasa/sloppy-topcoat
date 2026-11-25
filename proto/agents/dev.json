@@ -115,7 +115,7 @@
   ],
   "model_role": "coder",
   "think": false,
-  "persona": null,
+  "persona": "neutral",
   "programs": [
     "issue_area",
     "issue_investigate",

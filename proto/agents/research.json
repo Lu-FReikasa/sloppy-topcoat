@@ -69,7 +69,7 @@
   ],
   "model_role": "general",
   "think": null,
-  "persona": null,
+  "persona": "neutral",
   "programs": [
     "research_report",
     "doc_section"
