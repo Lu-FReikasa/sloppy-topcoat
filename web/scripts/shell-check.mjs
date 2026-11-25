@@ -33,7 +33,8 @@ function loadPlaywright() {
 const { chromium } = loadPlaywright();
 
 const dist = process.env.DIST ?? join(fileURLToPath(new URL("..", import.meta.url)), "dist");
-const SIZES = (process.env.SIZES ?? "320x640,360x740,390x844,768x1024,1280x800,1366x768")
+// 400 px is the first width where the search shows its text: the tightest header
+const SIZES = (process.env.SIZES ?? "320x640,360x740,390x844,400x800,768x1024,1280x800,1366x768")
   .split(",")
   .map((s) => s.split("x").map(Number));
 const LANGS = (process.env.LANGS ?? "en,de").split(",");
@@ -56,9 +57,15 @@ function measure() {
   };
   const q = (s) => document.querySelector(s);
   const cut = [];
+  // inside a box that shortens its text with an ellipsis, the rest is hidden on purpose
+  const shortened = (el) => {
+    for (let p = el.parentElement; p && !p.matches(".ws-top"); p = p.parentElement)
+      if (getComputedStyle(p).textOverflow === "ellipsis" && getComputedStyle(p).overflowX !== "visible") return true;
+    return false;
+  };
   for (const el of document.querySelectorAll(".ws-top, .ws-top *")) {
     const r = el.getBoundingClientRect();
-    if (r.width === 0 || getComputedStyle(el).visibility === "hidden") continue;
+    if (r.width === 0 || getComputedStyle(el).visibility === "hidden" || shortened(el)) continue;
     if (r.right > window.innerWidth + 0.5 || r.left < -0.5) cut.push(`${el.className || el.tagName} leaves the window`);
     // text that shortens with an ellipsis is meant to; anything else wider than its box is cut
     if (el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).textOverflow !== "ellipsis" && el.clientWidth > 0)
