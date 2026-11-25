@@ -72,7 +72,7 @@ function measure() {
     top: box(q(".ws-top")),
     body: box(q(".ws-body")),
     main: q(".ws-main") && { overflow: q(".ws-main").scrollHeight - q(".ws-main").clientHeight },
-    composer: box(q(".composer")),
+    composer: box(q(".talk-composer")),
     side: box(q(".ws-side")),
     sideShown: !!q(".ws-side") && getComputedStyle(q(".ws-side")).display !== "none",
     burger: box(q(".ws-burger")),
@@ -144,7 +144,7 @@ try {
 
       // a chat: the view fills the space below the crumb, the message box stays in the window
       await page.goto(`${base}#/w/chat`);
-      await page.waitForSelector(".composer", { timeout: 10000 }).catch(() => undefined);
+      await page.waitForSelector(".talk-composer", { timeout: 10000 }).catch(() => undefined);
       await page.waitForTimeout(250);
       const c = await page.evaluate(measure);
       await shot("chat");
