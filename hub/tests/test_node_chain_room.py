@@ -31,11 +31,17 @@ def pick(free: dict[str, int]) -> node_chain.Pick | None:
 
 
 def test_a_full_first_node_hands_the_request_to_a_free_one_of_the_row() -> None:
-    assert pick({"node-nvidia": 1, "node-amd": 2}) == node_chain.Pick("node-nvidia", "coder", None, None)
+    assert pick({"node-nvidia": 1, "node-amd": 2}) == node_chain.Pick(
+        "node-nvidia", "coder", None, None
+    )
     # node-nvidia' one slot is taken: node-amd with its own model answers, and it is no fallback
-    assert pick({"node-nvidia": 0, "node-amd": 2}) == node_chain.Pick("node-amd", "gpt-oss", None, None)
+    assert pick({"node-nvidia": 0, "node-amd": 2}) == node_chain.Pick(
+        "node-amd", "gpt-oss", None, None
+    )
     # every node full: the first one, its queue decides as before
-    assert pick({"node-nvidia": 0, "node-amd": 0}) == node_chain.Pick("node-nvidia", "coder", None, None)
+    assert pick({"node-nvidia": 0, "node-amd": 0}) == node_chain.Pick(
+        "node-nvidia", "coder", None, None
+    )
 
 
 def test_a_node_that_cannot_take_it_at_all_is_still_a_fallback() -> None:

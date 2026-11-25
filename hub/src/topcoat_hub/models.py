@@ -184,9 +184,13 @@ class ModelRating(Base):
     """The result of one bench suite for one model on one node (PRG-00 R6)."""
 
     __tablename__ = "model_ratings"
+    # named by d107
+    __table_args__ = (Index("ix_model_ratings_lookup", "model", "node", "suite", "variant"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=True
+    )
     run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
     model: Mapped[str] = mapped_column(Text)
     node: Mapped[str] = mapped_column(String(63))
@@ -2263,8 +2267,12 @@ class IssueFix(Base):
     rollout: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     error: Mapped[str | None] = mapped_column(Text)
     decided_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=True
+    )
 
 
 class SheetRow(Base):

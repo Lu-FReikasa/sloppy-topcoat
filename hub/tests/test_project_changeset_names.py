@@ -232,9 +232,7 @@ def test_a_plans_task_gets_the_missing_lines_instead_of_a_refusal() -> None:
 def test_a_named_but_unknown_application_is_not_replaced() -> None:
     from topcoat_hub.project_changesets import SetError, check_task_form, complete_task_form
 
-    op = [
-        {"op": "create_node", "kind": "task", "title": "x", "body": "Zielanwendung: dev-node"}
-    ]
+    op = [{"op": "create_node", "kind": "task", "title": "x", "body": "Zielanwendung: dev-node"}]
     done = complete_task_form(op)
     assert "Zielanwendung: dev-node" in done[0]["body"]
     try:

@@ -738,9 +738,12 @@ def test_a_model_of_the_authors_family_checks_last() -> None:
         ("Qwen3-Coder-30B-A3B-IQ4_NL", [("node-desk", True)]),
     )
     # the coder on the author's own node beats gpt-oss on another node
-    assert chat_review.pick_reviewer(
-        ms, "openai_gpt-oss-20b-MXFP4", "", author_node="node-desk", same_model_elsewhere=True
-    ) == "Qwen3-Coder-30B-A3B-IQ4_NL@node-desk"
+    assert (
+        chat_review.pick_reviewer(
+            ms, "openai_gpt-oss-20b-MXFP4", "", author_node="node-desk", same_model_elsewhere=True
+        )
+        == "Qwen3-Coder-30B-A3B-IQ4_NL@node-desk"
+    )
     assert same_family("openai_gpt-oss-20b-MXFP4@node-desk", "gpt-oss-20b-Q4@x")
     assert not same_family("openai_gpt-oss-20b-MXFP4", "Qwen3-Coder-30B-A3B-IQ4_NL")
     assert not same_family(None, "gpt-oss")
