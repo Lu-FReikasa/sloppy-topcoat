@@ -263,7 +263,7 @@
   },
   "pairing": {
     "heading": "Node hinzufügen",
-    "intro": "Lade auf dem neuen Rechner die Datei für sein Betriebssystem aus dem Release (Pre-Release „test“) herunter und führe im Download-Ordner einen dieser Befehle aus.",
+    "intro": "Lade auf dem neuen Rechner die Knoten-Datei für sein Betriebssystem herunter (GitHub → Actions → neuester grüner CI-Lauf auf main → Artifacts „topcoat-node-test-…“) und führe im Download-Ordner einen dieser Befehle aus.",
     "code": "Kopplungscode",
     "expires": "Gültig bis {{time}}",
     "command": "Nur koppeln (Vordergrund, zum Ausprobieren)",

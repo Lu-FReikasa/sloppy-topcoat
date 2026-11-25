@@ -380,17 +380,35 @@ docker build -f hub/Dockerfile -t topcoat-hub:local .          # hub image (cont
 scripts/smoke-test-hub-image.sh topcoat-hub:local              # TLS/migration/GUI smoke test
 ```
 
+There are two ways to a hub image and node binaries (ARCHITECTURE D123):
+
+- **CI build (the usual way).** Every green push to `main` builds both (job `publish`, see below):
+  the hub image goes to `ghcr.io/lu-freikasa/sloppy-topcoat-hub:sha-<commit>` (and `:test`), the
+  node binaries with `SHA256SUMS` are a workflow artifact of that run. You roll the image out
+  with `release.sh --image ghcr.io/...`; you check the node hashes and sign the release in the
+  browser (D80), and the hub serves it through the update channel (D50).
+- **Local build.** The commands above, or `release.sh` without `--image`: a release never depends
+  on GitHub being reachable.
+
 ### Rolling a hub image out: `scripts/dev/release.sh`
+
+```sh
+scripts/dev/release.sh --dry-run --image ghcr.io/lu-freikasa/sloppy-topcoat-hub:sha-<commit>   # CI image
+scripts/dev/release.sh --dry-run                                                             # local build
+```
 
 One command, one question per step, `--dry-run` prints everything and changes nothing:
 backup tag (on `origin/main`, or on the local `main` while there is no remote; you push it) →
-`make check` → `docker build` → smoke test → the running production image is saved on the server
+`make check` → `docker build`, or `docker pull` when `--image` names a registry image (its first
+part is a host such as `ghcr.io`; it says so when the image's `sha-<commit>` is not the checkout
+the checks ran on) → smoke test → the running production image is saved on the server
 (the way back) → the new image is sent (`docker save | gzip | ssh`) → production through
 `deploy/update-hub.sh` (revision check, database dump, health check, automatic rollback; a dry run
 of it comes first and production is always asked, `--yes` or not). The servers come from
 `TOPCOAT_PROD_SSH`, `TOPCOAT_PROD_DIR`, `TOPCOAT_BACKUP_REMOTE` (see the header of the script);
 nothing real is in the repository. It needs bash with `docker`, `ssh` and `make` (WSL or Git Bash
-on Windows). The test only checks the order of the steps and that a dry run changes nothing.
+on Windows). The test only checks the order of the steps, build or pull, and that a dry run
+changes nothing.
 
 `make check` needs Go, Node.js with npm, `uv` and a PostgreSQL 16 with pgvector (see
 `scripts/dev/local-ci.sh`). Run it on a Linux clone (`git clone` into the home folder of WSL, not
@@ -405,10 +423,17 @@ the workflow (`runs-on: [self-hosted, linux]`), and never give a runner on the f
 server the registry or update keys.
 
 CI (`.github/workflows/ci.yml`) builds and smoke-tests the hub image on every PR (job `image`).
-Every green push to `main` runs job `publish` (release channel **test**, ARCHITECTURE D13):
+Every green push to `main` runs job `publish` (release channel **test**, ARCHITECTURE D123):
 - hub image `ghcr.io/lu-freikasa/sloppy-topcoat-hub:test` and `:sha-<commit>`,
-- node binaries with version `test-<commit>` and `SHA256SUMS` in the pre-release `test`
-  (replaced on every run).
+- node binaries with version `test-<commit>` and `SHA256SUMS` as the workflow artifact
+  `topcoat-node-test-<full commit>` (GitHub → Actions → the run of the CI workflow on `main` →
+  *Artifacts*; kept 30 days, download needs a GitHub login). They are unsigned: nothing is
+  published as a release, and the signing key never reaches the CI.
+
+Every action in `.github/workflows/` is pinned to a full commit SHA with the version as a
+comment (`uses: actions/checkout@<sha> # v4.4.0`). To update one, take the commit of the new tag
+(`git ls-remote --tags https://github.com/<owner>/<action>`; for an annotated tag the `^{}`
+line) and change the SHA and the comment together.
 
 Channel `prod` (version tags) follows in stage 5.
 
