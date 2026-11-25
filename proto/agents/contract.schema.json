@@ -69,7 +69,7 @@
     "outputs": {
       "description": "Names of the enforced answer forms it writes (proto/agents/outputs)",
       "type": "array",
-      "items": {"enum": ["plan_v2", "verdict", "check", "investigate", "area"]}
+      "items": {"enum": ["plan_v2", "verdict", "check", "investigate", "area", "decompose"]}
     },
     "talks_to": {
       "type": "array",
