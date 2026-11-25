@@ -42,8 +42,13 @@ describe("growHeight", () => {
 function Box() {
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
-  useGrowingTextarea(ref, text);
-  return <textarea ref={ref} aria-label="message" value={text} onChange={(e) => setText(e.target.value)} />;
+  const room = useRef<HTMLDivElement>(null);
+  useGrowingTextarea(ref, text, room);
+  return (
+    <div ref={room} data-testid="room">
+      <textarea ref={ref} aria-label="message" value={text} onChange={(e) => setText(e.target.value)} />
+    </div>
+  );
 }
 
 describe("useGrowingTextarea", () => {
@@ -76,5 +81,10 @@ describe("useGrowingTextarea", () => {
       [`${box(MAX_LINES)}px`, "auto"],
       [`${box(MIN_LINES)}px`, "hidden"],
     ]);
+
+    // in a small chat window the box takes at most half of it: a 300 px room leaves 150 px, 6 lines
+    vi.spyOn(HTMLDivElement.prototype, "clientHeight", "get").mockReturnValue(300);
+    fireEvent.change(el, { target: { value: Array.from({ length: 14 }, (_, i) => `line ${i + 1}`).join("\n") } });
+    expect([el.style.height, el.style.overflowY]).toEqual([`${box(6)}px`, "auto"]);
   });
 });
