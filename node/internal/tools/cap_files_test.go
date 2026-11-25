@@ -12,7 +12,7 @@ import (
 	"topcoat/node/internal/providers/capability"
 )
 
-// filesTree is a released folder with ordinary files and a neighbour folder that is not released.
+// filesTree is a released folder with ordinary files and a neighbor folder that is not released.
 func filesTree(t *testing.T) (root, outside string) {
 	t.Helper()
 	base, err := filepath.EvalSymlinks(t.TempDir())

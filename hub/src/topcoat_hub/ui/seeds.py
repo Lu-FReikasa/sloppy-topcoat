@@ -3,10 +3,11 @@
 A built-in workspace is a **program** of the desktop: Chat, Research, Development and Administration
 (the applications of docs/PLATFORM.md), and Inbox, Incognito and Settings, which every person has.
 Its ``modules`` are its views in the order of its navigation, ``open`` the view it starts with,
-``agent`` the ceiling of its tools (app_scope.py). It is kept by the code, re-written at a start
-when its revision here is newer than the stored one, and copied to be changed. A built-in profile
-is only a starting point: it is written once and then belongs to the admin (a later start never
-touches what the admin changed)."""
+``agent`` the ceiling of its tools (app_scope.py), taken from the program's contract
+(``proto/agents/<key>.json``, D118) by :func:`builtin_templates`. It is kept by the code,
+re-written at a start when its revision here is newer than the stored one or its contract changed
+its ceiling, and copied to be changed. A built-in profile is only a starting point: it is written
+once and then belongs to the admin (a later start never touches what the admin changed)."""
 
 import logging
 import uuid
@@ -15,6 +16,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from topcoat_hub import agent_contract
 from topcoat_hub.models import SYSTEM_ID, UiGrant, UiProfile, UiTemplate, User
 
 log = logging.getLogger(__name__)
@@ -27,11 +29,20 @@ def _agent(groups: list[str] | None, **rest: Any) -> dict[str, Any]:
     }
 
 
-# The tool groups of an application are a ceiling, kept to what it needs: Chat and Research the
-# web and the notes, Chat also Topcoat's wiki (read only, 2026-11-12: Clipper at the Wiki window
-# talks in Chat), Development the workshop and GitHub only, Administration the servers.
-# Whatever lies outside is asked of the application that has it, by a hand-over (PLATFORM.md 3.8).
-# Inbox, Incognito and Settings have no conversation of their own and no tools.
+def _contract_agent(**rest: Any) -> dict[str, Any]:
+    """The agent block of a program that has a contract (Chat, Research, Development, Projects,
+    Administration): only what the contract cannot say, its frame. The tool ceiling (groups and the
+    internet switch) is the contract's list of tools, filled in by :func:`builtin_templates`; the
+    contract cannot name nodes, so the ceiling leaves them open (``None``) as before."""
+    return dict(rest)
+
+
+# The tool groups of an application are a ceiling, kept to what it needs, and its contract says
+# which (proto/agents/<key>.json, D118): Chat and Research the web, the notes and the wiki,
+# Development the workshop, GitHub and the trace, Projects its own tools, Administration the
+# servers. Whatever lies outside is asked of the application that has it, by a hand-over
+# (PLATFORM.md 3.8). The programs without a contract have no assistant of their own and no tools;
+# that is said here, since there is no contract to say it.
 _NO_TOOLS = _agent([], internet=False)
 
 # D74: each program's assistant has a frame of its own — a tone and a few rules that come before
@@ -169,7 +180,7 @@ BUILTIN_TEMPLATES: list[dict[str, Any]] = [
             "page.library",
             "page.archive",
         ],
-        _agent(["notes", "wiki"], internet=True, frame=FRAMES["chat"]),
+        _contract_agent(frame=FRAMES["chat"]),  # the contract of the assistant
         title_key="workspace.start",
     ),
     _program(
@@ -182,7 +193,7 @@ BUILTIN_TEMPLATES: list[dict[str, Any]] = [
         # shelf); the notes' search and the shelf follow
         ["page.research", "page.knowledge", "page.library"],
         # the wiki too (revision 11, 2026-11-18): a research about Topcoat reads its documentation
-        _agent(["notes", "wiki"], internet=True, frame=FRAMES["research"]),
+        _contract_agent(frame=FRAMES["research"]),
     ),
     _program(
         "dev",
@@ -192,9 +203,7 @@ BUILTIN_TEMPLATES: list[dict[str, Any]] = [
         40,
         ["page.workshop", "page.repos", "page.library"],
         # the wiki too (revision 16, 2026-11-17): the task runs survey the code it describes
-        _agent(
-            ["github", "workshop", "trace", "notes", "wiki"], internet=False, frame=FRAMES["dev"]
-        ),
+        _contract_agent(frame=FRAMES["dev"]),
         "admin",
     ),
     _program("files", 1, "Files", "[]", 45, ["page.files"], _NO_TOOLS, "admin"),
@@ -205,10 +214,9 @@ BUILTIN_TEMPLATES: list[dict[str, Any]] = [
         "#",
         25,
         ["page.project"],
-        # no internet, no machines: the project tools of the hub are the only tools of the run
-        # the wiki (notes, read only) too: the project agent compares the wiki with the repository
-        # and the wiki (released pages, read only)
-        _agent(["project", "notes", "wiki"], internet=False, frame=FRAMES["project"]),
+        # no internet, no machines: the project tools of the hub, the notes and the wiki (released
+        # pages, read only: the project agent compares the wiki with the repository)
+        _contract_agent(frame=FRAMES["project"]),
     ),
     # Topcoat's own wiki: read and release its pages; no assistant of its own
     _program("wiki", 1, "Wiki", "W", 27, ["page.wiki"], _NO_TOOLS),
@@ -237,21 +245,9 @@ BUILTIN_TEMPLATES: list[dict[str, Any]] = [
             "page.care",  # maintenance: care runs, budget, fixed rules
             "page.themes",
         ],
-        _agent(
-            [
-                "docker",
-                "journal",
-                "host",
-                "network",
-                "monitors",
-                "reach",
-                "notes",
-                "topcoat",
-                "identity",
-                "wiki",
-            ],
-            frame=FRAMES["admin"],
-        ),
+        # the server groups, no internet (the contract does not list it; before the ceiling came
+        # from the contract the internet switch was left open here)
+        _contract_agent(frame=FRAMES["admin"]),
         "admin",
     ),
     _program(
@@ -266,6 +262,42 @@ BUILTIN_TEMPLATES: list[dict[str, Any]] = [
         _NO_TOOLS,
     ),
 ]
+
+
+def contract_scope(key: str) -> dict[str, Any]:
+    """The tool ceiling of program ``key`` as its contract says it (``chat`` is the assistant's)."""
+    agent_contract.all_contracts()  # a broken contract raises here instead of reading as "none"
+    contract = agent_contract.get(key)
+    if contract is None:
+        raise agent_contract.ContractError(f"the program {key!r} has no contract")
+    return {"nodes": None, "groups": contract.groups, "internet": contract.internet}
+
+
+def builtin_templates() -> list[dict[str, Any]]:
+    """:data:`BUILTIN_TEMPLATES` with each tool ceiling filled in: from the contract where the
+    program has one, as written above where it has none. A program has exactly one of the two, so
+    there is one source for each ceiling. Read when called, so the configured proto root counts."""
+    agent_contract.all_contracts()
+    out = []
+    for spec in BUILTIN_TEMPLATES:
+        has_contract = agent_contract.get(spec["key"]) is not None
+        if has_contract == ("tool_scope" in spec["agent"]):
+            raise agent_contract.ContractError(
+                f"the program {spec['key']!r} needs its tool ceiling from exactly one place "
+                "(its contract or ui/seeds.py)"
+            )
+        if has_contract:
+            spec = {**spec, "agent": {"tool_scope": contract_scope(spec["key"]), **spec["agent"]}}
+        out.append(spec)
+    return out
+
+
+def _ceiling(agent: Any) -> tuple[Any, ...]:
+    """A tool scope reduced to what it allows (the order of the groups means nothing)."""
+    scope = (agent.get("tool_scope") if isinstance(agent, dict) else None) or {}
+    groups = scope.get("groups")
+    return (None if groups is None else sorted(groups), scope.get("internet"), scope.get("nodes"))
+
 
 # name, description, default, grants
 BUILTIN_PROFILES: list[dict[str, Any]] = [
@@ -301,17 +333,29 @@ async def ensure_builtin(sessionmaker: async_sessionmaker[AsyncSession]) -> int:
         if await db.get(User, SYSTEM_ID) is None:  # the pseudo users are made by CoreService
             log.warning("ui: the system user is missing, built-in workspaces are not written")
             return 0
+        try:
+            templates = builtin_templates()
+        except (OSError, ValueError, agent_contract.ContractError) as exc:
+            # only the programs depend on the contracts; the profiles below are still written
+            log.error(
+                "ui: the contracts cannot be read (%s), built-in workspaces are not written", exc
+            )
+            templates = []
         for key in RETIRED_BUILTINS:
             retired = await db.get(UiTemplate, key)
             if retired is not None and retired.builtin:
                 await db.delete(retired)
                 written += 1
-        for spec in BUILTIN_TEMPLATES:
+        for spec in templates:
             row = await db.get(UiTemplate, spec["key"])
             if row is None:
                 db.add(UiTemplate(owner_id=SYSTEM_ID, builtin=True, **spec))
                 written += 1
-            elif row.builtin and row.rev < spec["rev"]:
+            elif row.builtin and (
+                row.rev < spec["rev"]
+                # a changed contract reaches a hub that already has the row, without a new revision
+                or (row.rev == spec["rev"] and _ceiling(row.agent) != _ceiling(spec["agent"]))
+            ):
                 for name, value in spec.items():
                     setattr(row, name, value)
                 written += 1

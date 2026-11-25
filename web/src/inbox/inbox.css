@@ -1,4 +1,4 @@
-/* The inbox, the board and the tag of an application (docs/PLATFORM.md, 3.7).
+/* The inbox and the tag of an application (docs/PLATFORM.md, 3.7).
    One colour per application, the same everywhere: the tag, a left rule on an item, the chip of a
    count. Square edges and a plain frame: a label, not a pill. */
 
@@ -37,8 +37,7 @@
   --app-color: var(--app-project);
 }
 
-.inbox,
-.board {
+.inbox {
   display: grid;
   align-content: start;
   gap: 0.6rem;
@@ -50,8 +49,24 @@
   align-items: center;
   gap: 0.35rem;
 }
-.inbox-list,
-.board-list {
+.inbox-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+.inbox-group {
+  display: grid;
+  gap: 0.25rem;
+}
+.inbox-group-title {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.inbox-list {
   display: grid;
   gap: 0.2rem;
   margin: 0;
@@ -106,29 +121,6 @@
 .inbox-summary {
   margin: 0;
   white-space: pre-wrap;
-}
-.board-card {
-  padding: 0.5rem 0.6rem;
-  border: 1px solid var(--border);
-  background: var(--surface);
-}
-.board-card h2 {
-  margin: 0 0 0.3rem;
-  font-size: 0.95rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.board-note {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.3rem 0.4rem;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--warn);
-}
-.board-note .actions {
-  margin-left: auto;
 }
 .linklike {
   padding: 0;
@@ -203,50 +195,4 @@
   white-space: pre-wrap;
   word-break: break-word;
   opacity: 0.85;
-}
-
-.item-marks {
-  display: grid;
-  gap: 0.3rem;
-}
-.marks-list {
-  display: grid;
-  gap: 0.25rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.mark {
-  padding: 0.2rem 0.45rem;
-  border: 1px solid var(--border);
-  font-size: 0.9rem;
-}
-.mark-postit {
-  background: color-mix(in srgb, #f2d24b 30%, var(--surface));
-  border-color: #c9a92c;
-}
-.mark-sticker {
-  display: inline-block;
-  justify-self: start;
-  border-radius: 999px;
-  border-color: var(--accent);
-}
-.mark-highlight .mark-text {
-  background: color-mix(in srgb, #f2d24b 55%, transparent);
-}
-.mark-done {
-  opacity: 0.55;
-  text-decoration: line-through;
-}
-.mark-kind {
-  font-weight: 600;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-}
-.marks-add {
-  display: flex;
-  gap: 0.3rem;
-}
-.marks-add input {
-  flex: 1;
 }
