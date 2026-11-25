@@ -51,7 +51,8 @@ git clone https://github.com/Lu-FReikasa/sloppy-topcoat.git
 cd sloppy-topcoat
 ```
 
-The repository is private, so its images are too. Create a GitHub **personal access token
+The repository is public, but its ghcr package can be private (a separate setting); then
+docker needs a login. Create a GitHub **personal access token
 (classic)** with only the scope `read:packages` (GitHub → Settings → Developer settings →
 Personal access tokens), then:
 
