@@ -38,8 +38,8 @@ jobs:
       run:
         working-directory: hub
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           version: ${{ env.UV_VERSION }}
           python-version: "3.12"
@@ -61,21 +61,21 @@ jobs:
       run:
         working-directory: node
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: node/go.mod
           cache-dependency-path: node/go.sum
       - run: go vet ./...
       - run: go test -race ./...
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8.0.0
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           working-directory: node
       - name: vet + lint for windows
         run: |
           GOOS=windows go vet ./...
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8.0.0
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           working-directory: node
@@ -85,7 +85,7 @@ jobs:
         env:
           CGO_ENABLED: "0"
         run: ../scripts/build-node-release.sh "ci-${GITHUB_SHA::7}" bin
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: topcoat-node
           path: node/bin/
@@ -100,8 +100,8 @@ jobs:
       run:
         working-directory: node
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: node/go.mod
           cache-dependency-path: node/go.sum
@@ -114,7 +114,7 @@ jobs:
     name: hub image (docker build + smoke test)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: docker build -f hub/Dockerfile -t topcoat-hub:ci .
       - name: smoke test (TLS auto, migrations, GUI)
         run: scripts/smoke-test-hub-image.sh topcoat-hub:ci
@@ -126,8 +126,8 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
           cache: npm
@@ -156,12 +156,12 @@ jobs:
     env:
       TOPCOAT_TEST_DATABASE_URL: postgresql+psycopg://topcoat:topcoat@localhost:5432/topcoat_test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: node/go.mod
           cache-dependency-path: node/go.sum
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           version: ${{ env.UV_VERSION }}
           python-version: "3.12"
@@ -176,21 +176,23 @@ jobs:
           TOPCOAT_NODE_BIN="$GITHUB_WORKSPACE/node/bin/topcoat-node" uv run pytest -m integration -v -s
 
   publish:
-    # Channel "test" (ARCHITECTURE D13): every green push to main publishes the hub image
-    # and the node binaries. Pull requests never publish.
+    # Channel "test" (ARCHITECTURE D123): every green push to main pushes the hub image to ghcr
+    # and keeps the node binaries as a workflow artifact with SHA256SUMS. Nothing is published
+    # as a release: the maintainer checks the hashes, signs in the browser (D80) and rolls out
+    # with scripts/dev/release.sh. The signing key never reaches the CI. Pull requests never publish.
     name: publish channel test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [hub, node, node-windows, web, e2e, image]
     runs-on: ubuntu-24.04
     permissions:
-      contents: write   # replace the "test" pre-release
+      contents: read
       packages: write   # push to ghcr.io
     concurrency:
       group: publish-test
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: node/go.mod
           cache-dependency-path: node/go.sum
@@ -211,12 +213,13 @@ jobs:
             -t "$image:test" -t "$image:sha-${GITHUB_SHA::7}" .
           docker push "$image:test"
           docker push "$image:sha-${GITHUB_SHA::7}"
-      - name: node binaries -> pre-release "test"
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release delete test --yes --cleanup-tag || true
-          gh release create test --prerelease --target "$GITHUB_SHA" \
-            --title "Channel test (${GITHUB_SHA::7})" \
-            --notes "Built from ${GITHUB_SHA} on main. Hub image: ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/sloppy-topcoat-hub:test. Check downloads with SHA256SUMS." \
-            node/dist/topcoat-node-linux-amd64 node/dist/topcoat-node-windows-amd64.exe node/dist/SHA256SUMS
+      - name: node binaries -> workflow artifact (unsigned, D123)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: topcoat-node-test-${{ github.sha }}
+          path: |
+            node/dist/topcoat-node-linux-amd64
+            node/dist/topcoat-node-windows-amd64.exe
+            node/dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30

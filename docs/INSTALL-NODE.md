@@ -40,7 +40,8 @@ The node only opens outbound connections to the hub, GitHub (llama.cpp) and Hugg
 
 ## Get the binary
 
-GitHub → the repository → **Releases** → pre-release **test**: `topcoat-node-windows-amd64.exe`,
+GitHub → the repository → **Actions** → the newest green CI run on `main` → **Artifacts** →
+`topcoat-node-test-<commit>` (ARCHITECTURE D123): `topcoat-node-windows-amd64.exe`,
 `topcoat-node-linux-amd64` and `SHA256SUMS` (check with `sha256sum -c SHA256SUMS
 --ignore-missing` or `Get-FileHash`, see [QUICKSTART.md](QUICKSTART.md) part (c)). Building from
 source: [DEVELOPMENT.md](DEVELOPMENT.md).

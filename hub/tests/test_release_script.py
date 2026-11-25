@@ -45,6 +45,27 @@ def test_a_dry_run_lists_every_step_in_order_and_changes_nothing() -> None:
     assert out.index("(transfer)") < out.index("(prod)")
 
 
+def test_a_registry_image_is_pulled_instead_of_built() -> None:
+    """D123: CI builds the image, the maintainer rolls it out; every other step stays."""
+    ref = "ghcr.io/example-owner/sloppy-topcoat-hub:sha-0123456"
+    r = run("--dry-run", "--image", ref, TOPCOAT_PROD_SSH="ops@prod.example.lan")
+    assert r.returncode == 0, r.stdout + r.stderr
+    names = re.findall(r"step \d+ \((\w+)\)", r.stdout)
+    assert names == ["tag", "check", "pull", "smoke", "wayback", "transfer", "prod"], r.stdout
+    assert f"(dry run) docker pull {ref}" in r.stdout
+    assert "docker build" not in r.stdout
+    assert f"smoke-test-hub-image.sh {ref}" in r.stdout
+    assert f"update-hub.sh --dry-run --load /tmp/topcoat-image.tar.gz {ref}" in r.stdout
+
+
+def test_a_name_without_a_registry_is_still_built_locally() -> None:
+    for ref in ("topcoat-hub:mine", "team/topcoat-hub:mine"):
+        r = run("--dry-run", "--image", ref, "--stop-after", "build")
+        assert r.returncode == 0 and "stopped after build" in r.stdout, r.stdout + r.stderr
+        assert f"docker build -f hub/Dockerfile -t {ref} ." in r.stdout
+        assert "docker pull" not in r.stdout
+
+
 def test_the_test_hub_is_gone() -> None:
     r = run("--dry-run", "--skip-test-hub", TOPCOAT_PROD_SSH="ops@prod.example.lan")
     assert r.returncode == 64 and "unknown option" in r.stderr

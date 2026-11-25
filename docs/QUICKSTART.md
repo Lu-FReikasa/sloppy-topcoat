@@ -29,7 +29,7 @@ the warning once, or install the CA (link in the **Knoten hinzufügen** dialog).
 ## (a) Hub on Ubuntu Server (release channel `test`)
 
 Nothing is built on your machine: the hub image comes from the GitHub container registry of
-the repository, built by CI from every green push to `main` (channel **test**, ARCHITECTURE D13).
+the repository, built by CI from every green push to `main` (channel **test**, ARCHITECTURE D123).
 To build the hub from source instead, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ### 1. Install Docker and git (once)
@@ -137,9 +137,11 @@ Use `https://…:8443`. The vite dev server on `:5173` is plain HTTP; commands b
 
 ### Get the binary
 
-GitHub → the repository → **Releases** → pre-release **test** (replaced by every green build of
-`main`). Download `topcoat-node-windows-amd64.exe` and/or `topcoat-node-linux-amd64` and
-`SHA256SUMS`, then check the download:
+GitHub → the repository → **Actions** → the newest green run of the CI workflow on `main` →
+**Artifacts** → `topcoat-node-test-<commit>` (needs a GitHub login; kept 30 days; ARCHITECTURE
+D123). Unpack it: it holds `topcoat-node-windows-amd64.exe`, `topcoat-node-linux-amd64` and
+`SHA256SUMS`. These builds are unsigned; signed releases reach nodes through the hub's update
+channel. Check the download:
 
 ```sh
 sha256sum -c SHA256SUMS --ignore-missing          # Linux: "...: OK"
