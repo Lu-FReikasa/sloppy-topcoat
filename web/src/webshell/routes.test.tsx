@@ -168,6 +168,19 @@ describe("an address loaded fresh in the navigation shell shows the page it name
     expect(document.querySelector(".ws-crumb > span")?.textContent).toBe("Sheets");
   });
 
+  it("goes back to the program shown before a link, and forward to the page it opened", async () => {
+    const got = await load("#/w/wiki");
+    window.location.hash = "#/sheets/s1";
+    await waitFor(() => expect(got.asked().some((u) => u.includes("s1"))).toBe(true));
+    await waitFor(() => expect(window.location.hash).toBe("#/w/sheets"));
+    window.history.back();
+    await waitFor(() => expect(window.location.hash).toBe("#/w/wiki"));
+    await waitFor(() => expect(document.querySelector(".ws-crumb > span")?.textContent).toBe("Wiki"));
+    window.history.forward();
+    await waitFor(() => expect(window.location.hash).toBe("#/w/sheets"));
+    await waitFor(() => expect(document.querySelector(".ws-crumb > span")?.textContent).toBe("Sheets"));
+  });
+
   it("tells where tasks come from on the bare tasks address", async () => {
     await load("#/tasks");
     expect(screen.getByRole("heading", { name: "No task open" })).toBeTruthy();
