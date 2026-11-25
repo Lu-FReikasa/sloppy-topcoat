@@ -20,6 +20,16 @@ Applies to every agent session (local or cloud) and to humans.
 The maintainer wants features built and tried fast. Rules that protect the security baseline and the
 privacy of the repo stay strict; everything else is a default you may bend when it saves time.
 
+**Contributors without the maintainer's machines.** If there is no `../sloppy-topcoat-docs/` folder and no
+`.dev/hosts.env`, you are working from a clone of the public repository. Then:
+- your task is a **GitHub issue**; it is the brief. Issue #1 ("Start here") explains the workflow. Read the decisions in
+  `docs/ARCHITECTURE.md` that the issue names; a decision whose file starts with a *Status* line that says replaced or
+  removed is history.
+- test on your own machine: `make check-fast` while working, `make check` before you push (the hub tests need
+  Postgres with pgvector and run on Linux or WSL, see "Tests and lint" in `docs/DEVELOPMENT.md`). The rules below
+  about `remote-ci.sh`, `live_suite.py`, the overlay deploy and hand-overs are for the maintainer's sessions; skip them.
+- open a pull request against `main` with `Closes #<issue>`; the maintainer reviews, merges and deploys.
+
 - **Read what you need, not everything.** Start with the newest hand-over in the private docs folder
   (`../sloppy-topcoat-docs/`, dated files, outside git) and the task brief there. `SPEC`/`ARCHITECTURE`/decisions only for the part you touch. If a brief conflicts with
   the architecture, say so in the PR description and pick the simpler side.
