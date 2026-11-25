@@ -22,9 +22,9 @@ async def pick(gateway: Gateway, chain: list[tuple[str, str]]) -> Pick | None:
     falls back to its normal route and its normal error).
 
     An entry whose node has a free place comes before one whose places are all taken (live
-    2026-11-18: two items of a checklist waited for the one slot of node-nvidia while node-amd, next in
-    the row with its own house model and two free slots, did nothing). When every node is full,
-    the first one that can take it at all is the answer, as before: its queue decides."""
+    2026-11-18: two items of a checklist waited for the one slot of node-nvidia while node-amd,
+    next in the row with its own house model and two free slots, did nothing). When every node is
+    full, the first one that can take it at all is the answer, as before: its queue decides."""
     first_state: str | None = None
     full: Pick | None = None  # the first entry that could take it, but only after a wait
     has_room = getattr(gateway, "_has_room", None)
