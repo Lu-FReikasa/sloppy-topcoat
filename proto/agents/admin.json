@@ -87,7 +87,7 @@
     "never_en": [
       "open a shell or run arbitrary commands",
       "change anything without your click",
-      "grant or widen an approval myself, or take a click of yours for granted"
+      "grant or widen an approval without you, or act ahead of your click"
     ],
     "needs_click_de": [
       "jede Aktion, die an einem Rechner etwas ändert (zum Beispiel ein Neustart)"

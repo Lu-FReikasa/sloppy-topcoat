@@ -68,6 +68,23 @@ def test_every_text_for_the_person_comes_in_both_languages() -> None:
             assert talk["for_en"], key
 
 
+# a pronoun of the speaker: the lists read after "I cannot …" in the chat and after "What it never
+# does" on the GUI's card, so their items must suit both
+_SPEAKER = {"en": re.compile(r"\b(?:I|me|my|myself|mine)\b"),
+            "de": re.compile(r"\b(?:ich|mich|mir|mein\w*)\b", re.IGNORECASE)}  # fmt: skip
+
+
+def test_the_lists_for_the_person_name_no_speaker() -> None:
+    for key, c in agent_contract.all_contracts().items():
+        raw = c.raw
+        for lang, speaker in _SPEAKER.items():
+            texts = [t[lang] for t in raw["tasks"]] + [t[f"say_{lang}"] for t in raw["tools"]]
+            texts += raw["limits"][f"never_{lang}"] + raw["limits"][f"needs_click_{lang}"]
+            texts += [t[f"for_{lang}"] for t in raw["talks_to"]]
+            for text in texts:
+                assert not speaker.search(text), (key, lang, text)
+
+
 def test_the_contract_speaks_the_language_it_is_asked_in() -> None:
     """English by default and for a language the contracts do not speak; German unchanged."""
     en = agent_contract.long("dev")
