@@ -13,6 +13,21 @@
     font-size: max(16px, 1em) !important;
   }
 
+  /* a field at 16 px is wider than before: it never pushes its row out of the window */
+  select,
+  input:not([type="checkbox"], [type="radio"]) {
+    max-width: 100%;
+  }
+
+  .row-actions {
+    flex-wrap: wrap;
+  }
+
+  /* a grid track sized by its content would grow with the widest select instead */
+  .settings-body > * {
+    min-width: 0;
+  }
+
   /* touch targets: buttons, fields, the summary line of a fold, tabs */
   button,
   select,
