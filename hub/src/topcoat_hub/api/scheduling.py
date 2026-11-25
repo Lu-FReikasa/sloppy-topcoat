@@ -20,9 +20,11 @@ from topcoat_hub.auth import CurrentUser, require_admin
 from topcoat_hub.chat_store import get_hub_setting, set_hub_setting
 from topcoat_hub.db import get_db
 from topcoat_hub.gateway import PRIORITY_IDLE, GatewayError, interactive_work, spawn
+from topcoat_hub.house_residents import keep_house_resident
 from topcoat_hub.model_facts import PROOF_KEY
 from topcoat_hub.model_probes import run_probes
 from topcoat_hub.models import ChatReview, Conversation, JobRecord, Node, NodeInventory
+from topcoat_hub.protocol import ProtocolError
 from topcoat_hub.node_policy import (
     MAX_PAUSE_HOURS,
     POLICY_KEY,
@@ -421,7 +423,38 @@ async def put_house(
         ", ".join(f"{n}={m}" for n, m in policy.house.items()) or "none",
     )
     await _store(request, db, policy)
+    await _sync_house_residents(request, db, current.house, policy.house)
     return await _pools_view(request)
+
+
+async def _sync_house_residents(
+    request: Request, db: AsyncSession, before: dict[str, str], after: dict[str, str]
+) -> None:
+    """Each changed house model becomes the node's auto-reloading resident; the one it replaced
+    stops being one (house_residents, plan step 1.6)."""
+    changed = {n for n in set(before) | set(after) if before.get(n) != after.get(n)}
+    if not changed:
+        return
+    rows = await db.execute(select(Node.name, Node.id).where(Node.name.in_(changed)))
+    ids = {name: node_id for name, node_id in rows.all()}
+    state = request.app.state
+    for name in sorted(changed):
+        node_id = ids.get(name)
+        if node_id is None:
+            continue
+        try:
+            await keep_house_resident(
+                state.nodes,
+                state.schemas,
+                node_id,
+                after.get(name),
+                before.get(name),
+                source="house",
+            )
+        except (LookupError, ProtocolError) as exc:
+            log.warning("node %s: house resident not updated: %s", name, exc)
+            continue
+        await state.nodes.publish_node(node_id)
 
 
 @router.put("/scheduling/max-loaded")

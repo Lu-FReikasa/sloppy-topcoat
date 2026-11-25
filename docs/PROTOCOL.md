@@ -377,6 +377,12 @@ the model through `POST /api/nodes/{id}/actions` and sets it again when the user
 pushes the new config right after the action result. Removing the entry ends "keep ready".
 Residents with `auto_reload` are exempt from the idle TTL.
 
+A node's **house model** (D117) is always one of its residents: the hub makes it an entry with
+`auto_reload: true` when the house models change (`PUT /api/scheduling/house`; the replaced house
+model's entry is removed) and again each time the node connects, before it sends the config
+(event `config_changed {source: "house" | "house_reconnect", model, previous}`). A manual unload of
+the house model therefore lasts until the next reconnect.
+
 `config.pressure` (absent = off; missing fields = defaults):
 
 | field | default | meaning |
