@@ -337,6 +337,17 @@ random port. There is no official Linux CUDA build: Linux NVIDIA uses Vulkan; th
 glibc 2.43 (Ubuntu 26.04). The inventory reports `images {release, backend, installed, models[],
 loaded[]}`. The actions `image.generate` / `image.edit` follow with milestone P6. Additive in v1.
 
+### Voice capabilities (D127)
+`config.tools.voice {enabled, backend?: auto|cpu}` adds two read-only capabilities (invoked like every
+capability, assigned per node): `voice.transcribe {audio_base64 (WAV, at most 2.5 MB), model?, language?:
+auto|<iso>}` → `{text, language}` and `voice.speak {text (at most 600 characters), voice?}` →
+`{audio_base64, format: "wav"}`. They run the pinned official builds of whisper.cpp (`b5454`; Linux CPU,
+Windows CPU or CUDA 12; no Vulkan build) and Piper (`2023.11.14-2`, the last standalone binary) as **one
+short process per request**: no server, no port; audio is written to a temporary directory and removed
+after the request. Models: `<data dir>/voice-models/stt/*.bin` (whisper ggml) and `tts/*.onnx` with
+their `*.onnx.json`. Piper voices must come from a `rhasspy/piper-voices` revision written for that
+binary (before 2026-11-17, e.g. `a60bfb135881`): newer voice configs use phonemes it cannot read.
+
 **Tool mode of the agent (hub).** How the agent talks to a model is set per model — hub setting
 `agent_tool_modes`, `GET/PUT /api/agent/settings` (PUT admin) — to `native` (one function per
 capability plus `finish`, `tool_choice: required`, results as `tool` messages), `json` (the
@@ -1134,6 +1145,7 @@ Additive changes in v1 (no version bump):
   `insufficient_disk`, event `benchmark_error`, `benchmark_finished.failed_runs`.
 - E3-01c: `config.runner.jinja`, `config.runner.model_jinja`; hub `GET/PUT /api/agent/settings`.
 - D126 (#44): `config.images`, inventory `images`.
+- D127 (#53): `config.tools.voice`, capabilities `voice.transcribe`, `voice.speak`.
 - E3-05 (hub only): memory notes `kind`, `stage`, `expires_at`, `verify_with`, usage and feedback
   counters, status `archived`; `POST /api/memory/{id}/feedback`, `/archive`, `/api/memory/care`;
   runs of kind `care`; agent task origin `care`.

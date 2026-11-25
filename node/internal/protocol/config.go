@@ -427,6 +427,8 @@ type ToolsConfig struct {
 	// Workshop configures the repo.* capabilities of a dev node (E6-01 S1, D52); nil = they are
 	// not offered.
 	Workshop *WorkshopConfig `json:"workshop,omitempty"`
+	// Voice offers voice.transcribe (whisper.cpp) and voice.speak (Piper), D127; nil = off.
+	Voice *VoiceConfig `json:"voice,omitempty"`
 }
 
 // WorkshopConfig is config.tools.workshop: where the clones live, which hosts may be cloned from
@@ -518,6 +520,16 @@ func sameNetTargets(a, b []NetTarget) bool {
 	return true
 }
 
+// VoiceConfig is config.tools.voice (D127): the speech capabilities of a node.
+type VoiceConfig struct {
+	Enabled bool `json:"enabled"`
+	// Backend of whisper.cpp: auto (default: CUDA on Windows with an NVIDIA GPU, else the CPU) or cpu.
+	Backend string `json:"backend,omitempty"`
+}
+
+// On reports whether the voice capabilities are switched on.
+func (c *VoiceConfig) On() bool { return c != nil && c.Enabled }
+
 // ImagesConfig is config.images (D126): the image runner of a node.
 type ImagesConfig struct {
 	// Enabled starts the image runner (nothing is downloaded or started before a model loads).
@@ -558,7 +570,7 @@ func (t *ToolsConfig) Equal(o *ToolsConfig) bool {
 		!sameStrings(a.ComposeRoots, b.ComposeRoots) || !sameStrings(a.DocsRoots, b.DocsRoots) ||
 		!sameStrings(a.DocsExclude, b.DocsExclude) || !sameStrings(a.ReadRoots, b.ReadRoots) || !sameStrings(a.DNSNames, b.DNSNames) ||
 		!sameStrings(a.CertTargets, b.CertTargets) || !sameNetTargets(a.NetTargets, b.NetTargets) ||
-		!reflect.DeepEqual(a.Workshop, b.Workshop) {
+		!reflect.DeepEqual(a.Workshop, b.Workshop) || !reflect.DeepEqual(a.Voice, b.Voice) {
 		return false
 	}
 	at, bt := DefaultToolTimeoutSeconds, DefaultToolTimeoutSeconds
@@ -883,6 +895,13 @@ func ParseNodeConfig(raw []byte) (NodeConfig, error) {
 
 // Validate checks the fields the node relies on.
 func (c *NodeConfig) Validate() error {
+	if c.Tools != nil && c.Tools.Voice != nil {
+		switch c.Tools.Voice.Backend {
+		case "", BackendAuto, BackendCPU:
+		default:
+			return fmt.Errorf("config: tools.voice.backend must be auto or cpu")
+		}
+	}
 	if c.Images != nil {
 		switch c.Images.Backend {
 		case "", BackendAuto, BackendCUDA, BackendVulkan, BackendCPU:

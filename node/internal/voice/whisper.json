@@ -1,0 +1,14 @@
+{
+  "comment": "Pinned official whisper.cpp builds (https://github.com/ggml-org/whisper.cpp/releases), D127. SHA-256 = GitHub's asset digests. b5454 = the binaries of v1.9.5. There is no Linux GPU build and no Vulkan build: Linux runs on the CPU, Windows on the CPU or CUDA 12.",
+  "default": "b5454",
+  "base_url": "https://github.com/ggml-org/whisper.cpp/releases/download",
+  "releases": {
+    "b5454": {
+      "builds": [
+        {"os": "linux", "backend": "cpu", "assets": [{"name": "whisper-bin-ubuntu-x64.tar.gz", "sha256": "a72becf15d7917f990f6313867a52638b82b7f9ef237fb0c980dac56a135781c"}]},
+        {"os": "windows", "backend": "cpu", "assets": [{"name": "whisper-bin-x64.zip", "sha256": "6ba69e3482d7826214f90a6a9c84ca07782aec1e1d0c6a7c30c994fd5d816ccb"}]},
+        {"os": "windows", "backend": "cuda", "assets": [{"name": "whisper-bin-win-cuda-12.4.0-x64.zip", "sha256": "afef0b881c500958921c3f5523b50e59ee2ec9b6f5cbd25b324c51ed308a957a"}]}
+      ]
+    }
+  }
+}
