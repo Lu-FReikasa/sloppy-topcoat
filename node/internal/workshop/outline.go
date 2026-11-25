@@ -30,6 +30,12 @@ const (
 	outlineSymbols    = 40       // symbols per file by default
 	outlineMaxSymbols = 200
 	outlineName       = 120 // characters of one name (a long selector list, a long heading)
+	// outlineNameBytes bounds a nested name while it is built (a.b.c…), so deep nesting cannot
+	// grow the names quadratically; the answer cuts them to outlineName after masking.
+	outlineNameBytes = 1024
+	// outlineScan: the search for the ends in one file reads its bytes at most this many times in all
+	// (once per declaration around a line: Topcoat's own deepest JSON schemas need 5); see scanBudget.
+	outlineScan = 32
 )
 
 // outlineKinds are the file kinds repo.outline knows, by the short names of code_symbols.py.
@@ -76,6 +82,43 @@ func splitLines(text string) []string {
 }
 
 func indentOf(line string) int { return len(line) - len(strings.TrimLeft(line, " \t")) }
+
+// scanBudget bounds the search for the ends in one file. Each declaration looks for its end from its
+// own line (braces, or indentation for Python and JSON), so a file whose declarations never close
+// (`f(` on every line) would make every one of them scan to the end of the file: quadratic work that
+// a hostile file could use to keep the node busy for minutes per call. Past the budget a declaration
+// ends at the line where its scan stopped.
+type scanBudget struct{ left int }
+
+func newScanBudget(lines []string) *scanBudget {
+	n := 0
+	for _, l := range lines {
+		n += len(l) + 1
+	}
+	return &scanBudget{left: outlineScan*n + 64<<10}
+}
+
+// take spends n units and says whether there were any left.
+func (b *scanBudget) take(n int) bool {
+	b.left -= n
+	return b.left >= 0
+}
+
+// joinName is parent.name, cut at outlineNameBytes (on a rune boundary).
+func joinName(parent, name string) string {
+	s := name
+	if parent != "" {
+		s = parent + "." + name
+	}
+	if len(s) <= outlineNameBytes {
+		return s
+	}
+	cut := outlineNameBytes
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "…"
+}
 
 // symbolsOf returns the named places of a file in the order they stand; 0-based start, exclusive
 // end internally, converted to 1-based inclusive lines at the end.
@@ -145,9 +188,13 @@ func pyInString(lines []string) []bool {
 // pyEnd is one past the last line of the statement at i with indentation indent: the next code
 // line at that indentation or less (comments, blank lines, string lines and closing brackets of
 // a long signature do not end it), trailing blank and comment lines left out.
-func pyEnd(lines []string, inStr []bool, i, indent int) int {
+func pyEnd(lines []string, inStr []bool, i, indent int, b *scanBudget) int {
 	end := len(lines)
 	for j := i + 1; j < len(lines); j++ {
+		if !b.take(len(lines[j]) + 1) {
+			end = j
+			break
+		}
 		s := strings.TrimSpace(lines[j])
 		if inStr[j] || s == "" || strings.HasPrefix(s, "#") || strings.ContainsAny(s[:1], ")]}") {
 			continue
@@ -165,9 +212,10 @@ func pyEnd(lines []string, inStr []bool, i, indent int) int {
 
 func pySymbols(lines []string) []outlineSymbol {
 	inStr := pyInString(lines)
+	b := newScanBudget(lines)
 	type open struct {
 		indent int
-		name   string
+		name   string // the full name (Outer.inner)
 		class  bool
 	}
 	var out []outlineSymbol
@@ -183,11 +231,11 @@ func pySymbols(lines []string) []outlineSymbol {
 			stack = stack[:len(stack)-1]
 		}
 		if m := pyDef.FindStringSubmatch(line); m != nil {
-			names := make([]string, 0, len(stack)+1)
-			for _, o := range stack {
-				names = append(names, o.name)
+			parent := ""
+			if len(stack) > 0 {
+				parent = stack[len(stack)-1].name
 			}
-			names = append(names, m[3])
+			full := joinName(parent, m[3])
 			kind := "function"
 			if m[2] == "class" {
 				kind = "class"
@@ -198,13 +246,13 @@ func pySymbols(lines []string) []outlineSymbol {
 			for start > 0 && strings.HasPrefix(strings.TrimSpace(lines[start-1]), "@") && indentOf(lines[start-1]) == indent {
 				start--
 			}
-			out = append(out, outlineSymbol{strings.Join(names, "."), kind, start, pyEnd(lines, inStr, i, indent), len(stack)})
-			stack = append(stack, open{indent, m[3], m[2] == "class"})
+			out = append(out, outlineSymbol{full, kind, start, pyEnd(lines, inStr, i, indent, b), len(stack)})
+			stack = append(stack, open{indent, full, m[2] == "class"})
 			continue
 		}
 		if indent == 0 {
 			if m := pyAssign.FindStringSubmatch(line); m != nil {
-				out = append(out, outlineSymbol{m[1], "const", i, pyEnd(lines, inStr, i, 0), 0})
+				out = append(out, outlineSymbol{m[1], "const", i, pyEnd(lines, inStr, i, 0, b), 0})
 			}
 		}
 	}
@@ -226,12 +274,15 @@ var (
 
 // braceEnd is one past the last line of the declaration at start: its braces closed, or, for one
 // without a block (`const x = 1;`, `type A = B`), its statement ended.
-func braceEnd(lines []string, start int) int {
+func braceEnd(lines []string, start int, b *scanBudget) int {
 	depth := 0
 	opened := false
 	quote := byte(0) // a template or raw string (`) goes on over lines; other quotes end with theirs
 	for i := start; i < len(lines); i++ {
 		line := lines[i]
+		if !b.take(len(line) + 1) {
+			return i + 1
+		}
 	scan:
 		for j := 0; j < len(line); j++ {
 			c := line[j]
@@ -304,18 +355,19 @@ func tsSymbols(lines []string) []outlineSymbol {
 	var out []outlineSymbol
 	var owners []owner
 	named := map[string]bool{}
+	b := newScanBudget(lines)
 	for i, line := range lines {
 		m := tsDecl.FindStringSubmatch(line)
 		if m == nil {
 			continue
 		}
 		indent, word, name := len(m[1]), m[2], m[3]
-		end := braceEnd(lines, i)
+		end := braceEnd(lines, i, b)
 		full, depth := name, 0
 		if indent > 0 {
-			for k := len(owners) - 1; k >= 0; k-- {
+			for k := len(owners) - 1; k >= 0 && b.take(1); k-- {
 				if o := owners[k]; o.start < i && i < o.end {
-					full, depth = o.name+"."+name, o.depth+1
+					full, depth = joinName(o.name, name), o.depth+1
 					break
 				}
 			}
@@ -352,7 +404,7 @@ func tsSymbols(lines []string) []outlineSymbol {
 			continue
 		}
 		body := -1
-		for i := o.start + 1; i < o.end; i++ {
+		for i := o.start + 1; i < o.end && b.take(len(lines[i])+1); i++ {
 			s := strings.TrimSpace(lines[i])
 			if s == "" || strings.HasPrefix(s, "//") || strings.HasPrefix(s, "*") || strings.HasPrefix(s, "/*") || strings.HasPrefix(s, "@") {
 				continue
@@ -367,10 +419,10 @@ func tsSymbols(lines []string) []outlineSymbol {
 			if t := strings.TrimRight(lines[i], " \t"); !strings.HasSuffix(t, "{") && !strings.HasSuffix(t, "(") {
 				continue
 			}
-			name := o.name + "." + m[2]
+			name := joinName(o.name, m[2])
 			if !named[name] {
 				named[name] = true
-				out = append(out, outlineSymbol{name, "method", docStart(lines, i, false), braceEnd(lines, i), o.depth + 1})
+				out = append(out, outlineSymbol{name, "method", docStart(lines, i, false), braceEnd(lines, i, b), o.depth + 1})
 			}
 		}
 	}
@@ -390,19 +442,20 @@ var (
 
 func goSymbols(lines []string) []outlineSymbol {
 	var out []outlineSymbol
+	b := newScanBudget(lines)
 	for i, line := range lines {
 		if m := goFunc.FindStringSubmatch(line); m != nil {
 			if m[1] != "" {
-				out = append(out, outlineSymbol{m[1] + "." + m[2], "method", docStart(lines, i, true), braceEnd(lines, i), 1})
+				out = append(out, outlineSymbol{m[1] + "." + m[2], "method", docStart(lines, i, true), braceEnd(lines, i, b), 1})
 			} else {
-				out = append(out, outlineSymbol{m[2], "function", docStart(lines, i, true), braceEnd(lines, i), 0})
+				out = append(out, outlineSymbol{m[2], "function", docStart(lines, i, true), braceEnd(lines, i, b), 0})
 			}
 		} else if m := goType.FindStringSubmatch(line); m != nil {
 			kind := "type"
 			if m[2] != "" {
 				kind = "interface"
 			}
-			out = append(out, outlineSymbol{m[1], kind, docStart(lines, i, true), braceEnd(lines, i), 0})
+			out = append(out, outlineSymbol{m[1], kind, docStart(lines, i, true), braceEnd(lines, i, b), 0})
 		}
 	}
 	return out
@@ -416,10 +469,11 @@ var jsonKey = regexp.MustCompile(`^(\s*)"((?:[^"\\]|\\.)*)"\s*:`)
 func jsonSymbols(lines []string) []outlineSymbol {
 	type open struct {
 		indent int
-		key    string
+		key    string // the full key path (a.b.c)
 	}
 	var out []outlineSymbol
 	var stack []open
+	b := newScanBudget(lines)
 	for i, line := range lines {
 		m := jsonKey.FindStringSubmatch(line)
 		if m == nil {
@@ -429,24 +483,28 @@ func jsonSymbols(lines []string) []outlineSymbol {
 		for len(stack) > 0 && stack[len(stack)-1].indent >= indent {
 			stack = stack[:len(stack)-1]
 		}
-		keys := make([]string, 0, len(stack)+1)
-		for _, o := range stack {
-			keys = append(keys, o.key)
+		parent := ""
+		if len(stack) > 0 {
+			parent = stack[len(stack)-1].key
 		}
-		keys = append(keys, m[2])
+		full := joinName(parent, m[2])
 		end := i + 1
 		depth := len(stack)
 		if t := strings.TrimRight(line, " \t"); strings.HasSuffix(t, "{") || strings.HasSuffix(t, "[") {
 			end = len(lines)
 			for j := i + 1; j < len(lines); j++ {
+				if !b.take(len(lines[j]) + 1) {
+					end = j
+					break
+				}
 				if strings.TrimSpace(lines[j]) != "" && indentOf(lines[j]) <= indent {
 					end = j + 1
 					break
 				}
 			}
-			stack = append(stack, open{indent, m[2]})
+			stack = append(stack, open{indent, full})
 		}
-		out = append(out, outlineSymbol{strings.Join(keys, "."), "key", i, end, depth})
+		out = append(out, outlineSymbol{full, "key", i, end, depth})
 	}
 	return out
 }
@@ -495,9 +553,10 @@ var cssRule = regexp.MustCompile(`^([^\s{}/][^{}]*?)\s*\{`)
 
 func cssSymbols(lines []string) []outlineSymbol {
 	var out []outlineSymbol
+	b := newScanBudget(lines)
 	for i, line := range lines {
 		if m := cssRule.FindStringSubmatch(line); m != nil {
-			out = append(out, outlineSymbol{strings.Join(strings.Fields(m[1]), " "), "rule", i, braceEnd(lines, i), 0})
+			out = append(out, outlineSymbol{strings.Join(strings.Fields(m[1]), " "), "rule", i, braceEnd(lines, i, b), 0})
 		}
 	}
 	return out
@@ -622,6 +681,10 @@ func (w *Workshop) capOutline() capability.Capability {
 			var page []outlineFile
 			size, masked := 0, 0
 			for _, f := range files {
+				// a call that timed out stops here instead of reading on (each file is bounded)
+				if err := ctx.Err(); err != nil {
+					return nil, err
+				}
 				if len(page) == limit {
 					res["next_after"] = page[len(page)-1].Path
 					break
@@ -631,6 +694,13 @@ func (w *Workshop) capOutline() capability.Capability {
 					continue
 				}
 				b, _ := json.Marshal(entry)
+				// one file alone stays inside a page too: escaped names (<, &, non-Latin text) can
+				// make 200 of them larger than the whole answer may be
+				for len(b) > outlineBytes && len(entry.Symbols) > 0 {
+					kept, left := keepSymbols(entry.Symbols, len(entry.Symbols)/2) // the outer ones stay
+					entry.Symbols, entry.Left = kept, entry.Left+left
+					b, _ = json.Marshal(entry)
+				}
 				if size+len(b) > outlineBytes && len(page) > 0 {
 					res["next_after"] = page[len(page)-1].Path
 					break

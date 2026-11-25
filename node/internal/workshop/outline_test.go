@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 // names returns "name kind start-end" per symbol, the way the tests compare them.
@@ -183,6 +184,47 @@ func TestOutlineKeepsOuterNamesFirst(t *testing.T) {
 	}
 }
 
+// A hostile file (declarations that never close, deep nesting) must cost about as much as a normal
+// one: before the scan budget every declaration counted braces to the end of the file, minutes of
+// CPU for one 1 MB file, and nested names grew to gigabytes.
+func TestOutlineHostileFilesStayCheap(t *testing.T) {
+	const mb = maxFileBytes
+	for name, line := range map[string]string{
+		"open.ts":   "const a = (\n",
+		"nest.ts":   " class A {\n",
+		"open.go":   "func a(\n",
+		"open.css":  "a{\n",
+		"nest.py":   "", // built below: each def one level deeper
+		"nest.json": "",
+	} {
+		text := strings.Repeat(line, mb/max(len(line), 1))
+		switch name {
+		case "nest.py":
+			var b strings.Builder
+			for i := 0; b.Len() < mb; i++ {
+				fmt.Fprintf(&b, "%sdef %s():\n", strings.Repeat(" ", i), strings.Repeat("n", 200))
+			}
+			text = b.String()
+		case "nest.json":
+			var b strings.Builder
+			for i := 0; b.Len() < mb; i++ {
+				fmt.Fprintf(&b, "%s\"%s\": {\n", strings.Repeat(" ", i), strings.Repeat("k", 200))
+			}
+			text = b.String()
+		}
+		start := time.Now()
+		syms := symbolsOf(name, text)
+		if took := time.Since(start); took > 15*time.Second {
+			t.Errorf("%s: %d names took %v", name, len(syms), took)
+		}
+		for _, s := range syms {
+			if len(s.Name) > outlineNameBytes+len("…") || s.Start < 1 || s.End < s.Start {
+				t.Fatalf("%s: %d bytes of name, lines %d-%d", name, len(s.Name), s.Start, s.End)
+			}
+		}
+	}
+}
+
 func TestRepoOutline(t *testing.T) {
 	f := newFixture(t, nil)
 	f.must(t, "repo.sync", repoIn{"repo": "demo"})
@@ -228,6 +270,22 @@ func TestRepoOutline(t *testing.T) {
 	remarshal(t, f.must(t, "repo.outline", repoIn{"repo": "demo", "path": "web/src/big.json", "max_symbols": 3}), &got)
 	if len(got.Files) != 1 || len(got.Files[0].Symbols) != 3 || got.Files[0].Left != 8 {
 		t.Fatalf("cut file: %+v", got.Files)
+	}
+
+	// one file whose names escape to more than a page (`<` is six bytes in JSON) is cut to fit it,
+	// the outer names kept
+	var css strings.Builder
+	for i := range 200 {
+		fmt.Fprintf(&css, ".r%d %s { }\n", i, strings.Repeat("<", 110))
+	}
+	write(t, dir, "web/src/wide.css", css.String())
+	raw := f.must(t, "repo.outline", repoIn{"repo": "demo", "path": "web/src/wide.css", "max_symbols": 200})
+	if b, _ := json.Marshal(raw); len(b) > outlineBytes+1024 {
+		t.Fatalf("one file's answer is %d bytes", len(b))
+	}
+	remarshal(t, raw, &got)
+	if wide := got.Files[0]; len(wide.Symbols) == 0 || wide.Left == 0 || len(wide.Symbols)+wide.Left != 200 {
+		t.Fatalf("wide.css: %d names, %d left", len(wide.Symbols), wide.Left)
 	}
 
 	_, err := f.call(t, "repo.outline", repoIn{"repo": "demo", "path": "../up"})
