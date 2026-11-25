@@ -409,9 +409,7 @@ async def put_house(
         if order is None:
             order = [n for n in current.house if n in body.house]
             order += [n for n in body.house if n not in order]
-        parsed = parse_policy(
-            {"house": body.house, "house_order": order, "workers": body.workers}
-        )
+        parsed = parse_policy({"house": body.house, "house_order": order, "workers": body.workers})
         policy = replace(current, house=parsed.house, workers=parsed.workers)
         check_nodes(policy, await _known_nodes(db))
     except PolicyError as exc:

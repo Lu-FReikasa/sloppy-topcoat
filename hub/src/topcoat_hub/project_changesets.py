@@ -558,8 +558,8 @@ _ITEM = re.compile(r"^\s*- \[[ xX]\]\s*(.+?)\s*$", re.MULTILINE)
 def check_machine_points(operations: list[dict[str, Any]], machines: Iterable[str]) -> None:
     """A checklist point that names one of the person's machines is a question for Verwaltung:
     only it sees the machines and their models. Live 2026-11-18: three plans in a row put "Welche
-    Modelle auf node-amd und node-nvidia …" into a task for dev or research, which can never answer it,
-    although the catalogue's rule says so (issue 2.4). Refused with the way out named."""
+    Modelle auf node-amd und node-nvidia …" into a task for dev or research, which can never
+    answer it, although the catalogue's rule says so (issue 2.4). Refused with the way out named."""
     names = [m for m in machines if len(m) >= 3]
     if not names:
         return

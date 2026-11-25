@@ -763,6 +763,9 @@ export interface ChatSettings {
 export interface ActionError {
   code: string;
   message: string;
+  /** HTTP status when the hub refused the call itself (0: hub unreachable); absent when the
+   * node answered. Both can carry the same code, e.g. `busy`. */
+  status?: number;
 }
 
 export interface ActionResult {
