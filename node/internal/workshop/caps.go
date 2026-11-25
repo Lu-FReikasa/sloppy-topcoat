@@ -732,6 +732,9 @@ func (w *Workshop) capApplyPatch() capability.Capability {
 					}
 				}
 			}
+			if err := w.checkPatchSummary(ctx, dir, patch); err != nil {
+				return nil, err
+			}
 			if _, err := w.git(ctx, dir, nil, patch, "apply", "--check", "--whitespace=nowarn", "-"); err != nil {
 				return nil, inputErr("the patch does not apply: %v", err)
 			}
@@ -741,6 +744,93 @@ func (w *Workshop) capApplyPatch() capability.Capability {
 			return map[string]any{"repo": in.Repo, "applied": true}, nil
 		},
 	}
+}
+
+// checkPatchSummary checks what git apply --numstat does not show: it names only the new file of
+// a rename or copy, so the source would pass unchecked (a rename would make a secret readable or
+// move a pipeline file away), and it says nothing about file modes (a patch could create a
+// symbolic link or a submodule, which repo.commit would then commit). The summary of git apply
+// tells what kinds of change the patch makes; anything it lists that is not understood here is
+// refused.
+func (w *Workshop) checkPatchSummary(ctx context.Context, dir, patch string) error {
+	summary, err := w.git(ctx, dir, nil, patch, "apply", "--summary", "-")
+	if err != nil {
+		return inputErr("the patch does not parse: %v", err)
+	}
+	moves := 0
+	for _, line := range strings.Split(summary, "\n") {
+		f := strings.Fields(line)
+		if len(f) == 0 {
+			continue
+		}
+		mode := ""
+		switch {
+		case (f[0] == "create" || f[0] == "delete") && len(f) >= 3 && f[1] == "mode":
+			if f[0] == "create" {
+				mode = f[2] // create mode 120000 path
+			}
+		case f[0] == "mode" && len(f) >= 5 && f[1] == "change":
+			mode = f[4] // mode change 100644 => 120000 [path]
+		case f[0] == "rename" || f[0] == "copy":
+			moves++
+		case f[0] == "rewrite":
+		default:
+			return inputErr("the patch makes a change the workshop cannot check: %s", strings.TrimSpace(line))
+		}
+		switch mode {
+		case "120000":
+			return inputErr("the patch makes a symbolic link: the workshop does not create links")
+		case "160000":
+			return inputErr("the patch adds a submodule: the workshop does not add submodules")
+		}
+	}
+	sources, err := patchSources(patch)
+	if err != nil {
+		return err
+	}
+	if len(sources) != moves {
+		return inputErr("the patch's renames and copies cannot be checked: write them as a deletion and a new file")
+	}
+	for _, s := range sources {
+		// the source of a rename disappears, so it counts as written; a copy only reads it
+		if _, _, err := w.confineTracked(ctx, dir, s.path, s.rename); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type patchSource struct {
+	path   string
+	rename bool
+}
+
+// patchSources reads the source paths of the renames and copies from the extended headers of a
+// git patch ("rename from", the older "rename old", and "copy from"). git quotes a path with
+// unusual characters C-style; such a path is unquoted, and one that does not unquote is refused.
+func patchSources(patch string) ([]patchSource, error) {
+	var out []patchSource
+	for _, line := range strings.Split(patch, "\n") {
+		line = strings.TrimRight(line, "\r")
+		for _, h := range []struct {
+			prefix string
+			rename bool
+		}{{"rename from ", true}, {"rename old ", true}, {"copy from ", false}} {
+			rest, ok := strings.CutPrefix(line, h.prefix)
+			if !ok {
+				continue
+			}
+			if strings.HasPrefix(rest, `"`) {
+				unq, err := strconv.Unquote(rest)
+				if err != nil {
+					return nil, inputErr("the patch names a path that cannot be read: %s", rest)
+				}
+				rest = unq
+			}
+			out = append(out, patchSource{path: rest, rename: h.rename})
+		}
+	}
+	return out, nil
 }
 
 // cutNumstat reads "added<TAB>deleted<TAB>path" from git apply --numstat -z.
