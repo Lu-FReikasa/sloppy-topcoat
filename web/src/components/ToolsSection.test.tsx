@@ -27,6 +27,13 @@ const caps: NodeCapabilities = {
       read_only: false,
       input_schema: { required: ["container"], properties: { container: { type: "string" } } },
     },
+    {
+      // a capability this GUI has no text for (a newer node): its own description is shown
+      name: "acme.widgets",
+      description: "Widgets of the ACME controller",
+      read_only: true,
+      input_schema: {},
+    },
   ],
   enabled: ["docker.ps", "docker.logs", "docker.restart"],
   usable: ["docker.ps", "docker.logs"],
@@ -67,7 +74,10 @@ describe("ToolsSection", () => {
   it("lists the capabilities with their state for the user", async () => {
     setup();
     const table = await screen.findByRole("table");
-    expect(within(table).getByText("Containers of this host")).toBeTruthy();
+    // known capabilities in the GUI's language (issue #11), an unknown one as the node sent it
+    expect(within(table).getByText(/^Container dieses Docker-Hosts/)).toBeTruthy();
+    expect(within(table).queryByText("Containers of this host")).toBeNull();
+    expect(within(table).getByText("Widgets of the ACME controller")).toBeTruthy();
     const rows = within(table).getAllByRole("row");
     const restart = rows.find((r) => r.textContent?.includes("docker.restart"));
     expect(restart?.textContent).toContain("nur nach Bestätigung");
