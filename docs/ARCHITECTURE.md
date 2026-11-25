@@ -100,8 +100,7 @@ what replaces or amends it; the text below the status is kept as it was decided.
 | Shelved | decided not to pursue for now; kept for later |
 | Under review / Open question | conflicts with the current state or goal; the maintainer decides |
 
-D109 and D110 are reserved for the open decisions of the plan of 2026-11-24 (decomposition of large tasks,
-workshop scope). D115 and D116 restore two decisions of 2026-11-04 whose
+D115 and D116 restore two decisions of 2026-11-04 whose
 numbers were reused by mistake on 2026-11-17.
 
 ### Foundations and security
@@ -301,6 +300,8 @@ How code changes are made, confirmed, tested and rolled out, and how releases ar
 | [D108](decisions/D108.md) | An issue's investigation may try a guess, under the person's probe mandate | Current |
 | [D119](decisions/D119.md) | A model's answer has a form the server enforces, and a plan names symbols, not lines | Current |
 | [D120](decisions/D120.md) | The same failure twice stops the automatic drafts | Current |
+| [D109](decisions/D109.md) | A large task is a task node in Projects; its sub-tasks form a DAG the hub coordinates | Decided, not built |
+| [D110](decisions/D110.md) | A workshop scope per large task replaces the click per fix on its branch | Decided, not built |
 | [D104](decisions/D104.md) | A tested fix reaches the hub through a spool on the hub host, not through the hub | Amended |
 | [D98](decisions/D98.md) | Development may go live through an overlay; a release is an image | Current |
 | [D123](decisions/D123.md) | The CI builds; the maintainer signs and rolls out | Decided, not built |
