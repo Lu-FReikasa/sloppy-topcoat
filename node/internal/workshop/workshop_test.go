@@ -246,6 +246,79 @@ func TestReadListAndSearchHideSecrets(t *testing.T) {
 	}
 }
 
+// Git on Windows usually checks a tracked symbolic link out as a plain file that holds the target.
+// The workshop must refuse that file like a link: writing it would change the link in the next
+// commit. The test makes such a checkout on any system with core.symlinks=false.
+func TestALinkCheckedOutAsAPlainFileIsStillALink(t *testing.T) {
+	f := newFixture(t, nil)
+	if !linkMade {
+		t.Skip("the fixture has no symbolic link (no privilege for links on this system)")
+	}
+	f.must(t, "repo.sync", repoIn{"repo": "demo"})
+	clone := filepath.Join(f.w.dir, "demo")
+	run(t, clone, "config", "core.symlinks", "false")
+	if err := os.Remove(filepath.Join(clone, "link")); err != nil {
+		t.Fatal(err)
+	}
+	run(t, clone, "checkout", "--", "link")
+	if st, err := os.Lstat(filepath.Join(clone, "link")); err != nil || !st.Mode().IsRegular() {
+		t.Fatalf("the link was not checked out as a plain file: %v %v", st, err)
+	}
+
+	_, err := f.call(t, "repo.read", repoIn{"repo": "demo", "path": "link"})
+	refused(t, err, "symbolic link")
+	_, err = f.call(t, "repo.write", repoIn{"repo": "demo", "path": "link", "content": "/etc/shadow"})
+	refused(t, err, "symbolic link")
+	_, err = f.call(t, "repo.edit", repoIn{"repo": "demo", "path": "link", "old": "hostname", "new": "shadow"})
+	refused(t, err, "symbolic link")
+	_, err = f.call(t, "repo.write", repoIn{"repo": "demo", "path": "link/inside.txt", "content": "x"})
+	refused(t, err, "symbolic link")
+	patch := "diff --git a/link b/link\n--- a/link\n+++ b/link\n@@ -1 +1 @@\n-/etc/hostname\n\\ No newline at end of file\n+/etc/shadow\n\\ No newline at end of file\n"
+	_, err = f.call(t, "repo.apply_patch", repoIn{"repo": "demo", "patch": patch})
+	refused(t, err, "symbolic link")
+	if runtime.GOOS == "windows" {
+		// Windows opens the same file under another case or with a trailing dot; the index only
+		// knows "link", so these spellings must be refused before the lookup
+		for _, alias := range []string{"LINK", "link.", "Link/inside.txt"} {
+			_, err = f.call(t, "repo.write", repoIn{"repo": "demo", "path": alias, "content": "/etc/shadow"})
+			refused(t, err, "exact path")
+		}
+	}
+	if b, _ := os.ReadFile(filepath.Join(clone, "link")); string(b) != "/etc/hostname" {
+		t.Fatalf("the link changed: %q", b)
+	}
+
+	dst := filepath.Join(t.TempDir(), "copy")
+	if err := f.w.copyWorktree(f.ctx, clone, dst); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(dst, "link")); err == nil {
+		t.Fatal("the link was copied")
+	}
+	if _, err := os.Stat(filepath.Join(dst, "README.md")); err != nil {
+		t.Fatal("the copy is missing a plain file")
+	}
+}
+
+// A path through a directory link is refused even when the link stays inside the repository:
+// confine accepts only the file's exact path.
+func TestConfineRefusesALinkOnTheWay(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("sub", filepath.Join(dir, "alias")); err != nil {
+		t.Skip("no privilege for links on this system")
+	}
+	for _, p := range []string{"alias/new.txt", "alias/deeper/new.txt"} {
+		_, _, err := confine(dir, p, true)
+		refused(t, err, "exact path")
+	}
+	if _, _, err := confine(dir, "sub/new.txt", true); err != nil {
+		t.Fatalf("the real path was refused: %v", err)
+	}
+}
+
 func toStrings(v any) []string {
 	var out []string
 	for _, x := range v.([]any) {
@@ -320,6 +393,46 @@ func TestApplyPatch(t *testing.T) {
 	out := "diff --git a/../x b/../x\nnew file mode 100644\n--- /dev/null\n+++ b/../x\n@@ -0,0 +1 @@\n+x\n"
 	if _, err = f.call(t, "repo.apply_patch", repoIn{"repo": "demo", "patch": out}); err == nil {
 		t.Fatal("a patch outside the repository was accepted")
+	}
+}
+
+// git apply --numstat names only the new file of a rename or copy. The source must pass the same
+// checks, or a rename would make a secret readable or move a pipeline file away. A patch must not
+// create a symbolic link or a submodule either: repo.commit would commit it.
+func TestApplyPatchChecksRenameSourcesAndModes(t *testing.T) {
+	f := newFixture(t, nil)
+	f.must(t, "repo.sync", repoIn{"repo": "demo"})
+	clone := filepath.Join(f.w.dir, "demo")
+	for _, c := range []struct{ name, patch, want string }{
+		{"rename of a secret", "diff --git a/.env b/notes.txt\nsimilarity index 100%\nrename from .env\nrename to notes.txt\n", "may hold credentials"},
+		{"rename of a secret, quoted", "diff --git \"a/.env\" b/notes.txt\nsimilarity index 100%\nrename from \".env\"\nrename to notes.txt\n", "may hold credentials"},
+		{"copy of a secret", "diff --git a/deploy/server.key b/notes.txt\nsimilarity index 100%\ncopy from deploy/server.key\ncopy to notes.txt\n", "may hold credentials"},
+		{"rename out of the pipelines", "diff --git a/.github/workflows/ci.yml b/ci.yml\nsimilarity index 100%\nrename from .github/workflows/ci.yml\nrename to ci.yml\n", "pipeline definition"},
+		{"new link", "diff --git a/lnk b/lnk\nnew file mode 120000\n--- /dev/null\n+++ b/lnk\n@@ -0,0 +1 @@\n+/etc\n\\ No newline at end of file\n", "symbolic link"},
+		{"file turned into a link", "diff --git a/README.md b/README.md\nold mode 100644\nnew mode 120000\n", "symbolic link"},
+		{"new submodule", "diff --git a/sub b/sub\nnew file mode 160000\nindex 0000000..0123456\n--- /dev/null\n+++ b/sub\n@@ -0,0 +1 @@\n+Subproject commit 0123456789012345678901234567890123456789\n", "submodule"},
+	} {
+		_, err := f.call(t, "repo.apply_patch", repoIn{"repo": "demo", "patch": c.patch})
+		if err == nil {
+			t.Fatalf("%s: the patch was applied", c.name)
+		}
+		refused(t, err, c.want)
+	}
+	for _, gone := range []string{"notes.txt", "ci.yml", "lnk", "sub"} {
+		if _, err := os.Lstat(filepath.Join(clone, gone)); err == nil {
+			t.Fatalf("%s exists: a refused patch was applied", gone)
+		}
+	}
+	for _, kept := range []string{".env", "deploy/server.key", ".github/workflows/ci.yml", "README.md"} {
+		if st, err := os.Lstat(filepath.Join(clone, filepath.FromSlash(kept))); err != nil || !st.Mode().IsRegular() {
+			t.Fatalf("%s changed: %v %v", kept, st, err)
+		}
+	}
+	// a rename of an ordinary file still applies
+	ok := "diff --git a/app/util.py b/app/helpers.py\nsimilarity index 100%\nrename from app/util.py\nrename to app/helpers.py\n"
+	f.must(t, "repo.apply_patch", repoIn{"repo": "demo", "patch": ok})
+	if _, err := os.Stat(filepath.Join(clone, "app", "helpers.py")); err != nil {
+		t.Fatal("the rename was not applied")
 	}
 }
 

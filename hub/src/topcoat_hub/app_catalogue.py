@@ -1,10 +1,11 @@
 """What each application a task can run in may use, read from the ceilings that bind its runs.
 
-Live 2026-11-18: Projekte wrote a task for Research that asked which models node-amd and node-nvidia can
-run; Research has no tool that sees Topcoat's nodes (only Verwaltung has ``topcoat.state``), so the
-run could only answer "not found". The planner's own words even said Research reads the wiki, which
-it did not. This list is made from the same ``tool_scope`` of each program (ui_templates) that
-``app_scope.ceiling`` applies to the runs, so it says what a run there really has.
+Live 2026-11-18: Projekte wrote a task for Research that asked which models node-amd and
+node-nvidia can run; Research has no tool that sees Topcoat's nodes (only Verwaltung has
+``topcoat.state``), so the run could only answer "not found". The planner's own words even said
+Research reads the wiki, which it did not. This list is made from the same ``tool_scope`` of each
+program (ui_templates) that ``app_scope.ceiling`` applies to the runs, so it says what a run there
+really has.
 """
 
 from typing import Any

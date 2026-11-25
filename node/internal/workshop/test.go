@@ -163,10 +163,14 @@ func (w *Workshop) hostPath(p string) string {
 	return p
 }
 
-// copyWorktree copies the files of the worktree (tracked and new, without .git and without files
-// that look like credentials) to dst, so a test run cannot touch the clone.
+// copyWorktree copies the files of the worktree (tracked and new, without .git, without files
+// that look like credentials and without symbolic links) to dst, so a test run cannot touch the clone.
 func (w *Workshop) copyWorktree(ctx context.Context, dir, dst string) error {
 	out, err := w.git(ctx, dir, nil, "", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+	if err != nil {
+		return err
+	}
+	links, err := w.trackedLinks(ctx, dir)
 	if err != nil {
 		return err
 	}
@@ -175,7 +179,7 @@ func (w *Workshop) copyWorktree(ctx context.Context, dir, dst string) error {
 	}
 	var total int64
 	for _, rel := range strings.Split(out, "\x00") {
-		if rel == "" || secretName(rel) {
+		if rel == "" || secretName(rel) || links[rel] {
 			continue
 		}
 		src := filepath.Join(dir, filepath.FromSlash(rel))

@@ -444,7 +444,8 @@ def test_a_reference_written_inside_a_result_line_or_the_claim_counts() -> None:
 
 
 def test_evidence_written_as_its_values_finds_the_result_that_holds_them() -> None:
-    # live 2026-11-15 (Gemma Q2 on node-amd): evidence as nested objects with the values, no reference
+    # live 2026-11-15 (Gemma Q2 on node-amd): evidence as nested objects with the values,
+    # no reference
     evidence = {"E1": "live", "E2": "live"}
     texts = {
         "E1": '{"node":"node-cpu","loaded":[],"ram_used_mb":28374}',

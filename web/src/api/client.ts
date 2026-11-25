@@ -2325,7 +2325,7 @@ export class ApiClient {
       );
     } catch (err) {
       if (err instanceof ApiError && !(err instanceof UnauthorizedError)) {
-        return { ok: false, error: { code: err.code, message: err.message } };
+        return { ok: false, error: { code: err.code, message: err.message, status: err.status } };
       }
       throw err;
     }
