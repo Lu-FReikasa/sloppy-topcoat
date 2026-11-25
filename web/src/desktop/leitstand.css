@@ -194,12 +194,15 @@
   pointer-events: none;
 }
 
-.dt-look-leitstand .dt-nav {
+.dt-look-leitstand .dt-nav,
+.dt-look-leitstand .dt-program-body > .open-chats {
   background: #070d0f;
   border-color: #16302a;
 }
 
-.dt-look-leitstand .dt-nav button {
+/* Start's open conversations keep the rail's lettering now that they sit beside it, not in it (#77) */
+.dt-look-leitstand .dt-nav button,
+.dt-look-leitstand .open-chats button {
   font-family: var(--label);
   text-transform: uppercase;
   letter-spacing: 0.1em;
