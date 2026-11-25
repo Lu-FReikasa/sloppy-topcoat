@@ -503,7 +503,7 @@ func TestPeriodicHeartbeat(t *testing.T) {
 	}
 }
 
-// The heartbeat carries the CPU utilisation when the system can measure it and leaves the field
+// The heartbeat carries the CPU utilization when the system can measure it and leaves the field
 // out when it cannot (an older node sends none either).
 func TestHeartbeatCarriesCPUUtilisationWhenKnown(t *testing.T) {
 	hub := newFakeHub(t)

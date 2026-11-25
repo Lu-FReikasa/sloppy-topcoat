@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -54,7 +55,7 @@ func encodePS(script string) string {
 	u := utf16.Encode([]rune(script))
 	b := make([]byte, 0, len(u)*2)
 	for _, c := range u {
-		b = append(b, byte(c), byte(c>>8))
+		b = binary.LittleEndian.AppendUint16(b, c)
 	}
 	return base64.StdEncoding.EncodeToString(b)
 }
@@ -82,7 +83,9 @@ func (PowerShell) Run(ctx context.Context, script string, env map[string]string,
 		root = `C:\Windows`
 	}
 	exe := filepath.Join(root, "System32", windowsPS) // absolute: no PATH lookup to hijack
-	cmd := exec.CommandContext(ctx, exe, "-NoProfile", "-NonInteractive", "-NoLogo",
+	// G204: an absolute path below SystemRoot and fixed flags; the script is one of the fixed
+	// windows.* scripts, passed base64-encoded, never through a shell.
+	cmd := exec.CommandContext(ctx, exe, "-NoProfile", //nolint:gosec // see above "-NonInteractive", "-NoLogo",
 		"-ExecutionPolicy", "Bypass", "-EncodedCommand", encodePS(psPrelude+script))
 	cmd.Env = nil
 	for _, k := range []string{"SystemRoot", "windir", "SystemDrive", "ProgramData", "ProgramFiles", "ProgramFiles(x86)", "TEMP", "TMP", "COMPUTERNAME"} {
@@ -101,7 +104,7 @@ func (PowerShell) Run(ctx context.Context, script string, env map[string]string,
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		return nil, fmt.Errorf("powershell failed: %v: %s", err, strings.TrimSpace(errb.buf.String()))
+		return nil, fmt.Errorf("powershell failed: %w: %s", err, strings.TrimSpace(errb.buf.String()))
 	}
 	return bytes.TrimPrefix(out.buf.Bytes(), []byte{0xEF, 0xBB, 0xBF}), nil
 }

@@ -58,11 +58,3 @@ func (h *fileHost) RestoreProgram(context.Context) error {
 	}
 	return os.Rename(prev, h.program)
 }
-
-// stateFlag is the command line part that hands the updater's directory to node and updater.
-func stateFlag(stateDir string) string {
-	if stateDir == "" {
-		return ""
-	}
-	return " --update-state-dir " + stateDir
-}
