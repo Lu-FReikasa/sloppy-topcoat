@@ -1,7 +1,7 @@
-# Hub for the release channel "test" (ARCHITECTURE D13): Postgres 16 + pgvector and the
+# Hub for the release channel "test" (ARCHITECTURE D123): Postgres 16 + pgvector and the
 # published hub image, HTTPS on :8443 with the hub's own CA (TLS mode auto, D11).
 #   cp deploy/hub.env.example deploy/hub.env      # then edit
-#   docker login ghcr.io                          # once; the repository is private
+#   docker login ghcr.io                          # once, while the ghcr package is private
 #   docker compose -f deploy/docker-compose.yml --env-file deploy/hub.env up -d
 # Update to the newest test build:
 #   docker compose -f deploy/docker-compose.yml --env-file deploy/hub.env pull

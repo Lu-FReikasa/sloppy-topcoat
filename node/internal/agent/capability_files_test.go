@@ -14,7 +14,12 @@ import (
 // HOST-01: files.read exists only where folders are released, and runs only when the hub's config
 // lists it: a node refuses a call that is not in its whitelist, whatever the roots are.
 func TestFilesReadIsOfferedOnlyWithRootsAndRunsOnlyWhenWhitelisted(t *testing.T) {
-	dir := t.TempDir()
+	// on Windows the temp folder can hold a short (8.3) name such as RUNNER~1, which files.read
+	// refuses; EvalSymlinks expands it to the long name
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(dir, "a.log"), []byte("hello\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
