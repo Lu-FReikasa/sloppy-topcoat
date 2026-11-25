@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import and_, case, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from topcoat_hub.agent_store import AgentStore
@@ -160,10 +160,23 @@ class InboxStore:
         ]
         if application:
             where.append(InboxItem.application == application)
-        rows = await self.db.scalars(
-            select(InboxItem).where(*where).order_by(InboxItem.created_at.desc()).limit(limit)
+        # the groups are ordered in SQL, before the limit: an old item that waits for a decision
+        # must not drop out behind many newer results (the same rule as group_of)
+        group = case(
+            (InboxItem.kind.in_(sorted(ERROR_KINDS)), GROUPS.index("errors")),
+            (
+                and_(InboxItem.urgent.is_(True), InboxItem.resolved_at.is_(None)),
+                GROUPS.index("decide"),
+            ),
+            else_=GROUPS.index("results"),
         )
-        return sorted(rows.all(), key=lambda i: GROUPS.index(group_of(i)))
+        rows = await self.db.scalars(
+            select(InboxItem)
+            .where(*where)
+            .order_by(group, InboxItem.created_at.desc())
+            .limit(limit)
+        )
+        return list(rows.all())
 
     async def counts(self) -> dict[str, Any]:
         rows = await self.db.execute(

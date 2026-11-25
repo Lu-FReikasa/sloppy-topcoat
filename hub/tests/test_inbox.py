@@ -106,6 +106,28 @@ def test_an_item_is_an_error_by_its_kind_and_a_decision_while_it_waits() -> None
     assert group_of(item("handover_result")) == "results"
 
 
+def test_an_old_item_that_waits_for_a_decision_is_not_crowded_out(client: TestClient) -> None:
+    """The groups are ordered before the limit: more than a page of newer results must not push
+    an older urgent item out of the inbox (review of PR #89)."""
+    old = add_item(title="Waits since last week", kind="fix_blocked", urgent=True)
+    with create_engine(TEST_DB_URL).begin() as conn:
+        conn.execute(
+            text("UPDATE inbox_items SET created_at = now() - interval '7 days' WHERE id = :id"),
+            {"id": old},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO inbox_items (id, user_id, application, kind, title, summary, urgent) "
+                "SELECT gen_random_uuid(), :u, 'chat', 'task_done', 'Result ' || n, '', false "
+                "FROM generate_series(1, 210) AS n"
+            ),
+            {"u": str(DEV_ADMIN_ID)},
+        )
+    items = listing(client)["items"]
+    assert len(items) == 200  # the page is full
+    assert items[0]["title"] == "Waits since last week" and items[0]["group"] == "decide"
+
+
 def test_an_urgent_item_stays_until_it_is_resolved(client: TestClient) -> None:
     quiet = add_item(title="Information")
     urgent = add_item(title="Needs a click", urgent=True)
