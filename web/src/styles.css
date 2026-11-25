@@ -201,8 +201,11 @@ input {
   color: var(--bad);
 }
 
+/* a ring, not a filled dot: on a phone the dot is all there is, and red and green alone are lost on
+   colour-blind eyes */
 .conn-lost .conn-dot {
-  background: var(--bad);
+  background: transparent;
+  border: 2px solid var(--bad);
 }
 
 /* Overview */

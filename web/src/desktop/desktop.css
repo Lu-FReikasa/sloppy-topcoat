@@ -434,8 +434,14 @@
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }
+  /* only the dot shows; the words stay for screen readers (role="status") */
   .conn-text {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
