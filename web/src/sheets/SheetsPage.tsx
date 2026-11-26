@@ -15,7 +15,9 @@ import type {
   SheetSummary,
 } from "./types";
 import {
+  balanceColumns,
   chooseFit,
+  packColumns,
   isTabLine,
   maxColumns,
   neighbour,
@@ -945,22 +947,26 @@ function Stage({
     return collapse ? collapseRepeats(sections) : asWritten(sections);
   }, [sheet, hideTabs, collapse]);
 
-  // fit: columns and the largest font at which nothing spills into an extra column
+  // fit: columns and the largest font at which every part has its place. The parts are measured in
+  // a hidden copy one column wide and placed into the columns here (packColumns): browsers differ in
+  // how CSS columns overflow (some wrap them below), so the layout does not rely on that.
+  const [cols, setCols] = useState<number[][]>([]);
   useLayoutEffect(() => {
     const b = box.current;
-    const c = body.current;
-    if (!b || !c || items.length === 0) return;
+    const m = body.current;
+    if (!b || !m || items.length === 0) return;
+    const heights = (columns: number, font: number): number[] => {
+      const gap = 2 * font;
+      m.style.width = `${(b.clientWidth - gap * (columns - 1)) / columns}px`;
+      m.style.fontSize = `${font}px`;
+      const parts = [...(m.firstElementChild?.children ?? [])] as HTMLElement[];
+      return parts.map((p) => p.getBoundingClientRect().height + (parseFloat(getComputedStyle(p).marginBottom) || 0));
+    };
     const measure = () => {
       const height = b.clientHeight;
-      c.style.height = `${height}px`;
-      const f = chooseFit(maxColumns(b.clientWidth), (columns, font) => {
-        c.style.columnCount = String(columns);
-        c.style.fontSize = `${font}px`;
-        return c.scrollWidth <= c.clientWidth + 1;
-      });
-      c.style.columnCount = String(f.columns);
-      c.style.fontSize = `${f.font}px`;
-      c.style.height = f.fits ? `${height}px` : "auto";
+      const f = chooseFit(maxColumns(b.clientWidth), (columns, font) => packColumns(heights(columns, font), columns, height) !== null);
+      const hs = heights(f.columns, f.font);
+      setCols((f.fits && packColumns(hs, f.columns, height)) || balanceColumns(hs, f.columns));
       setFit((old) => (old && old.columns === f.columns && old.font === f.font && old.fits === f.fits ? old : f));
     };
     measure();
@@ -971,7 +977,8 @@ function Stage({
 
   const v = sheet?.view;
   return (
-    <div className="sheet-stage" data-testid="sheet-stage">
+    <>
+      <div className="sheet-stage" data-testid="sheet-stage">
       <header className="sheet-stage-head">
         {setlistName && here >= 0 && (
           <span className="sheet-stage-set" data-testid="sheet-stage-set">
@@ -1012,10 +1019,24 @@ function Stage({
         </div>
       </header>
       <div ref={box} className={`sheet-stage-box${fit && !fit.fits ? " is-scroll" : ""}`}>
-        <div ref={body} className="sheet-stage-body">
-          {v && <Body items={items} />}
-        </div>
+        {v && fit && (
+          <div
+            className="sheet-stage-cols"
+            style={{ gridTemplateColumns: `repeat(${fit.columns}, minmax(0, 1fr))`, fontSize: `${fit.font}px`, columnGap: `${2 * fit.font}px` }}
+          >
+            {cols.map((idx, k) => (
+              <div key={k} className="sheet-stage-body sheet-stage-col">
+                <Body items={idx.map((i) => items[i]!).filter(Boolean)} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+      </div>
+      {/* the measuring copy: out of sight, one column wide, at the font being tried */}
+      <div ref={body} className="sheet-stage-body sheet-stage-measure" aria-hidden="true">
+        {v && <Body items={items} />}
+      </div>
+    </>
   );
 }

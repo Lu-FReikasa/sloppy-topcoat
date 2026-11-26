@@ -88,3 +88,39 @@ export function isTabLine(text: string): boolean {
   const t = text.trim();
   return /^[a-gA-G]?\s*[|:]?[-0-9hpbr/\\|x~.]{6,}/.test(t) && (t.match(/-/g)?.length ?? 0) >= 4;
 }
+
+/** The parts (by their heights, in order) placed into at most `columns` columns of height
+ *  `capacity`, each column filled before the next; a part never breaks. The indexes per column,
+ *  or null when they do not fit. Browsers differ in how CSS columns overflow, so the stage places
+ *  the parts itself. */
+export function packColumns(heights: number[], columns: number, capacity: number): number[][] | null {
+  const out: number[][] = [[]];
+  let used = 0;
+  for (let i = 0; i < heights.length; i++) {
+    const h = heights[i]!;
+    if (h > capacity) return null;
+    if (used + h > capacity && out[out.length - 1]!.length > 0) {
+      if (out.length === columns) return null;
+      out.push([]);
+      used = 0;
+    }
+    out[out.length - 1]!.push(i);
+    used += h;
+  }
+  return out;
+}
+
+/** The parts spread over `columns` columns as evenly as the order allows (for a song that does not
+ *  fit one screen: the page then scrolls, the columns stay about equally long). */
+export function balanceColumns(heights: number[], columns: number): number[][] {
+  const total = heights.reduce((a, b) => a + b, 0);
+  const tallest = Math.max(0, ...heights);
+  let lo = Math.max(tallest, total / columns);
+  let hi = total;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) / 2;
+    if (packColumns(heights, columns, mid)) hi = mid;
+    else lo = mid;
+  }
+  return packColumns(heights, columns, hi) ?? [heights.map((_, i) => i)];
+}

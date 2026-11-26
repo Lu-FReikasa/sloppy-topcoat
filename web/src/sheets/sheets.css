@@ -557,10 +557,25 @@
   overflow-y: auto;
 }
 
-.sheet-stage-body {
-  column-gap: 2em;
-  column-fill: auto;
-  column-rule: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+/* the columns the stage placed the parts into (SheetsPage.tsx Stage, fit.ts packColumns) */
+.sheet-stage-cols {
+  display: grid;
+  align-items: start;
+}
+
+.sheet-stage-col + .sheet-stage-col {
+  border-left: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  padding-left: 1em;
+  margin-left: -1em;
+}
+
+/* the hidden copy the parts are measured in */
+.sheet-stage-measure {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .sheet-stage-body .sheet-body {

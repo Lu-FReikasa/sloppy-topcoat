@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseFit, isTabLine, maxColumns, MAX_FONT, MIN_FONT, neighbour, positionOf, sortGroups, visibleGroups } from "./fit";
+import { balanceColumns, chooseFit, packColumns, isTabLine, maxColumns, MAX_FONT, MIN_FONT, neighbour, positionOf, sortGroups, visibleGroups } from "./fit";
 import { groupSheets } from "./group";
 import type { SheetSummary } from "./types";
 
@@ -86,5 +86,19 @@ describe("isTabLine", () => {
     expect(isTabLine("--0--2--3--2--0--")).toBe(true);
     expect(isTabLine("Walking down the road - again")).toBe(false);
     expect(isTabLine("C   G   Am   F")).toBe(false);
+  });
+});
+
+describe("packColumns", () => {
+  it("fills each column before the next and never breaks a part", () => {
+    expect(packColumns([3, 3, 3, 3], 2, 7)).toEqual([[0, 1], [2, 3]]);
+    expect(packColumns([3, 3, 3, 3], 2, 5)).toBeNull();
+    expect(packColumns([8], 3, 7)).toBeNull();
+    expect(packColumns([1, 1], 3, 10)).toEqual([[0, 1]]);
+  });
+
+  it("balances a song that does not fit over the columns", () => {
+    expect(balanceColumns([4, 4, 4, 4, 4, 4], 3)).toEqual([[0, 1], [2, 3], [4, 5]]);
+    expect(balanceColumns([10, 1, 1], 2)).toHaveLength(2);
   });
 });
