@@ -141,6 +141,14 @@ describe("Sheets", () => {
     const jobs = screen.getByTestId("sheets-jobs");
     expect(within(jobs).queryByText("Other Song")).toBeNull();
     expect(within(jobs).getByText("no web")).toBeTruthy();
+    // the sheet view writes everything out until repeats are collapsed
+    const toggle = within(sheet).getByRole("button", { name: /Collapse repeats|Wiederholungen kürzen/ });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(sheet.querySelectorAll(".sheet-part")).toHaveLength(3);
+    fireEvent.click(toggle);
+    expect(sheet.querySelectorAll(".sheet-part")).toHaveLength(2);
+    expect(sheet.querySelector("#sheet-part-2")).toBeTruthy(); // the flow still finds the merged part
+    fireEvent.click(toggle);
     const flow = screen.getByTestId("sheet-flow");
     expect(within(flow).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["V1", "C", "C"]);
     expect(within(flow).getAllByRole("listitem")[1]?.className).toContain("sheet-kind-chorus");
@@ -216,6 +224,11 @@ describe("Sheets", () => {
     const stage = await screen.findByTestId("sheet-stage");
     await waitFor(() => expect(chordsOf(stage)).toEqual(["G", "D", "C"]));
     expect(screen.queryByTestId("sheets-list")).toBeNull();
+    // repeats collapse by default on stage: the chorus and its {chorus} reference are one block
+    const labels = () => [...stage.querySelectorAll(".sheet-part-label")].map((h) => h.textContent);
+    expect(labels()).toEqual(["Verse 1", "Chorus ×2"]);
+    fireEvent.click(within(stage).getByRole("button", { name: /Collapse repeats|Wiederholungen kürzen/ }));
+    expect(labels()).toEqual(["Verse 1", "Chorus", expect.stringMatching(/^Chorus · /)]);
     fireEvent.keyDown(window, { key: "PageDown" });
     expect(window.location.hash).toBe("#/sheets/s9");
     fireEvent.keyDown(window, { key: "Escape" });

@@ -299,6 +299,15 @@
   background: color-mix(in srgb, var(--part) 25%, transparent);
 }
 
+/* a part played again: its name and count on one line (#141) */
+.sheet-again .sheet-part-label {
+  margin: 0;
+}
+
+.sheet-times {
+  font-variant-numeric: tabular-nums;
+}
+
 .sheet-comment {
   font-style: italic;
   color: var(--muted);
