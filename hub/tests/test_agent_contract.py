@@ -248,3 +248,87 @@ def test_what_can_you_do_is_answered_in_the_persons_language(client, connect) ->
     sent = asked("Was kannst du?")
     assert "Ich bin Entwicklung: " in sent and "Was ich nie tue:" in sent
     assert "I am Development" not in sent
+
+
+# --- the secretary and the personas (issue #34, D112) ---------------------------------------------
+
+
+def test_every_contract_names_a_shipped_persona() -> None:
+    from topcoat_hub import personas
+
+    shipped = {t["key"] for t in personas.library()["templates"]}
+    for key, contract in agent_contract.all_contracts().items():
+        assert contract.persona in shipped, key
+    assert agent_contract.get("assistant").persona == "butler"
+
+
+def test_only_the_assistant_is_the_secretary_and_it_hands_on_reading_only() -> None:
+    contracts = agent_contract.all_contracts()
+    assert [k for k, c in contracts.items() if c.secretary] == ["assistant"]
+    sec = contracts["assistant"]
+    assert sec.secretary["reports"] == "when_asked"
+    hands_on = sec.hands_on()
+    assert set(hands_on) == {"research", "dev", "admin"}
+    for target, type_ in hands_on.items():
+        spec = messages.check_edge(type_, "assistant", target)  # a listed edge
+        # a hand-on starts a task of the other application, never a mandate or a staged change
+        assert spec.effect == "queue_task" and spec.trust == "own", type_
+    # what the secretary hands on is something its contract also says it talks to
+    assert set(hands_on) <= {t["to"] for t in sec.raw["talks_to"]}
+
+
+def test_the_employees_report_back_to_the_secretary() -> None:
+    for app in ("research", "dev", "admin"):
+        for kind in ("result", "failure", "clarification"):
+            messages.check_edge(f"{app}.{kind}", app, "assistant")
+    assert messages.responsibility("assistant", "en") == agent_contract.get("assistant").purpose()
+
+
+def test_the_secretary_says_what_it_hands_on_and_never_knows_in_words() -> None:
+    for lang, heading, never in (
+        ("en", "What I never know:", "only that they exist"),
+        ("de", "Was ich nie erfahre:", "nur, dass es sie gibt"),
+    ):
+        text = agent_contract.long("assistant", lang)
+        assert heading in text and never in text, lang
+        assert not _TECHNICAL.search(text.replace("Topcoat", "")), _TECHNICAL.search(text)
+        view = agent_contract.view("assistant", lang)
+        assert view["persona"] == "butler" and view["reports"] == "when_asked"
+        assert len(view["hands_on"]) == 3 and view["never_knows"]
+    assert "never_knows" not in agent_contract.view("dev", "en")
+
+
+def test_a_secretary_part_is_refused_on_another_employee(proto_copy: Path) -> None:
+    secretary = agent_contract.get("assistant").secretary
+
+    _edit(proto_copy, "research", lambda raw: raw.__setitem__("secretary", secretary))
+    agent_contract.set_proto_root(proto_copy)
+    with pytest.raises(agent_contract.ContractError):
+        agent_contract.all_contracts()
+
+
+def test_the_assistant_without_its_secretary_part_is_refused(proto_copy: Path) -> None:
+    _edit(proto_copy, "assistant", lambda raw: raw.pop("secretary"))
+    agent_contract.set_proto_root(proto_copy)
+    with pytest.raises(agent_contract.ContractError):
+        agent_contract.all_contracts()
+
+
+def test_a_conversation_starts_with_its_employees_persona(client, clean_db) -> None:  # type: ignore[no-untyped-def]
+    """Without a default of the person's own, a conversation with an employee speaks with the
+    persona its contract names; the person's own choice always wins."""
+    from tests.conftest import AUTH
+    from tests.test_chat import new_conv
+
+    templates = client.get("/api/personas", headers=AUTH).json()["templates"]
+    ids = {t["key"]: t["id"] for t in templates}
+
+    def persona_of(conv: str) -> str | None:
+        return client.get(f"/api/conversations/{conv}", headers=AUTH).json()["persona_ref"]
+
+    assert persona_of(new_conv(client, application="chat")) == ids["butler"]
+    assert persona_of(new_conv(client, application="research")) == ids["neutral"]
+    assert persona_of(new_conv(client)) is None  # a program without an application: none
+    r = client.put("/api/personas/default", headers=AUTH, json={"persona_id": ids["friend"]})
+    assert r.status_code == 200, r.text
+    assert persona_of(new_conv(client, application="chat")) == ids["friend"]

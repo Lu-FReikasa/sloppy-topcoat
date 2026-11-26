@@ -152,7 +152,8 @@ export const MESSAGE_TYPES: readonly MessageType[] = [
       "research"
     ],
     "to": [
-      "project"
+      "project",
+      "assistant"
     ],
     "trust": "foreign",
     "needsReview": true,
@@ -168,7 +169,8 @@ export const MESSAGE_TYPES: readonly MessageType[] = [
       "dev"
     ],
     "to": [
-      "project"
+      "project",
+      "assistant"
     ],
     "trust": "system",
     "needsReview": true,
@@ -184,7 +186,8 @@ export const MESSAGE_TYPES: readonly MessageType[] = [
       "admin"
     ],
     "to": [
-      "project"
+      "project",
+      "assistant"
     ],
     "trust": "system",
     "needsReview": false,
@@ -200,7 +203,8 @@ export const MESSAGE_TYPES: readonly MessageType[] = [
       "research"
     ],
     "to": [
-      "project"
+      "project",
+      "assistant"
     ],
     "trust": "foreign",
     "needsReview": false,
@@ -216,7 +220,8 @@ export const MESSAGE_TYPES: readonly MessageType[] = [
       "research"
     ],
     "to": [
-      "project"
+      "project",
+      "assistant"
     ],
     "trust": "foreign",
     "needsReview": false,
@@ -264,7 +269,8 @@ export const MESSAGE_TYPES: readonly MessageType[] = [
       "dev"
     ],
     "to": [
-      "project"
+      "project",
+      "assistant"
     ],
     "trust": "system",
     "needsReview": false,
@@ -280,7 +286,8 @@ export const MESSAGE_TYPES: readonly MessageType[] = [
       "dev"
     ],
     "to": [
-      "project"
+      "project",
+      "assistant"
     ],
     "trust": "system",
     "needsReview": false,
@@ -328,7 +335,8 @@ export const MESSAGE_TYPES: readonly MessageType[] = [
       "admin"
     ],
     "to": [
-      "project"
+      "project",
+      "assistant"
     ],
     "trust": "system",
     "needsReview": false,
@@ -344,7 +352,8 @@ export const MESSAGE_TYPES: readonly MessageType[] = [
       "admin"
     ],
     "to": [
-      "project"
+      "project",
+      "assistant"
     ],
     "trust": "system",
     "needsReview": false,
@@ -418,6 +427,24 @@ export const MESSAGE_TYPES: readonly MessageType[] = [
     "label": {
       "en": "Request from Administration",
       "de": "Anfrage der Administration"
+    }
+  },
+  {
+    "type": "assistant.request",
+    "from": [
+      "assistant"
+    ],
+    "to": [
+      "research",
+      "dev",
+      "admin"
+    ],
+    "trust": "own",
+    "needsReview": false,
+    "effect": "queue_task",
+    "label": {
+      "en": "Hand-on",
+      "de": "Weitergabe"
     }
   }
 ];

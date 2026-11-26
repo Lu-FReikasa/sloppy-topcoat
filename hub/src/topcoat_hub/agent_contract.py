@@ -3,8 +3,10 @@
 One file per application in ``proto/agents/<key>.json`` (assistant, research, dev, admin, project),
 checked against ``proto/agents/contract.schema.json``: what it is for, its typical tasks, the tool
 groups it may use (each said in a sentence), what it never does and what needs the person's click,
-the answer forms it writes, whom it gives work to, its model role. It was taken from what the
-prompts and the registry said before, not made up anew.
+the answer forms it writes, whom it gives work to, its model role, its default persona (a shipped
+template, D38) and, for the assistant only, its part as the secretary (D112: how it routes, what it
+hands on without a click, what it never knows, when it reports). It was taken from what the prompts
+and the registry said before, not made up anew.
 
 Who uses it:
 - the agent prompt (agent_prompts.for_application): the role sentence and its own rules in place of
@@ -78,6 +80,21 @@ class Contract:
         texts = self.raw["purpose"]
         return str(texts.get(language) or texts["en"])
 
+    @property
+    def persona(self) -> str:
+        """The key of its default persona template (``persona_data/personas.json``, D38)."""
+        return str(self.raw["persona"])
+
+    @property
+    def secretary(self) -> dict[str, Any] | None:
+        """The secretary's part (only the assistant, D112): routing, hand-on, never knows."""
+        return self.raw.get("secretary")
+
+    def hands_on(self) -> dict[str, str]:
+        """The employees the secretary may hand a reading task to without a click, with the
+        message type it uses (``{"research": "assistant.request", ...}``); empty for the others."""
+        return {h["to"]: h["type"] for h in (self.secretary or {}).get("hands_on", [])}
+
 
 def set_proto_root(root: Path) -> None:
     _PROTO[0] = Path(root)
@@ -136,6 +153,9 @@ _WORDS: dict[str, dict[str, str]] = {
         "never": "What I never do:",
         "clicks": "What needs your click:",
         "asks": "Whom I ask:",
+        "hands_on": "What I hand on without your click (it only reads):",
+        "never_knows": "What I never know:",
+        "reports": "I tell you by myself that a task is done only when you ask me to.",
     },
     "de": {
         "and": " und ",
@@ -150,6 +170,11 @@ _WORDS: dict[str, dict[str, str]] = {
         "never": "Was ich nie tue:",
         "clicks": "Was deinen Klick braucht:",
         "asks": "Wen ich frage:",
+        "hands_on": "Was ich ohne deinen Klick weitergebe (es liest nur):",
+        "never_knows": "Was ich nie erfahre:",
+        "reports": (
+            "Dass eine Aufgabe fertig ist, sage ich von selbst nur, wenn du mich darum bittest."
+        ),
     },
 }
 
@@ -218,6 +243,12 @@ def long(application: str | None, language: str = "en") -> str:
     if c.raw["talks_to"]:
         lines += ["", w["asks"]]
         lines += [f"- {_title_of(t['to'], lang)}: {t[f'for_{lang}']}" for t in c.raw["talks_to"]]
+    sec = c.secretary
+    if sec:
+        lines += ["", w["hands_on"]]
+        lines += [f"- {_title_of(h['to'], lang)}: {h[f'say_{lang}']}" for h in sec["hands_on"]]
+        lines += ["", w["never_knows"]] + [f"- {n}" for n in sec[f"never_knows_{lang}"]]
+        lines += ["", w["reports"]]
     return "\n".join(lines)
 
 
@@ -240,6 +271,21 @@ def view(application: str | None, language: str = "en") -> dict[str, Any] | None
         "talks_to": [
             {"to": _title_of(t["to"], lang), "for": t[f"for_{lang}"]} for t in c.raw["talks_to"]
         ],
+        "persona": c.persona,
+        **_secretary_view(c, lang),
+    }
+
+
+def _secretary_view(c: Contract, lang: str) -> dict[str, Any]:
+    sec = c.secretary
+    if not sec:
+        return {}
+    return {
+        "hands_on": [
+            {"to": _title_of(h["to"], lang), "for": h[f"say_{lang}"]} for h in sec["hands_on"]
+        ],
+        "never_knows": list(sec[f"never_knows_{lang}"]),
+        "reports": sec["reports"],
     }
 
 
