@@ -27,7 +27,7 @@ of the person. What a theme cannot say in the data below, it says in CSS.
 | field | values | meaning |
 |---|---|---|
 | `base` | `terminal`, `leitstand`, `schreibtisch` | a built-in theme whose style sheet this one starts from |
-| `layout.kind` | `tile`, `columns`, `rows`, `focus`, `cascade` | where the shown programs stand (`cascade` overlaps them; the one in front is on top) |
+| `layout.kind` | `tile`, `columns`, `rows`, `focus`, `cascade`, `nest` | where the shown programs stand (`cascade` overlaps them; the one in front is on top; `nest`: see below) |
 | `bar.position` | `bottom`, `top`, `left`, `right`, `hidden` | where the taskbar is; `hidden`: not drawn (Ctrl+K and the keys still work) |
 | `bar.items` | `start`, `programs`, `clock`, `status`, `me` | what the taskbar holds, in this order; an item that is not listed is not there |
 | `chrome.buttons` | `minimise`, `maximise`, `close` | the buttons of a program's title bar, in this order |
@@ -37,6 +37,37 @@ of the person. What a theme cannot say in the data below, it says in CSS.
 | `motion.overlay` | the same; optional, `none` when left out | how the overlay of the desktop client appears and goes |
 | `motion.ms` | 0 to 2000 | the length of each of them |
 | `css` | text, at most 40 000 characters | extra style sheet, see below |
+
+### The `nest` layout: levels and zoom
+
+`nest` keeps the shown programs in splits that nest to any depth: a program that opens splits the
+place of the one that was in front, along its longer side; one that closes gives its room to its
+neighbours. Each split is a **level**, and the view **zooms** to one of them: the framed group fills
+the stage, everything else lies outside it and keeps running (nothing is mounted again, a chat or
+an embedded page keeps its state). The tree and the zoom are kept per screen in the browser (the
+overlay of the desktop client keeps one per screen window).
+
+| key | does |
+|---|---|
+| `Alt+↓` | zoom in one level, towards the program in front (the last level is the program alone) |
+| `Alt+↑` | zoom out one level (in the browser `Esc` does the same while zoomed in) |
+| `Alt+0` | the overview: everything at once |
+
+The three are also in the command palette. Bringing a program forward that lies outside the frame
+(taskbar, `Alt+1`…`Alt+9`) zooms out just far enough to show it. A zoom moves the windows as a
+transform for `motion.ms` (none when the system asks for less motion).
+
+A program whose place is smaller than its minimum size (480 × 320 px) is laid out at that size and
+drawn **scaled down**; it then takes no input, and a click on it zooms to the first level where it
+has its full size. Classes for the style sheet: `.dt-scaled` (a program drawn scaled down) and
+`.dt-unframed` (a program outside the zoomed group, off the stage). In the overlay `Esc` stays the
+client's key (it hides the overlay) and nest windows are not moved or sized by hand.
+
+The idea comes from [Trellis](https://github.com/DanFessler/trellis) by Dan Fessler, a layout engine
+for web apps with nested, zoomable panels. Topcoat's `nest` is an independent implementation of that
+behaviour (`web/src/desktop/nest.ts`); it uses no Trellis code, whose licence does not fit the
+AGPL (#12). Not in it for now: tabs inside a window, docking by drag, free pan and pinch zoom,
+floating windows inside a nest.
 
 ### Animations of one's own
 
@@ -150,7 +181,7 @@ for it matches nothing (`proto/ui/theme-surface.json` holds the full list):
 |---|---|
 | `.dt-root` | the whole desktop (the root, see above); `.dt-bar-top`, `.dt-bar-bottom`, `.dt-bar-left`, `.dt-bar-right`, `.dt-bar-hidden` stand on it and say where the bar is |
 | `.dt-stage` | the area that holds the windows: the desktop's background belongs here (`leitstand` and `schreibtisch` paint it, over the root's background) |
-| `.dt-program` | a window; `.dt-program.dt-focused` the one in focus, `.dt-program.dt-maxi` a maximised one |
+| `.dt-program` | a window; `.dt-program.dt-focused` the one in focus, `.dt-program.dt-maxi` a maximised one; with `nest`, `.dt-program.dt-scaled` one drawn scaled down and `.dt-program.dt-unframed` one outside the zoomed group |
 | `.dt-titlebar` | the title bar of a window; inside it `.dt-title` (with `.dt-icon`) and `.dt-titlebar-buttons` |
 | `.dt-minimise`, `.dt-maximise`, `.dt-close` | the buttons of the title bar (inside `.dt-titlebar-buttons`; plain `button` elements) |
 | `.dt-program-body` | the content of a window |
@@ -169,7 +200,7 @@ buttons; the buttons are `.dt-minimise`, `.dt-maximise` and `.dt-close`.
 | style sheet | 40 000 characters (the built-in ones are 7 000 to 10 000) |
 | custom themes | 50 per hub |
 | images | only inline `data:image/...` in `url()`; no web fonts, no files, no `@import` |
-| layout | the five engines above; no per-window positions |
+| layout | the six engines above; no per-window positions |
 | code | none |
 
 ## Where themes live
@@ -187,7 +218,7 @@ buttons; the buttons are `.dt-minimise`, `.dt-maximise` and `.dt-close`.
 
 ## What is not in it, on purpose
 
-* No script, no custom component: nothing that runs. If layout logic beyond the five engines is
+* No script, no custom component: nothing that runs. If layout logic beyond the six engines is
   ever needed, it belongs in a sandbox (a Web Worker for a pure `(windows, area) -> rectangles`
   function, an iframe without access to the page's storage for a fully drawn shell, both reaching
   the core through a small allow-listed bridge), as a separate decision.

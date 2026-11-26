@@ -148,7 +148,7 @@ THEME_REFERENCE = (
     "it. Do not doubt the format, do not offer to verify anything.\n"
     '{"key": "dusk" (a-z 0-9 -, at most 40; a new key for a new theme), "name": "Dusk", '
     '"base": "terminal" (always, unless asked for a control room or a paper desk), '
-    '"layout": {"kind": "tile"|"columns"|"rows"|"focus"|"cascade"}, '
+    '"layout": {"kind": "tile"|"columns"|"rows"|"focus"|"cascade"|"nest"}, '
     '"bar": {"position": "bottom"|"top"|"left"|"right"|"hidden", '
     '"items": a list of "start","programs","clock","status","me"}, '
     '"chrome": {"buttons": a list of "minimise","maximise","close", "titlebar": "top"|"hidden"}, '
@@ -163,7 +163,10 @@ THEME_REFERENCE = (
     "tape, it ignores the colour variables inside the windows (never use it for a dark theme). "
     "layout: tile = a grid of all open programs, columns = side "
     "by side, rows = stacked, focus = one big and the rest small at the side, cascade = "
-    "overlapping windows. motion is only how a window appears.\n"
+    "overlapping windows, nest = splits inside splits with a view that zooms to one group "
+    "(Alt+Down/Alt+Up/Alt+0, Esc steps out; a program too small is drawn scaled down: "
+    ".dt-scaled, one outside the zoomed group: .dt-unframed). motion is only how a window "
+    "appears; for nest, ms is also the length of a zoom.\n"
     "css is a string. Every declaration ends with ; and every rule is on its own line (write \\n "
     "inside the json string); a line without ; swallows the next one. Colours are variables, "
     "written as bare declarations at the top, not inside :root: --bg (desktop and page "
