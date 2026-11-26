@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { UnauthorizedError, type ApiClient } from "../api/client";
 import { describeError, toActionError } from "../errors";
 import { formatDateTime, formatInt } from "../format";
+import { capabilityDescription } from "../i18n/shipped";
 import { capabilityStatus, inputTemplate, outputText, parseInput, toggleGrant } from "../tools";
 import type {
   GrantRow,
@@ -81,7 +82,7 @@ export function ToolsSection({ api, node }: Props) {
               {caps.offered.map((c) => (
                 <tr key={c.name}>
                   <td className="model-name">{c.name}</td>
-                  <td>{c.description}</td>
+                  <td>{capabilityDescription(c, t)}</td>
                   <td>{t(`tools.status.${capabilityStatus(c, caps.enabled, caps.usable)}`)}</td>
                 </tr>
               ))}

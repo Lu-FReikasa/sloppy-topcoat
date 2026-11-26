@@ -1007,7 +1007,150 @@
     "grantAllFor": "{{user}}: all read-only capabilities",
     "grantFor": "{{user}}: {{capability}}",
     "grantsSave": "Save",
-    "grantsSaved": "Saved"
+    "grantsSaved": "Saved",
+    "cap": {
+      "system": {
+        "info": "Host name, OS, kernel, uptime, load, CPUs, RAM and swap of this machine.",
+        "memory": "What the RAM is spent on: programs, cache, kernel, swap, ZFS ARC and the processes that hold the most."
+      },
+      "disk": {
+        "usage": "Usage of every mounted data file system (size, used, free, inodes), fullest first."
+      },
+      "docker": {
+        "ps": "Containers of this Docker host with state, health, restarts and start time.",
+        "inspect": "Status details of one container: state, exit code, restarts, health checks, mounts, networks. Never its environment variables.",
+        "logs": "The last log lines of one container, secrets masked.",
+        "restart": "Restart one container that the node's config lists; its service is down for a few seconds."
+      },
+      "compose": {
+        "projects": "Compose projects (stacks) on this Docker host with the state of each service.",
+        "file": "One file of a compose project (compose or .env file), secrets masked; only in released folders.",
+        "logs": "Logs of a whole compose project, all its containers merged by time.",
+        "restart": "Restart a whole compose project, dependencies first; its services are down meanwhile."
+      },
+      "journal": {
+        "logs": "Journal lines of one systemd unit, secrets masked."
+      },
+      "service": {
+        "status": "State of one systemd unit: active state, last result, main PID, restarts, memory, since when.",
+        "failed": "The systemd units that are failed right now.",
+        "restart": "Restart one systemd unit that the node's config lists; the service is down meanwhile."
+      },
+      "health": {
+        "check": "The general state of this machine in one call: failed units, troubled containers, full disks, RAM, load and recent errors."
+      },
+      "logs": {
+        "search": "Search for a text in the logs of all containers and the journal at once."
+      },
+      "certs": {
+        "expiry": "TLS certificates of the configured services: issuer, expiry date, days left and whether the chain is valid."
+      },
+      "net": {
+        "check": "Reachability of the configured hosts from this node: DNS, ping and ports."
+      },
+      "inventory": {
+        "snapshot": "What runs on this machine, for the hub's inventory: host facts, Docker containers and systemd services."
+      },
+      "shell": {
+        "read": "Run one read-only shell command as an unprivileged user without network; secrets masked."
+      },
+      "docs": {
+        "list": "List the Markdown and text files of a folder released for the knowledge base.",
+        "read": "Read one Markdown or text file of the knowledge base, page by page, secrets masked."
+      },
+      "files": {
+        "list": "List one folder inside a folder released for reading on this node.",
+        "read": "Read a text file inside a folder released for reading, page by page or its last lines."
+      },
+      "kuma": {
+        "monitors": "Uptime Kuma: every monitor with its status, response time and certificate expiry."
+      },
+      "omada": {
+        "sites": "Omada controller: the sites.",
+        "devices": "Omada controller: the devices of a site with status, model, IP and firmware.",
+        "clients": "Omada controller: the clients connected now.",
+        "events": "Omada controller: the site's event log in a time window.",
+        "audit_logs": "Omada controller: who changed what in the controller, in a time window.",
+        "alerts": "Omada controller: the site's alerts in a time window.",
+        "firmware": "Omada controller: the latest firmware known for one device."
+      },
+      "keycloak": {
+        "snapshot": "Keycloak: users, groups and clients with their role mappings, in one call.",
+        "user": "Keycloak: one person's groups and the roles they effectively have."
+      },
+      "web": {
+        "search": "Search the web through the operator's own search engine (SearXNG).",
+        "fetch": "Read one public web page as text.",
+        "images": "Search for pictures through the operator's own search engine (SearXNG).",
+        "image": "Fetch one public picture so the hub can keep it with a report."
+      },
+      "windows": {
+        "system": "Windows version and build, uptime, model, RAM, CPU, BIOS, time zone and the newest updates.",
+        "services": "Windows services with display name, state and start type.",
+        "events": "Entries of the System or Application event log (never Security), newest first.",
+        "storage": "Volumes and physical disks with size, free space and health.",
+        "network": "Network adapters, IPv4 addresses, DNS servers, routes and the network profile.",
+        "processes": "The processes using the most CPU time or memory.",
+        "programs": "Installed programs with version and publisher.",
+        "startup": "What starts by itself: startup commands and scheduled tasks.",
+        "defender": "Microsoft Defender status and the registered antivirus products.",
+        "devices": "Devices with a problem in Device Manager, and the graphics adapters with their drivers.",
+        "power": "Power settings: active plan, supported sleep states, last wake source and devices allowed to wake the PC."
+      },
+      "repo": {
+        "sync": "Clone the repository into the workshop or fetch its default branch.",
+        "status": "The state of the worktree: branch, head commit and changed files.",
+        "list": "List the files of the worktree; files that may hold credentials are left out.",
+        "read": "Read a text file of the worktree by line range, secrets masked.",
+        "search": "Search the worktree for a text or a regular expression.",
+        "outline": "A map of the worktree: each source file with its named places and their lines.",
+        "diff": "The change made so far as a unified diff, or only the list of files.",
+        "start": "Start a work branch from the current default branch.",
+        "edit": "Replace one exact piece of text in a file of the worktree.",
+        "write": "Create a file of the worktree or replace it completely.",
+        "apply_patch": "Apply a unified diff to the worktree, all or nothing.",
+        "reset": "Throw away every uncommitted change in the worktree.",
+        "test": "Run the repository's tests in a throw-away container with limits.",
+        "test_start": "Start the repository's tests in the background.",
+        "test_status": "The state of a background test run and the end of its output.",
+        "test_cancel": "Stop a background test run.",
+        "build_node": "Cross-build the node for Linux and Windows from the worktree; the binaries stay unsigned.",
+        "build_list": "The builds kept in the workshop for a repository, with sizes and SHA-256.",
+        "push": "Commit the change and push it to a work branch on the remote; needs a confirmed proposal.",
+        "branches": "The branches of a local repository: last commit and how far ahead or behind each is.",
+        "commit": "Commit the change in the worktree on its work branch in the workshop; nothing leaves the workshop."
+      },
+      "workshop": {
+        "create": "Create a new local repository with a first commit.",
+        "clone": "Create a local repository as a full copy of a remote one.",
+        "branch": "Create a branch in a local repository.",
+        "merge": "Merge a branch of a local repository into another; a conflict changes nothing.",
+        "publish": "Push a branch of a local repository to its remote, never forced.",
+        "pull": "Bring a branch of a local repository up to date with its remote (fast-forward only).",
+        "remove": "Delete a local repository from this workshop; this cannot be undone."
+      },
+      "browser": {
+        "open": "Open a headless browser on the repository's GUI with a faked hub, in a container without network.",
+        "close": "End the browser session and remove its container.",
+        "snapshot": "The page as a compact tree of what a user can see and operate.",
+        "act": "Operate the page: click, type, hover, scroll or press a key.",
+        "shot": "A small picture of the page or of a region.",
+        "console": "Console messages, page errors and failed requests.",
+        "audit": "Check the page by measurement and return only the violations.",
+        "animations": "Measure the animations on the page: timing, sampled values, frame times and layout shifts.",
+        "viewport": "Set the size of the page and optionally pixel ratio, color scheme and reduced motion."
+      },
+      "build": {
+        "fetch": "Fetch a commit, branch or tag into the build mirror and name the changes since the last release.",
+        "node_release": "Build the node for Linux and Windows from a pinned commit and upload the files to the hub; signs nothing.",
+        "hub_image": "Build the hub image from a pinned commit in a fresh clone.",
+        "node_container_image": "Build the container image of the CPU node from a pinned commit.",
+        "smoke_test": "Start the image built last with a database and check that it migrates and answers."
+      },
+      "hub": {
+        "update": "Roll the hub out to an image already on this host, with digest check, dump, health check and a way back."
+      }
+    }
   },
   "params": {
     "title": "Parameters",
@@ -3125,6 +3268,27 @@
       "ok": "done",
       "failed": "failed",
       "stopped": "stopped"
+    },
+    "programs": {
+      "research_report": "Research report with revision",
+      "theme_design": "Desktop theme with check and revision",
+      "two_node_check": "Two answers, a third model compares",
+      "wiki_check": "Check one wiki page against code, live state and topcoat.guide",
+      "doc_section": "Document one part of the repository from its code",
+      "issue_check": "Find the cause of an issue in the code the hub runs",
+      "issue_fix": "Write the fix of an issue as exact edits",
+      "issue_steps": "Plan the fix of an issue as small steps, one place each",
+      "fix_step": "Write one step of a planned fix as exact edits at one place",
+      "issue_area": "Round 0 of an issue's investigation: which part of the code it is about",
+      "issue_investigate": "Investigate an issue in rounds with Development and Administration, end with a plan",
+      "investigate_round": "One round of an issue's investigation: ask further, or write the report and plan",
+      "review_plan": "Second look at an issue's plan: right places for what the checks want?",
+      "probe_dev": "Answer one question of an issue's investigation in Development",
+      "probe_admin": "Answer one question of an issue's investigation in Administration",
+      "probe_read": "Find the code an investigation's test must call",
+      "probe_test": "Write one small test that tries a guess of an investigation",
+      "issue_plan": "Carry out an issue's settled plan step by step",
+      "checklist_check": "Work through a task's checklist, one item per fresh run"
     }
   },
   "pools": {
