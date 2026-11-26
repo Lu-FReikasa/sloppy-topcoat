@@ -540,15 +540,21 @@
   white-space: nowrap;
 }
 
+/* key, capo, setlist place and hint stay whole; only the title and the artist give way */
 .sheet-stage-info > * {
+  flex: 0 0 auto;
+}
+
+.sheet-stage-info > strong:first-of-type,
+.sheet-stage-info > .muted {
   flex: 0 1 auto;
-  min-width: 0;
+  min-width: 2.5em;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.sheet-stage-info > strong:first-of-type {
-  flex-shrink: 0.5;
+.sheet-stage-info > .muted {
+  flex-shrink: 3;
 }
 
 .sheet-stage-hint {
