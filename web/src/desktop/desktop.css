@@ -658,6 +658,15 @@
   display: none;
 }
 
+/* the nest layout (nest.ts): a program drawn smaller than its minimum is scaled down and zooms in
+   when it is clicked; programs outside the framed part lie off the stage (inert) */
+.dt-program.dt-scaled {
+  cursor: zoom-in;
+}
+.dt-program.dt-scaled .dt-program-body {
+  user-select: none;
+}
+
 /* how things move: a program that opens (the length is the theme's --dt-ms) */
 @keyframes dt-fade-in {
   from {

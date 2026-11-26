@@ -221,6 +221,32 @@ export function overview(): ZoomPath {
   return [];
 }
 
+/** The frame that shows `key`: the zoom as it is when the program is framed, else zoomed out just
+ *  far enough (a program brought forward from the taskbar must not stay outside the view). */
+export function reveal(tree: NestTree, zoom: readonly number[], key: string): ZoomPath {
+  const z = validZoom(tree, zoom);
+  const p = pathOf(tree, key);
+  if (!p) return z;
+  const common = z.findIndex((v, i) => p[i] !== v);
+  return common < 0 ? z : z.slice(0, common);
+}
+
+/** The shallowest zoom towards `key` at which the program is drawn at its full size (scale 1), or
+ *  the program alone when even that is too small. */
+export function zoomToFit(
+  tree: NestTree,
+  key: string,
+  area: Box,
+  min: { w: number; h: number } = MIN_TILE,
+): ZoomPath {
+  const p = pathOf(tree, key);
+  if (!p) return [];
+  const fits = p
+    .map((_, i) => p.slice(0, i))
+    .find((z) => (rects(tree, area, z, min).find((r) => r.key === key)?.scale ?? 0) >= 1);
+  return fits ?? p;
+}
+
 /** The zoom after the tree changed from `before` to `after` (a program added, removed or moved,
  *  programs dropped): the paths of a tree shift when it changes, so the zoom follows the programs
  *  it framed. It frames the smallest part of `after` that holds all of them that are still there
