@@ -2704,6 +2704,42 @@ export class ApiClient {
     return this.request("GET", `/api/ui/workspaces/${encodeURIComponent(key)}/agent${query}`);
   }
 
+  /** The registry of data plug-ins (D105, admin in the GUI only). */
+  plugins(): Promise<{ plugins: import("../plugins/types").PluginRow[] }> {
+    return this.request("GET", "/api/plugins");
+  }
+
+  plugin(key: string): Promise<import("../plugins/types").PluginDetail> {
+    return this.request("GET", `/api/plugins/${encodeURIComponent(key)}`);
+  }
+
+  pluginDiff(key: string, a: string, b: string): Promise<{ a: string; b: string; lines: string[] }> {
+    const q = new URLSearchParams({ a, b }).toString();
+    return this.request("GET", `/api/plugins/${encodeURIComponent(key)}/diff?${q}`);
+  }
+
+  /** Install a new plug-in. */
+  installPlugin(manifest: unknown): Promise<import("../plugins/types").PluginRow> {
+    return this.request("POST", "/api/plugins", manifest);
+  }
+
+  /** A new version of an installed plug-in. */
+  updatePlugin(key: string, manifest: unknown): Promise<import("../plugins/types").PluginRow> {
+    return this.request("POST", `/api/plugins/${encodeURIComponent(key)}/versions`, manifest);
+  }
+
+  rollbackPlugin(key: string, version: string): Promise<import("../plugins/types").PluginRow> {
+    return this.request("POST", `/api/plugins/${encodeURIComponent(key)}/rollback`, { version });
+  }
+
+  setPluginEnabled(key: string, enabled: boolean): Promise<import("../plugins/types").PluginRow> {
+    return this.request("PUT", `/api/plugins/${encodeURIComponent(key)}/enabled`, { enabled });
+  }
+
+  removePlugin(key: string): Promise<{ removed: string }> {
+    return this.request("DELETE", `/api/plugins/${encodeURIComponent(key)}`);
+  }
+
   uiTemplates(): Promise<{ templates: UiTemplateView[] }> {
     return this.request("GET", "/api/ui/templates");
   }
