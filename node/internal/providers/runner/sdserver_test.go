@@ -154,6 +154,34 @@ func TestAnImageModelRunsOnLoopbackOneAtATime(t *testing.T) {
 	}
 }
 
+func TestParallelLoadsLeaveNoOrphanedServer(t *testing.T) {
+	st := &sdStarter{}
+	s, data := newSD(t, st)
+	dir := filepath.Join(data, "image-models")
+	writeModel(t, dir, "a.gguf", 10)
+	writeModel(t, dir, "b.gguf", 10)
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _ = s.LoadImage(context.Background(), []string{"a", "b"}[i%2])
+		}()
+	}
+	wg.Wait()
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	alive := 0
+	for _, f := range st.started {
+		if !f.stopped.Load() {
+			alive++
+		}
+	}
+	if alive != 1 {
+		t.Fatalf("%d of %d started servers still run; exactly the recorded one may", alive, len(st.started))
+	}
+}
+
 func TestAServerThatDiesAtStartSaysWhy(t *testing.T) {
 	st := &sdStarter{dies: "sd-server: version `GLIBC_2.43' not found"}
 	s, data := newSD(t, st)
