@@ -119,6 +119,8 @@ describe("what a paste gives the message", () => {
     expect(pastedImages(clipboard([shot], "A1\tB1\r\n", "<table><tr><td>A1</td></tr></table>"))).toEqual([]);
     // "copy image" in a browser: the HTML holds the picture
     expect(pastedImages(clipboard([shot], "https://example.lan/a.png", '<img src="a.png">'))).toEqual([shot]);
+    // a file copied in a file manager: its name as text, no HTML
+    expect(pastedImages(clipboard([shot], "holiday.png"))).toEqual([shot]);
   });
 });
 
@@ -158,7 +160,7 @@ describe("images in the chat (D125)", () => {
     fireEvent.change(screen.getByTestId("image-input"), {
       target: { files: [new File(["x"], "notes.txt", { type: "text/plain" })] },
     });
-    expect((await screen.findByRole("alert")).textContent).toContain("Nur Bilder");
+    expect((await screen.findByRole("alert")).textContent).toContain("Nur JPEG-, PNG-");
   });
 
   it("shows the images of a message as thumbnails and one whole on click", async () => {

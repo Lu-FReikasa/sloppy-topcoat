@@ -4381,7 +4381,7 @@
     "missing": "Bild nicht verfügbar",
     "blind": "Das Modell dieser Antwort kann keine Bilder sehen und hat sie deshalb nicht bekommen.",
     "problem": {
-      "type": "Nur Bilder können mit einer Nachricht mitgehen.",
+      "type": "Nur JPEG-, PNG-, WebP-, GIF- und BMP-Bilder können mit einer Nachricht mitgehen.",
       "size": "Ein Bild darf höchstens 15 MB groß sein.",
       "count": "Höchstens {{max}} Bilder gehen mit einer Nachricht mit.",
       "read": "Das Bild konnte nicht gelesen werden."

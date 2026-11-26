@@ -107,13 +107,14 @@ export function imageFiles(data: DataTransfer | null): File[] {
 }
 
 /** The image files of a paste. Office programs (Excel, Word, LibreOffice) put a picture of the
- *  copied cells or text on the clipboard next to the text itself: then the text is what the person
- *  pastes, not the picture. A copied picture from a web page carries an <img> in its HTML. */
+ *  copied cells or text on the clipboard next to the text and its HTML: then the text is what the
+ *  person pastes, not the picture. A copied picture from a web page carries an <img> in its HTML;
+ *  a file copied in a file manager carries its name as text but no HTML, and stays an image. */
 export function pastedImages(data: DataTransfer | null): File[] {
   if (!data) return [];
   const text = data.getData?.("text/plain") ?? "";
   const html = data.getData?.("text/html") ?? "";
-  if (text.trim() !== "" && !/<img[\s>]/i.test(html)) return [];
+  if (text.trim() !== "" && html.trim() !== "" && !/<img[\s>]/i.test(html)) return [];
   return imageFiles(data);
 }
 

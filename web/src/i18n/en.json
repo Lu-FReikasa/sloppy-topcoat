@@ -4381,7 +4381,7 @@
     "missing": "Image not available",
     "blind": "The model of this answer cannot see images, so it did not get them.",
     "problem": {
-      "type": "Only images can go with a message.",
+      "type": "Only JPEG, PNG, WebP, GIF and BMP images can go with a message.",
       "size": "An image may have at most 15 MB.",
       "count": "At most {{max}} images go with one message.",
       "read": "The image could not be read."
