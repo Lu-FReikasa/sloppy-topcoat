@@ -130,6 +130,7 @@ def settings(clean_db: str, tmp_path: Path) -> Settings:
         memory_note_wait_seconds=5.0,
         review_after_answer=False,  # on only in the tests of the second look right after an answer
         wake_timeout_seconds=0,  # no waking on demand; test_wake_on_demand.py switches it on
+        secretary_routing=False,  # one more model call per Chat turn; test_secretary.py has it
     )
 
 

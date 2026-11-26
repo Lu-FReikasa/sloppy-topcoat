@@ -8,6 +8,7 @@ Every step is a line of the Akte. Nothing here asks a model; the result is writt
 stored evidence (``message_result.py``).
 """
 
+import logging
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -32,6 +33,15 @@ ACTION_OF = {"research": "request_report", "dev": "request_report", "admin": "re
 # the applications whose agents answer through ``<app>.message.send``
 ANSWERING = ("research", "dev", "admin")
 INBOX = {"en": "Inbox", "de": "Eingang"}  # the system project for what nobody asked for
+SECRETARY = "assistant"  # a request of the secretary (D112): its answer goes back to it, unreviewed
+
+log = logging.getLogger(__name__)
+
+
+def from_secretary(request: ProjectNode) -> bool:
+    """A task the secretary handed on (``assistant.request``, issue #36): its answer goes to the
+    assistant without the project's review, and its order follows every change of state."""
+    return request.source_app == SECRETARY and request.message_type == f"{SECRETARY}.request"
 
 
 def is_request(message_type: str | None) -> bool:
@@ -238,7 +248,28 @@ class MessageService:
             for _, task_id in stopped:
                 if task_id is not None:
                     await self.agents.cancel(user_id, task_id)
+        for node, _ in stopped:
+            await self._tell_secretary(user_id, node, "stopped")
         return [node for node, _ in stopped]
+
+    async def _tell_secretary(
+        self,
+        user_id: uuid.UUID,
+        request: ProjectNode,
+        state: str,
+        result: ProjectNode | None = None,
+    ) -> None:
+        """The order of a request the secretary handed on follows its state; a finished one is
+        reported into its conversation when the person asked for that (secretary.answered). A
+        failure here never undoes what was filed."""
+        if not from_secretary(request):
+            return
+        from topcoat_hub import secretary
+
+        try:
+            await secretary.answered(self.store._sessionmaker, user_id, request, state, result)
+        except Exception:
+            log.exception("secretary: the order of %s could not follow", request.id)
 
     # --- what comes back ------------------------------------------------------------------------
 
@@ -256,6 +287,7 @@ class MessageService:
         if event == "started":
             if request.msg_state == "queued":
                 await self._as(SYSTEM).set_message_state(user_id, request.id, "running")
+                await self._tell_secretary(user_id, request, "running")
             return
         if event == "canceled":
             await self._as(SYSTEM).set_message_state(
@@ -263,6 +295,7 @@ class MessageService:
             )
             if request.chain_id:
                 await self.store.finish_chain(user_id, request.chain_id)
+            await self._tell_secretary(user_id, request, "stopped")
             return
         async with self.store._sessionmaker() as db:  # the task and its evidence, as stored
             agent_store = AgentStore(db, user_id)
@@ -325,7 +358,8 @@ class MessageService:
                 for f in payload["findings"]
             ]
             payload.pop("coverage", None)
-        reviewed = messages.get(RESULT_OF[app]).needs_review
+        # the secretary's task is not the project's: its answer is filed without a review (D112)
+        reviewed = messages.get(RESULT_OF[app]).needs_review and not from_secretary(request)
         node = await self._file(
             user_id, request, RESULT_OF[app], payload, "delivered" if reviewed else "accepted",
             stats=message_result.stats_of(task, findings), verification=verification,
@@ -341,6 +375,7 @@ class MessageService:
             )
             if request.chain_id:
                 await self.store.finish_chain(user_id, request.chain_id)
+            await self._tell_secretary(user_id, request, "accepted", node)
         await self._watch(user_id, request)
         return node
 
@@ -356,13 +391,22 @@ class MessageService:
         )
         payload.setdefault("summary", "(no summary)")
         verification = message_check.verify_dev(payload, request.payload or {})
+        secretary = from_secretary(request)
         node = await self._file(
-            user_id, request, "dev.result", payload, "delivered",
+            user_id, request, "dev.result", payload, "accepted" if secretary else "delivered",
             stats=message_result.stats_of(task, []), verification=verification,
         )  # fmt: skip
         await self._as(SYSTEM).set_message_state(
             user_id, request.id, "delivered", reason="the answer is in"
         )
+        if secretary:  # a reading task of the secretary: no review, the answer goes back to it
+            await self._as(SYSTEM).set_message_state(
+                user_id, request.id, "accepted", reason="needs no review"
+            )
+            if request.chain_id:
+                await self.store.finish_chain(user_id, request.chain_id)
+            await self._tell_secretary(user_id, request, "accepted", node)
+            return node
         node = await self.start_review(user_id, request, node)
         await self._watch(user_id, request)
         return node
@@ -394,6 +438,7 @@ class MessageService:
                     f"({payload.get('reason')}). Try again, change the request, or drop it?",
                 )
             await self.store.finish_chain(user_id, request.chain_id)
+        await self._tell_secretary(user_id, request, "failed", node)
         return node
 
     async def _file(
@@ -408,12 +453,16 @@ class MessageService:
         verification: dict[str, Any] | None = None,
     ) -> ProjectNode:
         store = self._as(Actor("app", app=request.target_app))
+        # a result of a task the secretary handed on is addressed to it (the registry's edge)
+        to_secretary = from_secretary(request) and (type, request.target_app or "", SECRETARY) in (
+            messages.edges()
+        )
         return await store.add_message(
             user_id,
             request.project_id,
             type=type,
             sender=request.target_app or "research",
-            receiver="project",
+            receiver=SECRETARY if to_secretary else "project",
             payload=payload,
             state=state,
             chain_id=request.chain_id,
@@ -813,6 +862,13 @@ class MessageService:
             user_id, request.id, "waiting", reason="the application asks back"
         )
         questions = "; ".join(payload.get("questions") or [])
+        if from_secretary(request):
+            # the secretary's task has no planner: its order says it waits, the person is asked
+            await self._ask_person(
+                user_id, request, f"{request.title}: {app} needs to know: {questions}"[:200]
+            )
+            await self._tell_secretary(user_id, request, "waiting")
+            return node
         await self._ask_person(
             user_id, request, f"{request.title}: {app} needs to know: {questions}"[:200]
         )

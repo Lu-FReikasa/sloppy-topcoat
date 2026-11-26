@@ -1,8 +1,8 @@
 """the secretary's orders (D112, issue #36)
 
 Revision ID: so01_secretary_orders
-Revises: ib01_inbox_without_marks
-Create Date: 2026-11-25
+Revises: sh02_setlists
+Create Date: 2026-11-26
 
 Adds the table ``orders``: what the secretary handed on, to whom, its state and whether the
 person asked to be told when it is done. Additive; the downgrade drops the table.
@@ -15,7 +15,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "so01_secretary_orders"
-down_revision: str | None = "ib01_inbox_without_marks"
+down_revision: str | None = "sh02_setlists"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -26,9 +26,7 @@ def upgrade() -> None:
     op.create_table(
         "orders",
         sa.Column("id", UUID, primary_key=True),
-        sa.Column(
-            "user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-        ),
+        sa.Column("user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
         sa.Column(
             "conversation_id",
             UUID,
@@ -37,7 +35,10 @@ def upgrade() -> None:
         ),
         sa.Column("target", sa.String(20), nullable=False),
         sa.Column(
-            "message_id", UUID, sa.ForeignKey("project_nodes.id", ondelete="SET NULL"), nullable=True
+            "message_id",
+            UUID,
+            sa.ForeignKey("project_nodes.id", ondelete="SET NULL"),
+            nullable=True,
         ),
         sa.Column("topic", sa.String(300), nullable=False),
         sa.Column("status", sa.String(12), nullable=False),
