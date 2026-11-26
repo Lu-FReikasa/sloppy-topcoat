@@ -62,6 +62,8 @@ drawn **scaled down**; it then takes no input, and a click on it zooms to the fi
 has its full size. Classes for the style sheet: `.dt-scaled` (a program drawn scaled down) and
 `.dt-unframed` (a program outside the zoomed group, off the stage). In the overlay `Esc` stays the
 client's key (it hides the overlay) and nest windows are not moved or sized by hand.
+On a narrow screen, which shows only the program in front, the nest is not drawn and its keys
+do nothing (`Esc` minimises as in the other layouts).
 
 The idea comes from [Trellis](https://github.com/DanFessler/trellis) by Dan Fessler, a layout engine
 for web apps with nested, zoomable panels. Topcoat's `nest` is an independent implementation of that
