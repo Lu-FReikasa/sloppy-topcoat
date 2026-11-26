@@ -1,7 +1,6 @@
-"""Memory care (E3-05): the care run with fake nodes and a fake clock — check confirmed / changed /
-contradicted / not verifiable, expiry, archive and restore, budget, pauses, isolation between
-users, the tool scope of the check (never the notes, never the web), the question rule in the chat
-and the counting of recalls and uses."""
+"""Memory care (E3-05): the care run with fake nodes and a fake clock — expiry, archive and
+restore, no live checks and no lowered trust (D124), isolation between users, the question rule in
+the chat and the counting of recalls and uses."""
 
 import json
 import uuid
@@ -16,18 +15,15 @@ from sqlalchemy.orm import Session
 
 from tests.conftest import AUTH, TEST_DB_URL
 from tests.fakenode import FakeNode, eventually, online_node
-from tests.test_agent import finish, use
+from tests.test_agent import use
 from tests.test_chat import ask, new_conv, sent_messages, use_model
-from tests.test_tools import tools_node
+from tests.test_tools import set_config, tools_node
 from tests.users import make_user
 from topcoat_hub import chat, memory_care
 from topcoat_hub.memory import EXTRACTION_SYSTEM
-from topcoat_hub.memory_care_service import CARE_SYSTEM
 from topcoat_hub.models import DEV_ADMIN_ID, MemoryItem, MemoryVersion
 
 PS = {"capability": "docker.ps", "input": {}}
-SHOWS_8081 = {"containers": [{"name": "web", "ports": "0.0.0.0:8081->80/tcp"}]}
-LIVE = [{"claim": "web runs on 8081", "tag": "live", "evidence": ["E1"]}]
 
 
 class Clock:
@@ -110,29 +106,6 @@ def sql(query: str, **params: Any) -> list[Any]:
     return rows
 
 
-def judge(node: FakeNode, verdict: dict[str, Any] | None = None) -> None:
-    """The care model of this node answers the judge's question with ``verdict``."""
-
-    def answer(req: dict[str, Any]) -> str | None:
-        if req.get("stream") or req["messages"][0]["content"] != CARE_SYSTEM:
-            return None
-        return json.dumps(verdict or {"verdict": "confirmed", "evidence": ["E1"], "reason": "ok"})
-
-    node.answer_fn = answer
-
-
-def look(capability: str = "docker.ps", **args: Any) -> str:
-    return json.dumps(
-        {
-            "action": "tool",
-            "node": "vm-docker",
-            "capability": capability,
-            "input": args,
-            "reason": "check the note",
-        }
-    )
-
-
 @pytest.fixture
 def world(client: TestClient, connect: Callable[..., FakeNode]) -> tuple[FakeNode, FakeNode]:
     _, tnode = tools_node(client, connect, "vm-docker")
@@ -158,202 +131,43 @@ def change(run: dict[str, Any], action: str) -> dict[str, Any]:
     return found[0]
 
 
-# --- the check: confirmed, changed, contradicted, not verifiable ------------------------------
+# --- no live checks, no lowered trust (D124) ---------------------------------------------------
 
 
-def test_a_check_that_confirms_a_note_sets_last_verified_and_lengthens_its_life(
+def test_a_care_run_checks_no_note_and_lowers_no_trust(
     client: TestClient, world, clock: Clock
 ) -> None:
-    _, mnode = world
-    item = seed(clock, "Docker läuft auf vm-docker", age=40, verify_with=PS)
-    assert memory_care.needs_check(_as_note(item), clock.now())
-    use(client, look(), finish("docker is up", LIVE, ""))
-    judge(mnode)
-    assert run_care(client) is not None
-    run = last_run(client)
-    assert run["kind"] == "care" and run["status"] == "ok"
-    assert (run["stats"]["checked"], run["stats"]["unchanged"]) == (1, 1)
-    assert change(run, "verified")["undo"] is None
-    after = row(item)
-    assert after["verified_count"] == 1 and after["last_verified_at"] is not None
-    assert after["version"] == 1  # a confirmation changes no content: no new version
-    view = client.get(f"/api/memory/{item}", headers=AUTH).json()
-    assert view["stage"] == "sure" and view["halflife_days"] == pytest.approx(
-        14 * 1.5**2
-    )  # 1 check = 2 statements
-    # the check is a task of its own kind, hidden from the Tasks list
-    assert [r.origin for r in _tasks()] == ["care"]
-    assert client.get("/api/agent/tasks", headers=AUTH).json() == []
-
-
-def test_a_live_note_that_differs_gets_a_new_version_with_evidence_and_it_can_be_undone(
-    client: TestClient, world, clock: Clock
-) -> None:
-    tnode, mnode = world
-    tnode.capability_answers["docker.ps"] = SHOWS_8081
-    item = seed(clock, "web läuft auf Port 8080", age=40, evidence="live", verify_with=PS)
-    use(client, look(), finish("web is on 8081", LIVE, ""))
-    judge(
-        mnode,
-        {
-            "verdict": "changed",
-            "text": "web läuft auf Port 8081",
-            "quote": "8081",
-            "evidence": ["E1"],
-            "reason": "docker ps shows 8081",
-        },
-    )
-    run_care(client)
-    after = row(item)
-    assert after["text"] == "web läuft auf Port 8081" and after["version"] == 2
-    assert after["evidence"] == "live" and after["verified_count"] == 1
-    versions = client.get(f"/api/memory/{item}", headers=AUTH).json()["versions"]
-    assert versions[0]["actor"] == "care"
-    assert versions[0]["source"]["care"]["evidence"] == ["E1"]
-    assert "different state" in versions[0]["reason"]
-    entry = change(last_run(client), "changed")
-    assert (entry["undo"], entry["from_version"], entry["new_text"]) == (
-        "revert",
-        1,
-        "web läuft auf Port 8081",
-    )
-    # the report's undo: back to version 1
-    r = client.post(f"/api/memory/{item}/revert", headers=AUTH, json={"version": 1})
-    assert r.status_code == 200 and row(item)["text"] == "web läuft auf Port 8080"
-
-
-def test_an_empty_answer_never_changes_a_note_even_if_the_judge_says_so(
-    client: TestClient, world, clock: Clock
-) -> None:
-    # found with Nextcloud: "docker ps --name nextcloud" found nothing (the container is called
-    # nc-app) and a small judge called the service stopped
-    _, mnode = world  # the tool node answers docker.ps with nothing at all
-    item = seed(clock, "web läuft auf Port 8080", age=40, evidence="live", verify_with=PS)
-    use(client, look(), finish("nothing found", LIVE, ""))
-    judge(
-        mnode,
-        {
-            "verdict": "changed",
-            "text": "web ist gestoppt",
-            "quote": "gestoppt",
-            "evidence": ["E1"],
-            "reason": "no container",
-        },
-    )
-    run_care(client)
-    after = row(item)
-    assert after["text"] == "web läuft auf Port 8080" and after["version"] == 1
-    assert last_run(client)["stats"]["unverifiable"] == 1
-    assert last_run(client)["stats"]["changed"] == 0
-
-
-def test_a_note_the_user_said_is_never_overwritten_the_assistant_asks(
-    client: TestClient, world, clock: Clock
-) -> None:
-    tnode, mnode = world
-    tnode.capability_answers["docker.ps"] = SHOWS_8081
-    item = seed(clock, "web läuft auf Port 8080", age=40, evidence="doc", verify_with=PS)
-    use(client, look(), finish("web is on 8081", LIVE, ""))
-    judge(
-        mnode,
-        {
-            "verdict": "changed",
-            "text": "web läuft auf Port 8081",
-            "quote": "8081",
-            "evidence": ["E1"],
-            "reason": "x",
-        },
-    )
-    run_care(client)
-    after = row(item)
-    assert after["text"] == "web läuft auf Port 8080"  # the user's word stands
-    assert after["status"] == "disputed"
-    questions = client.get("/api/memory/questions", headers=AUTH).json()
-    assert len(questions) == 1
-    q = questions[0]
-    assert q["origin"] == "care" and q["observed"] == "web läuft auf Port 8081"
-    assert [c["id"] for c in q["candidates"]] == [item]
-    assert change(last_run(client), "asked")["question_id"] == q["id"]
-    # the user answers: the note is right (it was moved on purpose)
-    r = client.post(f"/api/memory/questions/{q['id']}/answer", headers=AUTH, json={"note_id": item})
-    assert r.status_code == 200, r.text
-    assert row(item)["status"] == "active" and row(item)["trust"] == 1.0
-
-
-def test_a_dismissed_question_is_not_asked_again_about_the_same_finding(
-    client: TestClient, world, clock: Clock
-) -> None:
-    tnode, mnode = world
-    tnode.capability_answers["docker.ps"] = SHOWS_8081
-    item = seed(clock, "web läuft auf Port 8080", age=40, evidence="doc", verify_with=PS)
-    verdict = {
-        "verdict": "changed",
-        "text": "web läuft auf Port 8081",
-        "quote": "8081",
-        "evidence": ["E1"],
-    }
-    use(client, look(), finish("web is on 8081", LIVE, ""), look(), finish("again", LIVE, ""))
-    judge(mnode, verdict)
-    run_care(client)
-    (q,) = client.get("/api/memory/questions", headers=AUTH).json()
-    client.post(f"/api/memory/questions/{q['id']}/dismiss", headers=AUTH)
-    clock.advance(5)  # past the recheck period: the note is looked at again
-    run_care(client)
-    assert client.get("/api/memory/questions", headers=AUTH).json() == []
-    assert row(item)["status"] == "disputed"
-
-
-def test_a_check_that_shows_nothing_lowers_the_trust_and_is_not_repeated_at_once(
-    client: TestClient, world, clock: Clock
-) -> None:
-    _, mnode = world
-    item = seed(clock, "Docker läuft auf vm-docker", age=40, verify_with=PS)
-    use(client, look(), finish("cannot tell", LIVE, ""))
-    judge(mnode, {"verdict": "unverifiable", "evidence": [], "reason": "the list says nothing"})
-    run_care(client)
-    after = row(item)
-    assert after["trust"] == pytest.approx(0.7) and after["verified_count"] == 0
-    assert after["version"] == 1 and after["status"] == "active"
-    assert change(last_run(client), "unverifiable")["reason"].startswith("care: not verifiable")
-    # not looked at again within the recheck period
-    assert not memory_care.needs_check(_as_note(item), clock.now())
-    clock.advance(4)
-    assert memory_care.needs_check(_as_note(item), clock.now())
-
-
-def test_a_verdict_that_names_no_evidence_of_this_check_counts_for_nothing(
-    client: TestClient, world, clock: Clock
-) -> None:
-    _, mnode = world
-    item = seed(clock, "Docker läuft auf vm-docker", age=40, verify_with=PS)
-    use(client, look(), finish("docker is up", LIVE, ""))
-    judge(mnode, {"verdict": "confirmed", "evidence": ["E9"], "reason": "trust me"})
-    run_care(client)
-    after = row(item)
-    assert after["verified_count"] == 0 and after["trust"] == pytest.approx(0.7)
-
-
-def test_an_operational_note_nothing_can_check_loses_trust_without_a_model_call(
-    client: TestClient, world, clock: Clock
-) -> None:
-    _, _ = world
-    item = seed(clock, "Der lil switch ist absichtlich aus", age=40)
+    checkable = seed(clock, "Docker läuft auf vm-docker", age=40, verify_with=PS)
+    blind = seed(clock, "Der lil switch ist absichtlich aus", age=40)
     model = use(client)
     run_care(client)
     assert model.calls == [] and _tasks() == []
-    assert row(item)["trust"] == pytest.approx(0.7)
-    assert last_run(client)["stats"]["unverifiable"] == 1
+    for item in (checkable, blind):
+        after = row(item)
+        assert after["trust"] == 1.0 and after["verified_count"] == 0 and after["version"] == 1
+        assert after["care_checked_at"] is None
+    run = last_run(client)
+    assert run["status"] == "ok" and run["stats"]["changes"] == []
 
 
-def test_a_check_that_could_not_start_blames_nobody(
-    client: TestClient, connect: Callable[..., FakeNode], clock: Clock
+def test_a_mirrored_profile_with_a_check_hint_is_not_checked_and_gets_no_file_edit_proposal(
+    client: TestClient, world, clock: Clock, connect: Callable[..., FakeNode]
 ) -> None:
-    online_node(client, connect, "node-a", loaded=["small"])  # a model, but no tool node
-    use_model(client)
-    item = seed(clock, "Docker läuft auf vm-docker", age=40, verify_with=PS)
+    # the profile's host has a connected tool node with the read-only shell: still no check
+    node_id, _ = tools_node(client, connect, "tools-alpha", with_shell=True)
+    set_config(client, node_id, lambda c: c["capabilities"].append("shell.read"))
+    item = seed(
+        clock,
+        "alpha runs the containers",
+        age=40,
+        source_type="kb",
+        source_ref={"path": "steckbriefe/alpha.md", "host": "alpha", "check_hint": "docker ps"},
+    )
+    model = use(client)
     run_care(client)
-    assert row(item)["trust"] == 1.0 and row(item)["care_checked_at"] is None
-    assert last_run(client)["stats"]["failed"] == 1
+    assert model.calls == [] and _tasks() == []
+    assert row(item)["trust"] == 1.0 and row(item)["version"] == 1
+    assert client.get("/api/core/proposals", headers=AUTH).json() == []
 
 
 # --- expiry and archive -----------------------------------------------------------------------
@@ -426,25 +240,17 @@ def test_a_useless_note_sinks_in_the_ranking_is_archived_after_the_period_and_co
     assert row(useless)["status"] == "active"
 
 
-def test_an_old_but_often_used_note_stays_and_is_only_checked(
-    client: TestClient, world, clock: Clock
-) -> None:
-    _, mnode = world
+def test_an_old_but_often_used_note_stays(client: TestClient, world, clock: Clock) -> None:
     item = seed(
         clock,
         "Docker läuft auf vm-docker",
         age=400,
-        verify_with=PS,
         recalled_count=45,
         used_count=40,
         last_used_at=clock.ago(3),
     )
-    use(client, look(), finish("docker is up", LIVE, ""))
-    judge(mnode)
     run_care(client)
-    run = last_run(client)
-    assert run["stats"]["archived"] == 0 and run["stats"]["unchanged"] == 1
-    assert row(item)["status"] == "active" and row(item)["verified_count"] == 1
+    assert last_run(client)["stats"]["archived"] == 0 and row(item)["status"] == "active"
 
 
 def test_age_alone_never_archives_even_a_very_old_note(
@@ -455,91 +261,18 @@ def test_age_alone_never_archives_even_a_very_old_note(
     assert row(item)["status"] == "active"
 
 
-# --- budget, pauses, scope --------------------------------------------------------------------
-
-
-def test_the_budget_of_a_run_stops_it(client: TestClient, world, clock: Clock) -> None:
-    _, mnode = world
-    client.app.state.settings.memory_care_max_notes = 1
-    ids = [seed(clock, f"Container c{n} läuft", age=30 + n, verify_with=PS) for n in range(3)]
-    use(client, *[look(), finish("up", LIVE, "")] * 3)
-    judge(mnode)
-    run_care(client)
-    run = last_run(client)
-    assert run["status"] == "stopped_budget" and run["stats"]["checked"] == 1
-    assert sum(row(i)["verified_count"] for i in ids) == 1
-
-
-def test_a_busy_node_pauses_the_run_and_the_notes_wait(
-    client: TestClient, world, clock: Clock
-) -> None:
-    _, mnode = world
-    item = seed(clock, "Docker läuft auf vm-docker", age=40, verify_with=PS)
-    mnode.state = "busy_gaming"
-    mnode.heartbeat()
-
-    def busy() -> None:
-        states = {n["name"]: n["state"] for n in client.get("/api/nodes", headers=AUTH).json()}
-        assert states["node-a"] == "busy_gaming"
-
-    eventually(busy)
-    model = use(client)
-    run_care(client)
-    assert last_run(client)["status"] == "paused"
-    assert model.calls == [] and row(item)["verified_count"] == 0 and row(item)["trust"] == 1.0
-
-
-def test_the_check_gets_only_the_servers_tool_group_never_the_notes_or_the_web(
-    client: TestClient, world, clock: Clock
-) -> None:
-    tnode, mnode = world
-    seed(clock, "Docker läuft auf vm-docker", age=40, verify_with=PS)
-    # the model tries to read a note file: nothing like that is offered to this task
-    use(client, look("docs.read", path="servers/SENSIBEL/x.md"), look(), finish("up", LIVE, ""))
-    judge(mnode)
-    run_care(client)
-    (task,) = _tasks()
-    assert task.origin == "care"
-    assert task.scope == {"nodes": None, "groups": ["docker"], "internet": False}
-    assert [c["capability"] for c in tnode.capability_calls] == ["docker.ps"]
-
-
-@pytest.mark.parametrize(
-    "check",
-    [
-        {"capability": "knowledge.search", "input": {"query": "passwörter"}},
-        {"capability": "docs.read", "input": {"path": "servers/SENSIBEL/zugang.md"}},
-        {"capability": "web.fetch", "input": {"url": "https://example.org"}},
-    ],
-)
-def test_a_note_whose_check_lies_in_the_notes_or_on_the_web_is_never_run(
-    client: TestClient, world, clock: Clock, check: dict[str, Any]
-) -> None:
-    item = seed(clock, "Zugang steht in der Doku", age=40, verify_with=check)
-    model = use(client)
-    run_care(client)
-    assert _tasks() == [] and model.calls == []
-    assert row(item)["trust"] == pytest.approx(0.7)  # "not verifiable", nothing was read
-
-
 # --- isolation (D20) --------------------------------------------------------------------------
 
 
 def test_a_care_run_only_touches_the_notes_of_its_own_user(
     client: TestClient, world, clock: Clock, clean_db: str
 ) -> None:
-    _, mnode = world
     b_id, b_auth = make_user(clean_db, "bea")
-    a_note = seed(clock, "Docker läuft auf vm-docker", age=40, verify_with=PS)
-    b_note = seed(clock, "Docker läuft auf bea-host", user=b_id, age=40, verify_with=PS)
+    a_gone = seed(clock, "Dienst X ist down", expires_at=clock.ago(1))
     b_gone = seed(clock, "Dienst Y ist down", user=b_id, expires_at=clock.ago(1))
-    use(client, look(), finish("up", LIVE, ""))
-    judge(mnode)
     run_care(client)  # for the dev admin only
-    assert row(a_note)["verified_count"] == 1
-    assert row(b_note)["verified_count"] == 0 and row(b_note)["trust"] == 1.0
+    assert row(a_gone)["status"] == "deleted"
     assert row(b_gone)["status"] == "active"
-    assert {str(t.user_id) for t in _tasks()} == {str(DEV_ADMIN_ID)}
     assert client.get("/api/memory", headers=b_auth).json()["care"]["runs"] == []
     # B's own run strikes B's note and leaves A's alone
     run_care(client, b_id)
@@ -597,19 +330,16 @@ def test_the_care_can_be_started_by_hand_and_says_why_it_cannot(
 def test_the_scheduler_runs_once_per_night_and_only_when_there_is_something_to_do(
     client: TestClient, world, clock: Clock
 ) -> None:
-    _, mnode = world
     care = client.app.state.memory_care
     client.app.state.settings.memory_care_hour = clock.now().astimezone().hour
-    seed(clock, "Docker läuft auf vm-docker", age=40, verify_with=PS)
-    use(client, look(), finish("up", LIVE, ""), look(), finish("up", LIVE, ""))
-    judge(mnode)
+    seed(clock, "Dienst X ist down", expires_at=clock.ago(1))
     assert client.portal.call(care.tick) == 1  # the first idle moment after the care hour
     assert last_run(client)["trigger"] == "nightly"
     assert client.portal.call(care.tick) == 0  # the same night: not again
     clock.advance(1)
     assert client.portal.call(care.tick) == 0  # a new night, but nothing to do: no run, no row
     assert len(client.get("/api/memory", headers=AUTH).json()["care"]["runs"]) == 1
-    clock.advance(100)  # the note is doubtful again
+    seed(clock, "Dienst Y ist down", expires_at=clock.ago(1))  # something to do again
     assert client.portal.call(care.tick) == 1
     assert len(client.get("/api/memory", headers=AUTH).json()["care"]["runs"]) == 2
 
@@ -618,7 +348,7 @@ def test_a_hub_that_is_not_idle_does_not_start_a_care_run(
     client: TestClient, world, clock: Clock
 ) -> None:
     care = client.app.state.memory_care
-    seed(clock, "Docker läuft auf vm-docker", age=40, verify_with=PS)
+    seed(clock, "Dienst X ist down", expires_at=clock.ago(1))
     client.app.state.memory.settings.memory_idle_seconds = 120  # the optional quiet time is on
     client.app.state.memory.activity.begin()  # somebody is chatting
     assert client.portal.call(care.tick) == 0
@@ -628,7 +358,7 @@ def test_without_a_quiet_time_a_care_run_starts_and_the_node_queue_puts_chat_fir
     client: TestClient, world, clock: Clock
 ) -> None:
     care = client.app.state.memory_care
-    seed(clock, "Docker läuft auf vm-docker", age=40, verify_with=PS)
+    seed(clock, "Dienst X ist down", expires_at=clock.ago(1))
     assert client.app.state.memory.settings.memory_idle_seconds == 0  # the default
     client.app.state.memory.activity.begin()  # somebody is chatting: the queue sorts it out
     assert client.portal.call(care.tick) == 1

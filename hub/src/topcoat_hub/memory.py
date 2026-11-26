@@ -410,24 +410,22 @@ class Candidate:
     inferred: bool
     refs: list[Recalled]
     vec: list[float] | None = None
-    # E3-05: what kind of note, whether it is a passing state, how it could be checked, and the
+    # E3-05: what kind of note, whether it is a passing state, and the
     # reference of the live check result the user confirmed (the only way to a [live] note)
     kind: str = "person"
     volatile: bool = False
-    verify_with: dict[str, Any] | None = None
     live_ref: str | None = None
     live_task: str | None = None
     # D74: the tags the model chose (names, or "parent/new" for a tag it adds)
     tags: list[str] = field(default_factory=list)
 
     def fields(self, now: Any) -> dict[str, Any]:
-        """What the store needs besides the text: evidence, kind, expiry, check, source extras."""
+        """What the store needs besides the text: evidence, kind, expiry, source extras."""
         live = self.live_ref is not None
         return {
             "evidence": "live" if live else ("assumption" if self.inferred else "doc"),
             "kind": self.kind,
             "expires_at": memory_care.expiry_for(now) if self.volatile else None,
-            "verify_with": self.verify_with,
             "last_verified_at": now if live else None,
         }
 
@@ -484,9 +482,7 @@ EXTRACTION_SYSTEM = (
     '"operational" (about the user\'s servers, devices, services). Set "volatile": true for a '
     "state that changes soon (a service is down right now, a disk is full today): it is not kept "
     "long. "
-    "For an operational note that a read-only look at the servers could check, you may give "
-    '"verify_with": {"capability": "<name of a read-only capability>", "input": {}} — only if you '
-    "are sure of the name. If results of a server check are listed and the user confirms or "
+    "If results of a server check are listed and the user confirms or "
     'corrects one of them, set "check_ref" to its reference (e.g. "E2") and '
     '"confirmed_by_user": true. Put into "used" the numbers of the existing notes whose content '
     "the assistant's reply really relied on. "
@@ -972,19 +968,13 @@ class MemoryService:
     def _care_fields(
         self, cand: Candidate, entry: dict[str, Any], last_check: dict[str, tuple[str, str]]
     ) -> bool:
-        """Kind, passing state, way to check and live origin of a proposed note, as far as they
+        """Kind, passing state and live origin of a proposed note, as far as they
         can be trusted. ``False``: the note must not be stored (a volatile note when the time to
         live is 0)."""
         cand.kind = memory_care.kind_of(entry.get("kind"))
         cand.volatile = entry.get("volatile") is True
         if cand.volatile and memory_care.expiry_for(memory_care.utcnow(), self.care_config) is None:
             return False
-        verify = memory_care.verify_input_ok(entry.get("verify_with"))
-        if verify is not None and (
-            cand.kind != "operational" or memory_filter.check(json.dumps(verify))
-        ):
-            verify = None
-        cand.verify_with = verify
         # [live] only with a reference to a check result the user confirmed: the model's word
         # alone never makes a note live
         ref = entry.get("check_ref")

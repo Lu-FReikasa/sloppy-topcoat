@@ -1028,43 +1028,7 @@ class MemoryStore:
             stmt = stmt.where(MemoryRun.kind == kind)
         return await self.db.scalar(stmt.limit(1))
 
-    # --- care (E3-05): checks, use, feedback, expiry ------------------------------------------
-
-    async def mark_care_checked(self, item_id: uuid.UUID, now: datetime) -> None:
-        await self.db.execute(
-            update(MemoryItem)
-            .where(MemoryItem.id == item_id, MemoryItem.user_id == self.user_id)
-            .values(care_checked_at=now)
-        )
-
-    async def lower_trust(
-        self, item_id: uuid.UUID, factor: float, floor: float, now: datetime
-    ) -> None:
-        """A check could not be made: trust the note less (never below ``floor``) and do not
-        look again right away."""
-        await self.db.execute(
-            update(MemoryItem)
-            .where(MemoryItem.id == item_id, MemoryItem.user_id == self.user_id)
-            .values(trust=func.greatest(MemoryItem.trust * factor, floor), care_checked_at=now)
-        )
-
-    async def verify(self, item_id: uuid.UUID, now: datetime) -> MemoryItem | None:
-        """A live check showed the note still holds: counted (twice as strong as a statement),
-        the clock restarts, trust is back to 1. No new version: nothing about the note changed."""
-        await self.db.execute(
-            update(MemoryItem)
-            .where(MemoryItem.id == item_id, MemoryItem.user_id == self.user_id)
-            .values(
-                last_verified_at=now,
-                verified_count=MemoryItem.verified_count + 1,
-                trust=1.0,
-                care_checked_at=now,
-            )
-        )
-        item = await self.get(item_id)
-        if item is not None:
-            await self.db.refresh(item)
-        return item
+    # --- care (E3-05): use, feedback, expiry ------------------------------------------------
 
     async def record_recalled(self, item_ids: Sequence[uuid.UUID]) -> None:
         """These notes went into a prompt."""

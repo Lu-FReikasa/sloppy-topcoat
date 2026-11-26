@@ -179,7 +179,7 @@ def test_a_secret_in_a_steckbrief_is_not_mirrored(
 # --- the care run -----------------------------------------------------------------------------
 
 
-def test_the_care_never_archives_rewrites_or_distrusts_a_mirrored_note() -> None:
+def test_the_care_never_archives_a_mirrored_note() -> None:
     now = datetime(2026, 10, 1, tzinfo=UTC)
     from types import SimpleNamespace
 
@@ -197,46 +197,10 @@ def test_the_care_never_archives_rewrites_or_distrusts_a_mirrored_note() -> None
     cfg = memory_care.DEFAULT
     plain = kb()
     plan = plan_for([plain], [], now, cfg)
-    assert plan.archive == [] and plan.unverifiable == [] and plan.checks == []
-    # the same note as a user's fact would be archived or distrusted: the file decides, not the care
+    assert plan.archive == [] and not plan.has_work
+    # the same note as a user's fact would be archived: the file decides, not the care
     user = kb(source_type="chat", recalled_count=20)
     assert plan_for([user], [], now, cfg).archive == [user]
-    # a note with a way to check (set by the care itself earlier) is checked like any other
-    checkable = kb(verify_with={"capability": "system.info", "input": {}}, trust=1.0)
-    assert plan_for([checkable], [], now, cfg).checks == [checkable]
-
-
-def test_a_live_check_that_contradicts_a_steckbrief_becomes_a_proposal_to_edit_the_file(
-    client: TestClient, world: dict[str, Any], clean_db: str
-) -> None:
-    docs: Docs = world["docs"]
-    docs.files["steckbriefe/node-amd.md"] = HOST
-    indexed(client, world)
-    [row] = all_kb_rows(clean_db)
-    care = client.app.state.memory_care
-
-    async def differs() -> str:
-        async with care.sessionmaker() as db:
-            item = await MemoryStore(db, A_ID).get(row.id)
-        stats: dict[str, Any] = {"changed": 0, "asked": 0, "proposed": 0, "changes": []}
-        verdict = {"verdict": "changed", "text": "node-amd: llama-server is stopped",
-                   "evidence": ["E1"], "reason": "the unit is inactive"}  # fmt: skip
-        outcome = await care._differs(A_ID, item, verdict, ["E1"], {"care": {}}, stats)
-        assert stats["proposed"] == 1 and stats["changed"] == 0
-        assert stats["changes"][0]["action"] == "proposed"
-        return outcome
-
-    assert client.portal.call(differs) == "asked"
-    [after] = all_kb_rows(clean_db)
-    assert after.text == row.text and after.version == row.version  # the note did not change
-    [proposal] = client.get("/api/core/proposals", headers=AUTH).json()
-    assert proposal["action"] == "kb_edit" and proposal["origin"] == "care"
-    assert "llama-server is stopped" in proposal["evidence"]["markdown"]  # Markdown to copy
-    assert proposal["evidence"]["path"] == "steckbriefe/node-amd.md"
-    # accepting a file edit writes no file: it just closes the proposal (the user copies the text)
-    r = client.post(f"/api/core/proposals/{proposal['id']}/accept", headers=AUTH)
-    assert r.status_code == 200 and r.json()["item"] is None
-    assert all_kb_rows(clean_db)[0].text == row.text
 
 
 class FakeGateway:

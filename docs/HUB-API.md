@@ -369,7 +369,7 @@ to the E2-02 fields: `kind` (`person` | `preference` | `operational`), `stage` (
 `stale`, the only form of reliability the model sees), `reliability` and `usefulness` (0..1, for the GUI),
 `last_verified_at`, `verified_count` (live checks; a check counts `TOPCOAT_MEMORY_LIVE_CHECK_WEIGHT`
 = 2 times a statement), `expires_at` (volatile notes only), `verify_with` (`{capability, input}` of a
-read-only capability, or `null`), `recalled_count`, `used_count`, `last_used_at`, `feedback_positive`,
+read-only capability, or `null`; no longer written or used since D124, older notes may still carry one), `recalled_count`, `used_count`, `last_used_at`, `feedback_positive`,
 `feedback_negative`, `halflife_days` (this note's, grown by its confirmations). `status` may now be
 `archived`.
 

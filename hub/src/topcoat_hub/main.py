@@ -361,7 +361,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.memory_care = MemoryCare(
             app.state.sessionmaker,
             app.state.gateway,
-            app.state.agents,
             app.state.memory,
             settings,
             digester=app.state.digester,
