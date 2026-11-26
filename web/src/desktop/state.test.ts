@@ -17,10 +17,12 @@ import {
   soloState,
   soloStep,
   soloViewOf,
+  startKey,
   taskbarClick,
   toggleMaximise,
   viewOf,
   visible,
+  withStart,
   type DesktopState,
   type ProgramInfo,
 } from "./state";
@@ -118,6 +120,27 @@ describe("the desktop state", () => {
     expect(programFor(PROGRAMS, "page.node", null)).toBe("admin"); // with the machines
     expect(programFor(PROGRAMS, "page.model", "chat")).toBe("admin"); // with the models
     expect(programFor(PROGRAMS, "page.nope", null)).toBeNull();
+  });
+});
+
+// a load with no program used last (#115)
+describe("where a load goes when no program was used last", () => {
+  const research = { key: "research", modules: ["page.research"], first: "page.research" };
+  it("is Start wherever it stands, else the first program", () => {
+    expect(startKey([research, ...PROGRAMS])).toBe("chat");
+    expect(startKey([research, ...PROGRAMS.slice(0, 1)])).toBe("research");
+    expect(startKey([])).toBeNull();
+  });
+  it("opens Start only when nothing is in front, also when everything is minimised", () => {
+    const front = openProgram(EMPTY, "inbox");
+    expect(withStart(front, PROGRAMS)).toBe(front);
+    const down = minimise(front, "inbox");
+    expect(withStart(down, PROGRAMS)).toMatchObject({ open: ["inbox", "chat"], minimised: ["inbox"], focus: "chat" });
+    const startDown = minimise(openProgram(EMPTY, "chat"), "chat");
+    expect(withStart(startDown, PROGRAMS)).toMatchObject({ open: ["chat"], minimised: [], focus: "chat" });
+  });
+  it("leaves the desktop alone for a person without Start", () => {
+    expect(withStart(EMPTY, PROGRAMS.slice(0, 1))).toBe(EMPTY);
   });
 });
 
