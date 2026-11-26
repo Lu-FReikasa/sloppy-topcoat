@@ -615,6 +615,19 @@
   background: color-mix(in srgb, currentColor 9%, transparent);
 }
 
+/* a sorted or searched view (#149): rows are not dragged there */
+.setlist-item.is-fixed {
+  cursor: default;
+}
+
+/* search and view of one setlist: the search takes the line, the view select wraps below it in
+   the narrow side column */
+.setlist-view > input[type="search"] {
+  flex: 1 1 10rem;
+  min-width: 0;
+  font-size: 16px;
+}
+
 .setlist-item.is-dragged {
   opacity: 0.5;
 }

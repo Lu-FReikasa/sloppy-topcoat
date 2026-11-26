@@ -4412,7 +4412,16 @@
       "remove": "Aus der Setliste entfernen",
       "missing": "Sheet gelöscht",
       "position": "{{name}} · {{n}} von {{total}}",
-      "side": "Setlist"
+      "side": "Setlist",
+      "search": "In der Setliste suchen",
+      "view": "Ansicht",
+      "views": {
+        "setlist": "Reihenfolge der Setliste",
+        "title": "Titel",
+        "artist": "Interpret, dann Titel"
+      },
+      "sortedHint": "Sortiert oder gesucht: die Nummern sind die Plätze in der Setliste. Umsortieren in der Reihenfolge der Setliste ohne Suche.",
+      "noMatch": "Kein Lied der Setliste passt."
     },
     "back": "Zurück zur Liste",
     "close": "Schließen",

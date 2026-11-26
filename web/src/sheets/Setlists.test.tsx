@@ -4,10 +4,10 @@ import type { ApiClient } from "../api/client";
 import { Setlists } from "./Setlists";
 import type { Setlist, SetlistItem, SheetSummary } from "./types";
 
-const sheet = (id: string, title: string): SheetSummary => ({
+const sheet = (id: string, title: string, artist = "Example Band"): SheetSummary => ({
   id,
   title,
-  artist: "Example Band",
+  artist,
   instrument: "guitar",
   key: "A",
   capo: 0,
@@ -89,5 +89,61 @@ describe("Setlists", () => {
     expect(loads).toHaveBeenCalledTimes(1); // no reload while a change is still on its way
     answers[1]!(true);
     await waitFor(() => expect(loads).toHaveBeenCalledTimes(2));
+  });
+
+  it("a sorted or searched view keeps the stored order and plays from the song's own position", async () => {
+    // the evening's order: 1 Zebra (Alpha Band), 2 Moon (Beta Band), 3 Apple (Beta Band)
+    const list = [sheet("z", "Zebra Song", "Alpha Band"), sheet("m", "Moon Song", "Beta Band"), sheet("p", "Apple Song", "Beta Band")];
+    const gig: Setlist = {
+      id: "L2",
+      name: "Gig",
+      items: list.map((s) => ({ sheet_id: s.id, newest: false })),
+      updated_at: null,
+      created_at: null,
+    };
+    const setlistUpdate = vi.fn((_id: string, patch: { items?: SetlistItem[] }) => Promise.resolve({ ...gig, ...patch }));
+    const api = { setlists: () => Promise.resolve({ setlists: [gig] }), setlistUpdate } as unknown as ApiClient;
+    const onPlay = vi.fn();
+    window.localStorage.setItem("topcoat.sheets.setlist", "L2");
+    window.localStorage.removeItem("topcoat.sheets.setlistView");
+    const { unmount } = render(<Setlists api={api} list={list} onOpen={() => undefined} onPlay={onPlay} onError={() => undefined} />);
+    const items = await screen.findByTestId("setlist-items");
+    const rows = () =>
+      within(items)
+        .getAllByRole("listitem")
+        .map((li) => `${li.querySelector(".setlist-n")!.textContent} ${li.getAttribute("aria-label")}`);
+    const moves = () => within(items).queryAllByRole("button", { name: /^(Move (up|down)|Nach (oben|unten))$/ });
+    expect(moves().length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByTestId("setlist-view"), { target: { value: "title" } });
+    // an index of the set: sorted by title, each song with its fixed position
+    expect(rows()).toEqual(["3 Apple Song", "2 Moon Song", "1 Zebra Song"]);
+    expect(moves()).toHaveLength(0);
+    expect(within(items).getAllByRole("listitem")[0]!.getAttribute("draggable")).toBe("false");
+    // Alt+arrow does nothing here: no PATCH, the stored order stays
+    fireEvent.keyDown(within(items).getAllByRole("listitem")[0]!, { key: "ArrowUp", altKey: true });
+    // playing from "Apple Song" starts at its place in the setlist, not at the top of the view
+    fireEvent.click(within(within(items).getAllByRole("listitem")[0]!).getByRole("button", { name: /^(Play on stage from this song|Ab diesem Lied auf der Bühne spielen)$/ }));
+    expect(onPlay).toHaveBeenCalledWith(gig, 2);
+
+    fireEvent.change(screen.getByTestId("setlist-view"), { target: { value: "artist" } });
+    expect(rows()).toEqual(["1 Zebra Song", "3 Apple Song", "2 Moon Song"]);
+    fireEvent.change(screen.getByTestId("setlist-search"), { target: { value: "beta" } });
+    expect(rows()).toEqual(["3 Apple Song", "2 Moon Song"]);
+    // setlist order with a search: still no reordering
+    fireEvent.change(screen.getByTestId("setlist-view"), { target: { value: "setlist" } });
+    expect(rows()).toEqual(["2 Moon Song", "3 Apple Song"]);
+    expect(moves()).toHaveLength(0);
+    // removing a song from a searched view drops just that song from the stored order
+    fireEvent.click(within(within(items).getAllByRole("listitem")[0]!).getByRole("button", { name: /^(Remove from the setlist|Aus der Setliste entfernen)$/ }));
+    await waitFor(() => expect(setlistUpdate).toHaveBeenCalledTimes(1));
+    expect(setlistUpdate.mock.calls[0]![1].items!.map((i) => i.sheet_id)).toEqual(["z", "p"]);
+
+    // the view is remembered per setlist; the search is not
+    fireEvent.change(screen.getByTestId("setlist-view"), { target: { value: "title" } });
+    unmount();
+    render(<Setlists api={api} list={list} onOpen={() => undefined} onPlay={onPlay} onError={() => undefined} />);
+    expect(((await screen.findByTestId("setlist-view")) as HTMLSelectElement).value).toBe("title");
+    expect((screen.getByTestId("setlist-search") as HTMLInputElement).value).toBe("");
   });
 });
