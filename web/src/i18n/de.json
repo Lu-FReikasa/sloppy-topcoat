@@ -4288,8 +4288,7 @@
   "sheets": {
     "title": "Sheets",
     "list": "Deine Sheets",
-    "empty": "Noch keine Sheets. Starte eine Recherche oder füge ein Sheet ein.",
-    "pick": "Wähle links ein Sheet oder starte eine Recherche zu einem Song.",
+    "empty": "Noch keine Sheets. Recherchiere einen Song oder füge ein Sheet ein, mit „Neues Sheet …“.",
     "loading": "Lädt …",
     "capoN": "Kapo {{n}}",
     "key": "Tonart",
@@ -4373,7 +4372,8 @@
       "search": "Songs suchen",
       "artist": "Interpret",
       "allArtists": "Alle Interpreten",
-      "none": "Kein Sheet passt."
+      "none": "Kein Sheet passt.",
+      "keys": "/ oder Strg+F: suchen · Enter: ersten Song öffnen"
     },
     "sort": {
       "label": "Sortierung",
@@ -4386,7 +4386,6 @@
       "exit": "Verlassen",
       "prev": "Vorheriges Lied",
       "next": "Nächstes Lied",
-      "hideTabs": "Tabs ausblenden",
       "scroll": "Zu lang für einen Bildschirm: scrollen"
     },
     "setlists": {
@@ -4411,7 +4410,24 @@
       "down": "Nach unten",
       "remove": "Aus der Setliste entfernen",
       "missing": "Sheet gelöscht",
-      "position": "{{name}} · {{n}} von {{total}}"
+      "position": "{{name}} · {{n}} von {{total}}",
+      "side": "Setlist",
+      "search": "In der Setliste suchen",
+      "view": "Ansicht",
+      "views": {
+        "setlist": "Reihenfolge der Setliste",
+        "title": "Titel",
+        "artist": "Interpret, dann Titel"
+      },
+      "sortedHint": "Sortiert oder gesucht: die Nummern sind die Plätze in der Setliste. Umsortieren in der Reihenfolge der Setliste ohne Suche.",
+      "noMatch": "Kein Lied der Setliste passt."
+    },
+    "back": "Zurück zur Liste",
+    "close": "Schließen",
+    "versions": "Versionen",
+    "new": {
+      "open": "Neues Sheet …",
+      "title": "Neues Sheet"
     }
   },
   "images": {
@@ -4425,7 +4441,7 @@
     "missing": "Bild nicht verfügbar",
     "blind": "Das Modell dieser Antwort kann keine Bilder sehen und hat sie deshalb nicht bekommen.",
     "problem": {
-      "type": "Nur Bilder können mit einer Nachricht mitgehen.",
+      "type": "Nur JPEG-, PNG-, WebP-, GIF- und BMP-Bilder können mit einer Nachricht mitgehen.",
       "size": "Ein Bild darf höchstens 15 MB groß sein.",
       "count": "Höchstens {{max}} Bilder gehen mit einer Nachricht mit.",
       "read": "Das Bild konnte nicht gelesen werden."

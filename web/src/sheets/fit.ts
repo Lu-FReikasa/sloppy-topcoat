@@ -1,7 +1,7 @@
 // Fitting a song on one screen (the stage mode): CSS columns plus the largest font size at which
 // nothing overflows. The search is pure; the caller measures the real element (fits()).
 
-import { groupSheets, plain, type SheetGroup } from "./group";
+import { groupSheets, matchesSearch, plain, type SheetGroup } from "./group";
 import type { SheetSummary } from "./types";
 
 export const MIN_FONT = 12;
@@ -14,10 +14,11 @@ export interface Fit {
   fits: boolean;
 }
 
-/** How many columns a screen of this width may use: a column wants about 560 px
- *  (1920 wide → 3, 1200 wide → 2), at least 1, at most 4. */
+/** How many columns a screen of this width may try: a column needs about 260 CSS px, at least 1,
+ *  at most 4. The fit measures each try (long lines wrap) and keeps the one with the largest font,
+ *  so a scaled laptop screen (1200 px at 150 % is 800 CSS px) still gets two columns. */
 export function maxColumns(width: number): number {
-  return Math.max(1, Math.min(4, Math.floor(width / 560)));
+  return Math.max(1, Math.min(4, Math.floor(width / 260)));
 }
 
 /** The largest font (whole px, MIN_FONT…MAX_FONT) at which fits(columns, font) holds, per column
@@ -59,9 +60,8 @@ export function sortGroups(groups: SheetGroup[], mode: SortMode): SheetGroup[] {
 
 /** The songs the list shows: filtered by search and artist, sorted. */
 export function visibleGroups(list: SheetSummary[], query: string, artist: string, mode: SortMode): SheetGroup[] {
-  const q = plain(query);
   const shown = groupSheets(list).filter(
-    (g) => (!artist || plain(g.artist) === plain(artist)) && (!q || plain(`${g.title} ${g.artist}`).includes(q)),
+    (g) => (!artist || plain(g.artist) === plain(artist)) && matchesSearch(g.title, g.artist, query),
   );
   return sortGroups(shown, mode);
 }
@@ -84,8 +84,38 @@ export function neighbour(groups: SheetGroup[], id: string, step: number, at?: n
   return g?.versions[g.versions.length - 1]?.id ?? null;
 }
 
-/** A line that is guitar tablature or a riff drawn in dashes ("e|--3--|", "--0--2--"). */
-export function isTabLine(text: string): boolean {
-  const t = text.trim();
-  return /^[a-gA-G]?\s*[|:]?[-0-9hpbr/\\|x~.]{6,}/.test(t) && (t.match(/-/g)?.length ?? 0) >= 4;
+/** The parts (by their heights, in order) placed into at most `columns` columns of height
+ *  `capacity`, each column filled before the next; a part never breaks. The indexes per column,
+ *  or null when they do not fit. Browsers differ in how CSS columns overflow, so the stage places
+ *  the parts itself. */
+export function packColumns(heights: number[], columns: number, capacity: number): number[][] | null {
+  const out: number[][] = [[]];
+  let used = 0;
+  for (let i = 0; i < heights.length; i++) {
+    const h = heights[i]!;
+    if (h > capacity) return null;
+    if (used + h > capacity && out[out.length - 1]!.length > 0) {
+      if (out.length === columns) return null;
+      out.push([]);
+      used = 0;
+    }
+    out[out.length - 1]!.push(i);
+    used += h;
+  }
+  return out;
+}
+
+/** The parts spread over `columns` columns as evenly as the order allows (for a song that does not
+ *  fit one screen: the page then scrolls, the columns stay about equally long). */
+export function balanceColumns(heights: number[], columns: number): number[][] {
+  const total = heights.reduce((a, b) => a + b, 0);
+  const tallest = Math.max(0, ...heights);
+  let lo = Math.max(tallest, total / columns);
+  let hi = total;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) / 2;
+    if (packColumns(heights, columns, mid)) hi = mid;
+    else lo = mid;
+  }
+  return packColumns(heights, columns, hi) ?? [heights.map((_, i) => i)];
 }

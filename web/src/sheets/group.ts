@@ -7,6 +7,13 @@ export function plain(text: string): string {
   return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 }
 
+/** Whether a song is found by a search: the plain words of the query anywhere in "title artist".
+ *  The library and the setlists match the same way. */
+export function matchesSearch(title: string, artist: string, query: string): boolean {
+  const q = plain(query);
+  return !q || plain(`${title} ${artist}`).includes(q);
+}
+
 export interface SheetGroup {
   key: string;
   title: string;

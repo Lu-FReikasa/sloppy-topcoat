@@ -1,11 +1,39 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
+import { sheetsHref } from "../route";
 import { groupSheets } from "./group";
-import { moveItem, resolveSetlist } from "./setlist";
+import { canReorder, moveItem, resolveSetlist, SETLIST_VIEWS, viewOrder, type SetlistView } from "./setlist";
 import type { Setlist, SetlistItem, SheetSummary } from "./types";
 
 const SETLIST_KEY = "topcoat.sheets.setlist";
+// the view chosen per setlist (setlist order, by title, by artist): { [setlist id]: view }
+const VIEW_KEY = "topcoat.sheets.setlistView";
+
+function views(): Record<string, SetlistView> {
+  try {
+    const v: unknown = JSON.parse(window.localStorage.getItem(VIEW_KEY) ?? "{}");
+    return v && typeof v === "object" ? (v as Record<string, SetlistView>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function rememberedView(id: string): SetlistView {
+  const v = views()[id];
+  return v && SETLIST_VIEWS.includes(v) ? v : "setlist";
+}
+
+function rememberView(id: string, view: SetlistView) {
+  try {
+    const all = views();
+    if (view === "setlist") delete all[id];
+    else all[id] = view;
+    window.localStorage.setItem(VIEW_KEY, JSON.stringify(all));
+  } catch {
+    /* not remembered; the view still holds for this page */
+  }
+}
 
 function rememberedSetlist(): string {
   try {
@@ -28,15 +56,20 @@ interface Props {
   list: SheetSummary[];
   /** The open sheet, which "add" puts into the setlist. */
   openId?: string;
+  /** A song of the setlist is opened in the normal view (the setlist then stays beside it). */
+  onOpen: () => void;
   /** Play the setlist on the stage, from the item at this index. */
   onPlay: (setlist: Setlist, from: number) => void;
   onError: (e: unknown) => void;
 }
 
 /** The person's setlists: pick one, create, rename, delete; add the open sheet (that version or
- *  always the newest of its song), reorder by drag or Alt+↑/↓, play it on the stage. Every change
- *  is saved at once; a refused one reloads the setlists from the hub. */
-export function Setlists({ api, list, openId, onPlay, onError }: Props) {
+ *  always the newest of its song), reorder by drag or Alt+↑/↓, open a song (the setlist then stays
+ *  beside it), play it on the stage from the start or from a song. Every change
+ *  is saved at once; a refused one reloads the setlists from the hub. A setlist can also be looked
+ *  at sorted by title or artist and searched (#149): only the view changes, each row keeps its
+ *  position number, reordering works only in setlist order, and the stage plays in setlist order. */
+export function Setlists({ api, list, openId, onOpen, onPlay, onError }: Props) {
   const { t } = useTranslation();
   const [setlists, setSetlists] = useState<Setlist[] | null>(null);
   const [selected, setSelectedState] = useState(rememberedSetlist);
@@ -66,13 +99,30 @@ export function Setlists({ api, list, openId, onPlay, onError }: Props) {
     reload();
   };
 
-  const change = async (s: Setlist, patch: { name?: string; items?: SetlistItem[] }) => {
+  // changes go to the hub one after the other: each one sends the whole order, so two quick moves
+  // must not overtake each other on the way
+  const sending = useRef<Promise<void>>(Promise.resolve());
+  const change = (s: Setlist, patch: { name?: string; items?: SetlistItem[] }) => {
     replace({ ...s, ...patch });
-    try {
-      await api.setlistUpdate(s.id, patch);
-    } catch (e) {
-      failed(e);
-    }
+    const before = sending.current;
+    const send = async (): Promise<void> => {
+      await before;
+      try {
+        await api.setlistUpdate(s.id, patch);
+      } catch (e) {
+        onError(e);
+        void reloadWhenSent();
+      }
+    };
+    sending.current = send();
+  };
+  // after a refused change, reload once the changes queued behind it have landed, or the hub's
+  // answer would show an order that a later change is still about to replace
+  const reloadWhenSent = async (): Promise<void> => {
+    const last = sending.current;
+    await last;
+    if (last === sending.current) reload();
+    else await reloadWhenSent();
   };
 
   const remove = async (s: Setlist) => {
@@ -127,8 +177,9 @@ export function Setlists({ api, list, openId, onPlay, onError }: Props) {
           setlist={current}
           list={list}
           openId={openId}
-          onChange={(patch) => void change(current, patch)}
+          onChange={(patch) => change(current, patch)}
           onDelete={() => void remove(current)}
+          onOpen={onOpen}
           onPlay={(from) => onPlay(current, from)}
         />
       )}
@@ -164,6 +215,7 @@ function SetlistEditor({
   openId,
   onChange,
   onDelete,
+  onOpen,
   onPlay,
 }: {
   setlist: Setlist;
@@ -171,6 +223,7 @@ function SetlistEditor({
   openId?: string;
   onChange: (patch: { name?: string; items?: SetlistItem[] }) => void;
   onDelete: () => void;
+  onOpen: () => void;
   onPlay: (from: number) => void;
 }) {
   const { t } = useTranslation();
@@ -181,6 +234,14 @@ function SetlistEditor({
   const rows = useRef<(HTMLLIElement | null)[]>([]);
   const entries = useMemo(() => resolveSetlist(setlist.items, list), [setlist.items, list]);
   const items = setlist.items;
+  const [view, setViewState] = useState<SetlistView>(() => rememberedView(setlist.id));
+  const setView = (v: SetlistView) => {
+    setViewState(v);
+    rememberView(setlist.id, v);
+  };
+  const [query, setQuery] = useState("");
+  const shown = useMemo(() => viewOrder(entries, view, query), [entries, view, query]);
+  const reorder = canReorder(view, query);
 
   // a row moved by keys keeps the focus, so it can be moved again
   useEffect(() => {
@@ -195,6 +256,7 @@ function SetlistEditor({
     else setName(setlist.name);
   };
   const move = (from: number, to: number, keepFocus = false) => {
+    if (!reorder) return;
     const next = moveItem(items, from, to);
     if (next === items) return;
     onChange({ items: next });
@@ -236,19 +298,40 @@ function SetlistEditor({
         <p className="muted small">{t("sheets.setlists.empty")}</p>
       ) : (
         <>
-          <p className="muted small">{t("sheets.setlists.keys")}</p>
+          <div className="sheets-row setlist-view">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("sheets.setlists.search")}
+              aria-label={t("sheets.setlists.search")}
+              data-testid="setlist-search"
+            />
+            <select value={view} onChange={(e) => setView(e.target.value as SetlistView)} aria-label={t("sheets.setlists.view")} data-testid="setlist-view">
+              {SETLIST_VIEWS.map((v) => (
+                <option key={v} value={v}>
+                  {t(`sheets.setlists.views.${v}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="muted small">{reorder ? t("sheets.setlists.keys") : t("sheets.setlists.sortedHint")}</p>
+          {shown.length === 0 && <p className="muted small">{t("sheets.setlists.noMatch")}</p>}
           <ol className="setlist-items" data-testid="setlist-items">
-            {entries.map((e, i) => (
+            {shown.map((i) => {
+              const e = entries[i]!;
+              return (
               <li
                 key={`${i}-${e.item.sheet_id}`}
                 ref={(el) => {
                   rows.current[i] = el;
                 }}
-                className={`setlist-item${dragFrom === i ? " is-dragged" : ""}`}
+                className={`setlist-item${dragFrom === i ? " is-dragged" : ""}${reorder ? "" : " is-fixed"}`}
                 tabIndex={0}
-                draggable
+                draggable={reorder}
                 aria-label={e.sheet ? e.sheet.title : t("sheets.setlists.missing")}
                 onDragStart={(ev) => {
+                  if (!reorder) return;
                   setDragFrom(i);
                   ev.dataTransfer.setData("text/plain", String(i));
                 }}
@@ -271,12 +354,13 @@ function SetlistEditor({
                 <span className="setlist-n">{i + 1}</span>
                 <span className="setlist-song">
                   {e.sheet ? (
-                    <button type="button" className="setlist-title" onClick={() => onPlay(i)} title={t("sheets.setlists.playFrom")}>
+                    <a className="setlist-title" href={sheetsHref(e.sheet.id)} onClick={onOpen} aria-current={e.sheet.id === openId ? "page" : undefined}>
                       {e.sheet.title}
-                    </button>
+                    </a>
                   ) : (
                     <span className="muted">{t("sheets.setlists.missing")}</span>
                   )}
+                  {view === "artist" && e.sheet?.artist && <span className="muted small setlist-artist">{e.sheet.artist}</span>}
                   {e.sheet && (e.item.newest || e.versions > 1) && (
                     <span className="muted small">
                       {e.item.newest ? t("sheets.setlists.newest", { n: e.version }) : t("sheets.version", { n: e.version })}
@@ -284,18 +368,26 @@ function SetlistEditor({
                   )}
                 </span>
                 <span className="setlist-tools">
-                  <button type="button" onClick={() => move(i, i - 1)} disabled={i === 0} aria-label={t("sheets.setlists.up")} title={t("sheets.setlists.up")}>
-                    ↑
+                  <button type="button" onClick={() => onPlay(i)} disabled={!e.sheet} aria-label={t("sheets.setlists.playFrom")} title={t("sheets.setlists.playFrom")}>
+                    ▶
                   </button>
-                  <button type="button" onClick={() => move(i, i + 1)} disabled={i === items.length - 1} aria-label={t("sheets.setlists.down")} title={t("sheets.setlists.down")}>
-                    ↓
-                  </button>
-                  <button type="button" onClick={() => onChange({ items: drop(i) })} aria-label={t("sheets.setlists.remove")} title={t("sheets.setlists.remove")}>
+                  {reorder && (
+                    <>
+                      <button type="button" onClick={() => move(i, i - 1)} disabled={i === 0} className="setlist-edit" aria-label={t("sheets.setlists.up")} title={t("sheets.setlists.up")}>
+                        ↑
+                      </button>
+                      <button type="button" onClick={() => move(i, i + 1)} disabled={i === items.length - 1} className="setlist-edit" aria-label={t("sheets.setlists.down")} title={t("sheets.setlists.down")}>
+                        ↓
+                      </button>
+                    </>
+                  )}
+                  <button type="button" onClick={() => onChange({ items: drop(i) })} className="setlist-edit" aria-label={t("sheets.setlists.remove")} title={t("sheets.setlists.remove")}>
                     ×
                   </button>
                 </span>
               </li>
-            ))}
+              );
+            })}
           </ol>
         </>
       )}

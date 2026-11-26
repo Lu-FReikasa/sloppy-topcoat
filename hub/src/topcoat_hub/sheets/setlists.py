@@ -67,12 +67,13 @@ class SetlistStore:
             out[row.setlist_id].append(row)
         return out
 
-    async def get(self, setlist_id: uuid.UUID) -> SetlistRow:
-        row = await self.db.scalar(
-            select(SetlistRow).where(
-                SetlistRow.id == setlist_id, SetlistRow.user_id == self.user_id
-            )
+    async def get(self, setlist_id: uuid.UUID, *, lock: bool = False) -> SetlistRow:
+        """The setlist; ``lock`` holds it until the transaction ends, so two changes of one setlist
+        (each rewrites all its items) run one after the other instead of colliding on positions."""
+        stmt = select(SetlistRow).where(
+            SetlistRow.id == setlist_id, SetlistRow.user_id == self.user_id
         )
+        row = await self.db.scalar(stmt.with_for_update() if lock else stmt)
         if row is None:
             raise SheetError(404, "not_found", "there is no such setlist")
         return row
@@ -90,7 +91,7 @@ class SetlistStore:
     async def update(
         self, setlist_id: uuid.UUID, *, name: str | None = None, items: Sequence[Item] | None = None
     ) -> SetlistRow:
-        row = await self.get(setlist_id)
+        row = await self.get(setlist_id, lock=True)
         if name is not None:
             row.name = _name(name)
         if items is not None:

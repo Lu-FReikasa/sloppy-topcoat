@@ -324,3 +324,50 @@ def test_two_admins_storing_the_same_version_get_a_conflict_not_an_error(
         "/api/plugins/notes-board/versions", headers=AUTH, json=manifest(version="1.1.0")
     )
     assert r.status_code == 409 and r.json()["detail"]["code"] == "conflict"
+
+
+def test_the_schema_allows_no_longer_version_than_the_columns_hold() -> None:
+    from topcoat_hub import plugins
+    from topcoat_hub.models import Plugin, PluginChange, PluginVersion
+
+    most = plugins.schema()["properties"]["version"]["maxLength"]
+    columns = (
+        Plugin.__table__.c.version,
+        PluginVersion.__table__.c.version,
+        PluginChange.__table__.c.from_version,
+        PluginChange.__table__.c.to_version,
+    )
+    assert all(c.type.length >= most for c in columns)
+
+
+def test_a_version_longer_than_its_column_is_refused_not_an_error(client: TestClient) -> None:
+    # the pattern alone allows any number of digits; the columns hold 20 characters
+    long = "1.0." + "1" * 20
+    r = client.post("/api/plugins", headers=AUTH, json=manifest(version=long))
+    assert r.status_code == 422, r.text
+    assert "version" in " ".join(r.json()["detail"]["problems"])
+    install(client, manifest())
+    r = client.post("/api/plugins/notes-board/versions", headers=AUTH, json=manifest(version=long))
+    assert r.status_code == 422, r.text
+
+
+def test_the_planners_catalogue_says_what_the_plugin_left_a_program(client: TestClient) -> None:
+    from topcoat_hub import app_catalogue
+
+    def research_line() -> str:
+        async def look() -> str:
+            async with client.app.state.sessionmaker() as db:
+                return await app_catalogue.catalogue(db)
+
+        text = client.portal.call(look)
+        return next(line for line in text.splitlines() if line.startswith("- research "))
+
+    assert "wiki" in research_line().split("NOT")[0]
+    r = client.post(
+        "/api/plugins/research/versions", headers=AUTH, json=research_version("1.1.0", ["notes"])
+    )
+    assert r.status_code == 201, r.text
+    # a task planned for Research must not count on the wiki or the web the plug-in took away
+    can, cannot = research_line().split("can NOT use:")
+    assert "wiki" not in can and "internet" not in can
+    assert "wiki" in cannot and "internet" in cannot

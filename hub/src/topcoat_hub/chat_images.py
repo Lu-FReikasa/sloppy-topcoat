@@ -45,7 +45,11 @@ MAX_SIDE = 1536  # the longer side after re-encoding
 MAX_STORED_BYTES = 400_000
 JPEG_QUALITY = 85
 CONTENT_TYPE = "image/jpeg"
-FORMATS = ("JPEG", "PNG", "WEBP", "GIF", "BMP")
+# the readers that may parse an upload at all (no EPS, PSD, TIFF … reader sees it)
+READERS = ("JPEG", "PNG", "WEBP", "GIF", "BMP")
+# what they may find: MPO is a JPEG with further pictures appended (many phone cameras write it,
+# Pillow's JPEG reader opens it as MPO); its first picture is the photo
+FORMATS = (*READERS, "MPO")
 # what one request to a model may carry in images (raw bytes): the request is sent to the node as
 # base64 inside a JSON envelope whose body is limited (proto/v1/proxy_request.schema.json)
 PROMPT_IMAGE_BYTES = 640_000
@@ -111,7 +115,7 @@ def reencode(raw: bytes) -> Encoded:
     from PIL import Image, ImageOps  # Pillow loads its plug-ins on first use
 
     try:
-        with Image.open(io.BytesIO(raw)) as probe:
+        with Image.open(io.BytesIO(raw), formats=READERS) as probe:
             if probe.format not in FORMATS:
                 raise ImageError("bad_image", "only JPEG, PNG, WebP, GIF and BMP images")
             if probe.width * probe.height > MAX_PIXELS:
@@ -123,15 +127,19 @@ def reencode(raw: bytes) -> Encoded:
         raise
     except (OSError, ValueError, SyntaxError, Image.DecompressionBombError) as exc:
         raise ImageError("bad_image", "the file is not a readable image") from exc
+    # scaled to MAX_SIDE once, before anything else is made of it: a picture of 40 Mpx takes
+    # 160 MB per copy, so the flattening and the loop below work on the small one
     if picture.mode in ("RGBA", "LA", "PA") or (
         picture.mode == "P" and "transparency" in picture.info
     ):
         rgba = picture.convert("RGBA")
+        rgba.thumbnail((MAX_SIDE, MAX_SIDE), Image.Resampling.LANCZOS)
         flat = Image.new("RGB", rgba.size, (255, 255, 255))
         flat.paste(rgba, mask=rgba.getchannel("A"))
         picture = flat
     else:
         picture = picture.convert("RGB")
+        picture.thumbnail((MAX_SIDE, MAX_SIDE), Image.Resampling.LANCZOS)
     side = MAX_SIDE
     while True:
         scaled = picture.copy()
@@ -263,7 +271,12 @@ def seers(views: Iterable[Any], policy: Any, proven: Mapping[str, Sequence[str]]
         for name, loaded in view.models.items():
             if not loaded:
                 continue
-            if "vision" not in model_facts.kinds_of(name, manual, proven, view.gguf.get(name)):
+            facts = view.gguf.get(name)
+            # only a projector the node loads with the model lets it see (D125): a "-vl" in the
+            # name of a model loaded without one is a server that refuses the image
+            if not (facts or {}).get("projector"):
+                continue
+            if "vision" not in model_facts.kinds_of(name, manual, proven, facts):
                 continue
             out.append(Seer(view.name, name, house.get(view.name) == name, view.name in workers))
     return out

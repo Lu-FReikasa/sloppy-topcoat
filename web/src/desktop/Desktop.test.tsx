@@ -219,6 +219,13 @@ describe("Desktop", () => {
     fireEvent.keyDown(window, { key: "2", altKey: true });
     expect(await screen.findByRole("region", { name: "Archive" })).toBeTruthy();
     expect(h.prefs().desktop.focus).toBe("archive");
+    // an Esc a page took for itself (Sheets: back to the list) leaves the window open
+    const take = (e: KeyboardEvent) => e.preventDefault();
+    window.addEventListener("keydown", take, true);
+    fireEvent.keyDown(window, { key: "Escape" });
+    window.removeEventListener("keydown", take, true);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(h.prefs().desktop.minimised).toEqual([]);
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(h.prefs().desktop.minimised).toEqual(["archive"]));
   });

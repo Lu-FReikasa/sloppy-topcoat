@@ -16,7 +16,7 @@ from topcoat_hub.sheets.chordpro import kind_of
 from topcoat_hub.sheets.chords import parse_chord
 
 _FILLER = re.compile(
-    r"^(?:\|+|:?\|\|?:?|[-\N{EN DASH}/%.]+|\(?x\s?\d+\)?|\(?\d+x\)?|n\.?c\.?|\(|\))$", re.I
+    r"^(?:\*+|\|+|:?\|\|?:?|[-\N{EN DASH}/%.]+|\(?x\s?\d+\)?|\(?\d+x\)?|n\.?c\.?|\(|\))$", re.I
 )
 _TAB = re.compile(r"^\s*[eBGDAEbgdah]?\s*\|[-0-9|hpbrx/\\~^().\s]{4,}\|?\s*$")
 _META = (

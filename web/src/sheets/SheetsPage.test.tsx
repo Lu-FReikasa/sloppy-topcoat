@@ -113,12 +113,63 @@ describe("Sheets", () => {
     expect(artistsOf(groups.flatMap((g) => g.versions))).toEqual(["Oasis", "the beatles"]);
   });
 
-  it("lists sheets and only unfinished researches, shows a sheet with its flow and switches the capo", async () => {
-    let capoView = true;
+  it("shows the library full width: search first, songs as a table with their versions, unfinished researches", async () => {
     const failed: SheetResearchJob = { ...JOB, id: "j2", song: "Lost Song", status: "failed", error: "no web", sheet_id: null };
+    const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song", artist: "Other Band", key: "E", capo: 0, created_at: "2026-11-19T12:00:00Z" };
+    const { api } = client({
+      "GET /api/sheets": {
+        sheets: [
+          { ...SUMMARY, created_at: "2026-11-20T10:00:00Z" },
+          { ...SUMMARY, id: "s3", key: "C", capo: 0, created_at: "2026-11-20T12:00:00Z" },
+          zebra,
+        ],
+      },
+      "GET /api/sheets/research": { jobs: [JOB, failed] },
+    });
+    window.sessionStorage.clear();
+    window.localStorage.removeItem("topcoat.sheets.sort");
+    window.location.hash = "#/sheets";
+    render(<SheetsPage api={api} />);
+    const table = await screen.findByTestId("sheets-list");
+    expect(screen.queryByTestId("sheet")).toBeNull();
+    // search comes before sort and artist
+    const fields = [...screen.getByTestId("sheets").querySelectorAll(".sheets-filter > *")].map((el) => el.getAttribute("aria-label"));
+    expect(fields[0]).toMatch(/Search songs|Songs suchen/);
+    // one row per song; the title opens the newest version, v1 and v2 open each one
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows.map((r) => r.querySelector(".sheets-col-title a")?.textContent)).toEqual(["Example Song", "Zebra Song"]);
+    expect(rows[0]!.querySelector(".sheets-col-title a")?.getAttribute("href")).toBe("#/sheets/s3");
+    expect(rows[0]!.querySelector(".sheets-col-key")?.textContent).toBe("C");
+    expect(within(rows[0]!).getAllByRole("link").map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+      ["Example Song", "#/sheets/s3"],
+      ["v1", "#/sheets/s1"],
+      ["v2", "#/sheets/s3"],
+    ]);
+    expect(rows[1]!.querySelector(".sheets-col-versions")?.textContent).toBe("");
+    // a finished research is its sheet in the list; a failed one stays with its reason
+    const jobs = screen.getByTestId("sheets-jobs");
+    expect(within(jobs).queryByText("Other Song")).toBeNull();
+    expect(within(jobs).getByText("no web")).toBeTruthy();
+    // "/" finds the search; Enter opens the first hit
+    const search = screen.getByTestId("sheets-search");
+    fireEvent.keyDown(document.body, { key: "/" });
+    expect(document.activeElement).toBe(search);
+    fireEvent.change(search, { target: { value: "zebra" } });
+    expect(within(screen.getByTestId("sheets-list")).getAllByRole("row")).toHaveLength(2);
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(window.location.hash).toBe("#/sheets/s9");
+    // Ctrl+F too, from anywhere on the page
+    search.blur();
+    fireEvent.keyDown(document.body, { key: "f", ctrlKey: true });
+    expect(document.activeElement).toBe(search);
+  });
+
+  it("shows a sheet over the whole width with its flow, switches the capo and goes back with Esc", async () => {
+    let capoView = true;
     const { api, calls } = client({
       "GET /api/sheets": { sheets: [SUMMARY, { ...SUMMARY, id: "s3", title: "Example Song", created_at: "2026-11-20T12:00:00Z" }] },
-      "GET /api/sheets/research": { jobs: [JOB, failed] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/setlists": { setlists: [] },
       "GET /api/sheets/s1": () =>
         new Response(JSON.stringify(detail(capoView, capoView ? ["G", "D"] : ["A", "E"])), {
           headers: { "Content-Type": "application/json" },
@@ -130,17 +181,15 @@ describe("Sheets", () => {
         });
       },
     });
+    window.sessionStorage.clear();
+    window.location.hash = "#/sheets/s1";
     render(<SheetsPage api={api} id="s1" />);
     const sheet = await screen.findByTestId("sheet");
     await waitFor(() => expect(chordsOf(sheet)).toEqual(["G", "D", "C"]));
-    // two versions of one song: one entry with v1 and v2
-    const list = screen.getByTestId("sheets-list");
-    expect(within(list).getAllByText("Example Song")).toHaveLength(1);
-    expect(within(list).getAllByRole("link").map((a) => a.textContent?.slice(0, 2))).toEqual(["v1", "v2"]);
-    // a finished research is its sheet in the list; a failed one stays with its reason
-    const jobs = screen.getByTestId("sheets-jobs");
-    expect(within(jobs).queryByText("Other Song")).toBeNull();
-    expect(within(jobs).getByText("no web")).toBeTruthy();
+    // no song list and no setlist beside a sheet opened from the library
+    expect(screen.queryByTestId("sheets-list")).toBeNull();
+    expect(screen.queryByTestId("setlists")).toBeNull();
+    expect(screen.getByTestId("sheets-back").getAttribute("href")).toBe("#/sheets");
     // the sheet view writes everything out until repeats are collapsed
     const toggle = within(sheet).getByRole("button", { name: /Collapse repeats|Wiederholungen kürzen/ });
     expect(toggle.getAttribute("aria-pressed")).toBe("false");
@@ -156,6 +205,22 @@ describe("Sheets", () => {
     fireEvent.click(within(sheet).getByRole("button", { name: /Show sounding chords|Klingende Akkorde zeigen/ }));
     await waitFor(() => expect(chordsOf(sheet)).toEqual(["A", "E", "C"]));
     expect(calls.some((c) => c.method === "PATCH" && (c.body as { capo_view: boolean }).capo_view === false)).toBe(true);
+    // Esc while typing does nothing; Esc on the page goes back to the library
+    const field = document.createElement("input");
+    document.body.appendChild(field);
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(window.location.hash).toBe("#/sheets/s1");
+    field.remove();
+    // a menu of the shell is open (the web shell's drawer, the taskbar menu): that Esc is the menu's
+    const menu = document.createElement("button");
+    menu.setAttribute("aria-expanded", "true");
+    document.body.appendChild(menu);
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+    expect(window.location.hash).toBe("#/sheets/s1");
+    menu.remove();
+    // taken by the page (the desktop shell then does not minimise the window)
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(false);
+    expect(window.location.hash).toBe("#/sheets");
   });
 
   it("transposes only the view and compares a source", async () => {
@@ -197,7 +262,12 @@ describe("Sheets", () => {
       "POST /api/sheets/research": { ...JOB, status: "running", sheet_id: null },
     });
     render(<SheetsPage api={api} />);
-    const form = await screen.findByRole("form", { name: /Research a song|Song recherchieren/ });
+    // research and paste wait behind one button
+    expect(screen.queryByRole("form", { name: /Research a song|Song recherchieren/ })).toBeNull();
+    fireEvent.click(await screen.findByTestId("sheets-new"));
+    const dialog = screen.getByRole("dialog", { name: /New sheet|Neues Sheet/ });
+    expect(within(dialog).getByRole("button", { name: /Paste a sheet|Sheet einfügen/ })).toBeTruthy();
+    const form = within(dialog).getByRole("form", { name: /Research a song|Song recherchieren/ });
     fireEvent.change(within(form).getByLabelText(/^Song$/), { target: { value: "Wonderwall" } });
     fireEvent.change(within(form).getByLabelText(/Artist|Künstler/), { target: { value: "Oasis" } });
     fireEvent.change(within(form).getByLabelText(/Instrument/), { target: { value: "piano" } });
@@ -209,6 +279,31 @@ describe("Sheets", () => {
       instrument: "piano",
       wish: "",
     });
+    // a started research closes the dialog; its progress shows in the library
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("shows a refused research inside the dialog, not behind it", async () => {
+    const { api } = client({
+      "GET /api/sheets": { sheets: [SUMMARY] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/setlists": { setlists: [] },
+      "POST /api/sheets/research": () =>
+        new Response(JSON.stringify({ detail: "no node can research" }), { status: 409, headers: { "Content-Type": "application/json" } }),
+    });
+    render(<SheetsPage api={api} />);
+    fireEvent.click(await screen.findByTestId("sheets-new"));
+    const dialog = screen.getByRole("dialog", { name: /New sheet|Neues Sheet/ });
+    const form = within(dialog).getByRole("form", { name: /Research a song|Song recherchieren/ });
+    fireEvent.change(within(form).getByLabelText(/^Song$/), { target: { value: "Example Song" } });
+    fireEvent.click(within(form).getByRole("button", { name: /Research|Recherchieren/ }));
+    expect(await within(dialog).findByRole("alert")).toBeTruthy();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    // closed, the message stays in the library; opened again, the dialog starts clean
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Close$|^Schließen$/ }));
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    fireEvent.click(screen.getByTestId("sheets-new"));
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("opens the stage mode, pages with the keys of a foot pedal and leaves with Esc", async () => {
@@ -228,6 +323,9 @@ describe("Sheets", () => {
     // repeats collapse by default on stage: the chorus and its {chorus} reference are one block
     const labels = () => [...stage.querySelectorAll(".sheet-part-label")].map((h) => h.textContent);
     expect(labels()).toEqual(["Verse 1", "Chorus ×2"]);
+    // the hidden measuring copy carries no anchors: every id on the page stays unique
+    const ids = [...document.querySelectorAll("[id^='sheet-part-']")].map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
     fireEvent.click(within(stage).getByRole("button", { name: /Collapse repeats|Wiederholungen kürzen/ }));
     expect(labels()).toEqual(["Verse 1", "Chorus", expect.stringMatching(/^Chorus · /)]);
     fireEvent.keyDown(window, { key: "PageDown" });
@@ -300,6 +398,40 @@ describe("Sheets", () => {
     expect(window.location.hash).toBe("#/sheets/s2");
   });
 
+  it("plays in setlist order on the stage, from a song picked in the title view", async () => {
+    const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song" };
+    const gig: Setlist = { id: "L1", name: "Gig", items: [{ sheet_id: "s9", newest: false }, { sheet_id: "s1", newest: false }], updated_at: null, created_at: null };
+    const { api, calls } = client({
+      "GET /api/sheets": { sheets: [SUMMARY, zebra] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/setlists": { setlists: [gig] },
+      "GET /api/sheets/s1": detail(true, ["G", "D"]),
+      "GET /api/sheets/s9": { ...detail(true, ["G", "D"]), id: "s9" },
+    });
+    window.sessionStorage.clear();
+    window.localStorage.setItem("topcoat.sheets.setlist", "L1");
+    window.localStorage.setItem("topcoat.sheets.setlistView", JSON.stringify({ L1: "title" }));
+    window.location.hash = "#/sheets";
+    render(<SheetsPage api={api} />);
+    const panel = await screen.findByTestId("setlists");
+    const items = await within(panel).findByTestId("setlist-items");
+    const rows = within(items).getAllByRole("listitem");
+    expect(rows.map((li) => li.getAttribute("aria-label"))).toEqual(["Example Song", "Zebra Song"]);
+    fireEvent.click(within(rows[0]!).getByRole("button", { name: /^(Play on stage from this song|Ab diesem Lied auf der Bühne spielen)$/ }));
+    const at = async (n: number) =>
+      waitFor(() => expect(screen.getByTestId("sheet-stage-set").textContent).toMatch(new RegExp(`Gig · ${n} (of|von) 2`)));
+    // "Example Song" is second in the setlist: the stage starts there and pages in setlist order
+    await at(2);
+    fireEvent.keyDown(window, { key: "PageDown" });
+    await at(2);
+    fireEvent.keyDown(window, { key: "PageUp" });
+    await at(1);
+    const asked = () => calls.filter((c) => c.method === "GET" && /\/api\/sheets\/s\d$/.test(c.url)).map((c) => c.url.slice(-2));
+    await waitFor(() => expect(asked()).toEqual(["s1", "s9"]));
+    expect(calls.filter((c) => c.method === "PATCH")).toHaveLength(0);
+    window.localStorage.removeItem("topcoat.sheets.setlistView");
+  });
+
   it("adds the open sheet to a setlist and reorders with Alt+arrow keys", async () => {
     const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song" };
     const gig: Setlist = { id: "L1", name: "Gig", items: [{ sheet_id: "s9", newest: false }], updated_at: null, created_at: null };
@@ -311,7 +443,12 @@ describe("Sheets", () => {
       "PATCH /api/sheets/setlists/L1": gig,
     });
     window.localStorage.setItem("topcoat.sheets.setlist", "L1");
+    window.sessionStorage.clear();
     render(<SheetsPage api={api} id="s1" />);
+    // opened from the library: the setlist comes beside the sheet when asked for
+    await screen.findByTestId("sheet");
+    expect(screen.queryByTestId("setlists")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^Setlist$/ }));
     const panel = await screen.findByTestId("setlists");
     await within(panel).findByTestId("setlist-items");
     fireEvent.change(within(panel).getByLabelText(/^(Version)$/), { target: { value: "this" } });
@@ -337,5 +474,43 @@ describe("Sheets", () => {
     );
     // the moved song keeps the focus, so it can be moved on
     await waitFor(() => expect(document.activeElement?.getAttribute("aria-label")).toBe("Example Song"));
+  });
+
+  it("keeps the setlist beside a song opened from it, and not beside one opened from the library", async () => {
+    const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song" };
+    const gig: Setlist = { id: "L1", name: "Gig", items: [{ sheet_id: "s9", newest: false }, { sheet_id: "s1", newest: false }], updated_at: null, created_at: null };
+    const { api } = client({
+      "GET /api/sheets": { sheets: [SUMMARY, zebra] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/setlists": { setlists: [gig] },
+      "GET /api/sheets/s1": detail(true, ["G", "D"]),
+      "GET /api/sheets/s9": { ...detail(true, ["G", "D"]), id: "s9" },
+    });
+    window.localStorage.setItem("topcoat.sheets.setlist", "L1");
+    window.sessionStorage.clear();
+    window.location.hash = "#/sheets";
+    // both shells mount the page afresh for a new address, as the key does here
+    const { rerender } = render(<SheetsPage key="list" api={api} />);
+    const items = await screen.findByTestId("setlist-items");
+    const link = within(items).getByRole("link", { name: "Zebra Song" });
+    expect(link.getAttribute("href")).toBe("#/sheets/s9");
+    fireEvent.click(link);
+    rerender(<SheetsPage key="s9" api={api} id="s9" />);
+    const side = await screen.findByTestId("setlists");
+    expect(side.closest(".sheets-side")).toBeTruthy();
+    const open = await within(side).findByRole("link", { name: "Zebra Song" });
+    expect(open.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("button", { name: /^Setlist$/ }).getAttribute("aria-pressed")).toBe("true");
+    // the next song of the setlist opens with the setlist still beside it
+    fireEvent.click(within(side).getByRole("link", { name: "Example Song" }));
+    rerender(<SheetsPage key="s1" api={api} id="s1" />);
+    expect(await screen.findByTestId("setlists")).toBeTruthy();
+    // back in the library, a song opened from the table stands alone
+    rerender(<SheetsPage key="list2" api={api} />);
+    const table = await screen.findByTestId("sheets-list");
+    fireEvent.click(within(table).getByRole("link", { name: "Zebra Song" }));
+    rerender(<SheetsPage key="s9b" api={api} id="s9" />);
+    await screen.findByTestId("sheet");
+    expect(screen.queryByTestId("setlists")).toBeNull();
   });
 });

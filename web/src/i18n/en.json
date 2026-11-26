@@ -4288,8 +4288,7 @@
   "sheets": {
     "title": "Sheets",
     "list": "Your sheets",
-    "empty": "No sheets yet. Start a research or paste a sheet.",
-    "pick": "Pick a sheet on the left, or start a research for a song.",
+    "empty": "No sheets yet. Research a song or paste a sheet with “New sheet …”.",
     "loading": "Loading …",
     "capoN": "Capo {{n}}",
     "key": "Key",
@@ -4373,7 +4372,8 @@
       "search": "Search songs",
       "artist": "Artist",
       "allArtists": "All artists",
-      "none": "No sheet matches."
+      "none": "No sheet matches.",
+      "keys": "/ or Ctrl+F: search · Enter: open the first song"
     },
     "sort": {
       "label": "Sort",
@@ -4386,7 +4386,6 @@
       "exit": "Leave",
       "prev": "Previous song",
       "next": "Next song",
-      "hideTabs": "Hide tabs",
       "scroll": "Too long for one screen: scroll"
     },
     "setlists": {
@@ -4411,7 +4410,24 @@
       "down": "Move down",
       "remove": "Remove from the setlist",
       "missing": "Sheet deleted",
-      "position": "{{name}} · {{n}} of {{total}}"
+      "position": "{{name}} · {{n}} of {{total}}",
+      "side": "Setlist",
+      "search": "Search the setlist",
+      "view": "View",
+      "views": {
+        "setlist": "Setlist order",
+        "title": "Title",
+        "artist": "Artist, then title"
+      },
+      "sortedHint": "Sorted or searched: the numbers are the setlist positions. Reorder in setlist order without a search.",
+      "noMatch": "No song of the setlist matches."
+    },
+    "back": "Back to the list",
+    "close": "Close",
+    "versions": "Versions",
+    "new": {
+      "open": "New sheet …",
+      "title": "New sheet"
     }
   },
   "images": {
@@ -4425,7 +4441,7 @@
     "missing": "Image not available",
     "blind": "The model of this answer cannot see images, so it did not get them.",
     "problem": {
-      "type": "Only images can go with a message.",
+      "type": "Only JPEG, PNG, WebP, GIF and BMP images can go with a message.",
       "size": "An image may have at most 15 MB.",
       "count": "At most {{max}} images go with one message.",
       "read": "The image could not be read."

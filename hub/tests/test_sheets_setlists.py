@@ -2,13 +2,16 @@
 for one evening, each a sheet as that version or as the newest version of its song; created,
 renamed, reordered and deleted, and nobody else's."""
 
+import asyncio
 import uuid
 from typing import Any
 
 from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from tests.conftest import AUTH, TEST_DB_URL
 from tests.users import make_user
+from topcoat_hub.sheets.setlists import Item, SetlistStore
 
 SONG = """\
 {{title: {title}}}
@@ -117,3 +120,28 @@ def test_setlists_are_personal(client: TestClient) -> None:
     )
     assert r.status_code == 404
     assert client.get(f"/api/sheets/setlists/{sid}", headers=AUTH).json()["name"] == "Gig"
+
+
+async def test_two_new_orders_at_once_do_not_collide(client: TestClient) -> None:
+    """Two quick reorders (Alt+↓ held, or two tabs) are two PATCHes that may overlap. Each writes
+    the whole order; the second waits for the first instead of failing on the positions."""
+    a, b = _sheet(client, "Song A"), _sheet(client, "Song B")
+    sid = uuid.UUID(_setlist(client, name="Gig", items=[{"sheet_id": a}, {"sheet_id": b}])["id"])
+    me = uuid.UUID(client.get("/api/me", headers=AUTH).json()["id"])
+    engine = create_async_engine(TEST_DB_URL)
+    try:
+        async with AsyncSession(engine) as first, AsyncSession(engine) as second:
+            await SetlistStore(first, me).update(
+                sid, items=[Item(uuid.UUID(b)), Item(uuid.UUID(a))]
+            )
+            later = asyncio.create_task(
+                SetlistStore(second, me).update(sid, items=[Item(uuid.UUID(a), newest=True)])
+            )
+            await asyncio.sleep(0.3)  # the second update now waits on the first
+            await first.commit()
+            await later
+            await second.commit()
+    finally:
+        await engine.dispose()
+    items = client.get(f"/api/sheets/setlists/{sid}", headers=AUTH).json()["items"]
+    assert items == [{"sheet_id": a, "newest": True}]
