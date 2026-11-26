@@ -438,3 +438,107 @@
 .sheet-stage-body .sheet-text {
   white-space: pre-wrap;
 }
+
+/* Setlists (Setlists.tsx): the songs of one evening in order, reordered by drag or Alt+↑/↓. */
+.sheets-setlists {
+  margin: 0 0 1rem;
+}
+
+.sheets-setlists h2 {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0.25rem 0 0.4rem;
+}
+
+.sheets-setlists select {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.setlist {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.setlist .sheets-row > input {
+  min-width: 0;
+}
+
+.setlist-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.setlist-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 0.35rem;
+  cursor: grab;
+}
+
+.setlist-item:hover,
+.setlist-item:focus-visible {
+  background: color-mix(in srgb, currentColor 9%, transparent);
+}
+
+.setlist-item.is-dragged {
+  opacity: 0.5;
+}
+
+.setlist-n {
+  min-width: 1.4em;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.setlist-song {
+  display: grid;
+  min-width: 0;
+}
+
+/* the title plays the setlist from this song; it reads as the song's name, not as a button */
+.sheets-setlists .setlist-title {
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 0;
+  min-width: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.sheets-setlists .setlist-title:hover {
+  text-decoration: underline;
+}
+
+.setlist-tools {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.setlist-tools button {
+  min-width: 2rem;
+  padding-inline: 0.3rem;
+}
+
+.setlist-add {
+  margin: 0;
+}
+
+.sheet-stage-set {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

@@ -114,3 +114,18 @@ export interface SheetPatch {
   title?: string;
   artist?: string;
 }
+
+/** A song of a setlist: this sheet, or (newest) the newest version of its song when played. */
+export interface SetlistItem {
+  sheet_id: string;
+  newest: boolean;
+}
+
+/** The order of songs for one evening (rehearsal or gig). */
+export interface Setlist {
+  id: string;
+  name: string;
+  items: SetlistItem[];
+  updated_at: string | null;
+  created_at: string | null;
+}
