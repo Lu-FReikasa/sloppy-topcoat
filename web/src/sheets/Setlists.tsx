@@ -66,13 +66,30 @@ export function Setlists({ api, list, openId, onPlay, onError }: Props) {
     reload();
   };
 
-  const change = async (s: Setlist, patch: { name?: string; items?: SetlistItem[] }) => {
+  // changes go to the hub one after the other: each one sends the whole order, so two quick moves
+  // must not overtake each other on the way
+  const sending = useRef<Promise<void>>(Promise.resolve());
+  const change = (s: Setlist, patch: { name?: string; items?: SetlistItem[] }) => {
     replace({ ...s, ...patch });
-    try {
-      await api.setlistUpdate(s.id, patch);
-    } catch (e) {
-      failed(e);
-    }
+    const before = sending.current;
+    const send = async (): Promise<void> => {
+      await before;
+      try {
+        await api.setlistUpdate(s.id, patch);
+      } catch (e) {
+        onError(e);
+        void reloadWhenSent();
+      }
+    };
+    sending.current = send();
+  };
+  // after a refused change, reload once the changes queued behind it have landed, or the hub's
+  // answer would show an order that a later change is still about to replace
+  const reloadWhenSent = async (): Promise<void> => {
+    const last = sending.current;
+    await last;
+    if (last === sending.current) reload();
+    else await reloadWhenSent();
   };
 
   const remove = async (s: Setlist) => {
@@ -127,7 +144,7 @@ export function Setlists({ api, list, openId, onPlay, onError }: Props) {
           setlist={current}
           list={list}
           openId={openId}
-          onChange={(patch) => void change(current, patch)}
+          onChange={(patch) => change(current, patch)}
           onDelete={() => void remove(current)}
           onPlay={(from) => onPlay(current, from)}
         />

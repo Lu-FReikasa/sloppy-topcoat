@@ -510,8 +510,6 @@
   background: none;
   border: 0;
   padding: 0;
-  min-height: 0;
-  min-width: 0;
   color: inherit;
   font: inherit;
   font-weight: 600;
@@ -530,8 +528,25 @@
 }
 
 .setlist-tools button {
-  min-width: 2rem;
   padding-inline: 0.3rem;
+}
+
+/* Below 760 px touch.css gives every button and select 40 px; these rules would beat it, so they
+   are for wider screens only (the ↑ ↓ × buttons and the title were 30 and 20 px on phones). */
+@media (min-width: 760px) {
+  .sheets-setlists .setlist-title {
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .setlist-tools button {
+    min-width: 2rem;
+  }
+
+  /* alone on its line in the narrow nav column, the select would keep its 19 px native height */
+  .sheets-setlists select {
+    min-height: 2.2rem;
+  }
 }
 
 .setlist-add {
