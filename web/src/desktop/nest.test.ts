@@ -11,6 +11,7 @@ import {
   normalise,
   overview,
   pathOf,
+  reveal,
   rects,
   removeProgram,
   saveNests,
@@ -20,6 +21,7 @@ import {
   WEIGHT_MIN,
   zoomIn,
   zoomOut,
+  zoomToFit,
   type NestNode,
   type NestTree,
 } from "./nest";
@@ -197,6 +199,27 @@ describe("zoom", () => {
     expect(groupOf(SAMPLE, "b")).toEqual([1]);
     expect(groupOf(leaf("a"), "a")).toEqual([]);
     expect(zoomIn(SAMPLE, [], "nope")).toEqual([]);
+  });
+});
+
+describe("zoom that follows the person", () => {
+  it("zooms out just far enough to show a program brought forward", () => {
+    expect(reveal(SAMPLE, [1, 1], "c")).toEqual([1, 1]); // framed already
+    expect(reveal(SAMPLE, [1, 1], "b")).toEqual([1]);
+    expect(reveal(SAMPLE, [1, 1, 0], "d")).toEqual([1, 1]);
+    expect(reveal(SAMPLE, [1, 1], "a")).toEqual([]);
+    expect(reveal(SAMPLE, [1], "nope")).toEqual([1]);
+  });
+
+  it("zooms to the first level where a program has its full size", () => {
+    const min = { w: 480, h: 320 };
+    // c is 400 wide in the overview, 800 when the right half is framed
+    expect(zoomToFit(SAMPLE, "c", AREA, min)).toEqual([1]);
+    // a fits in the overview already
+    expect(zoomToFit(SAMPLE, "a", AREA, min)).toEqual([]);
+    // on a tiny area nothing fits: the program alone
+    expect(zoomToFit(SAMPLE, "c", { x: 0, y: 0, w: 300, h: 200 }, min)).toEqual([1, 1, 0]);
+    expect(zoomToFit(SAMPLE, "nope", AREA, min)).toEqual([]);
   });
 });
 
