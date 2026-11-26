@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiClient, UnauthorizedError } from "./api/client";
 import { connectStream, LOST_AFTER_MS, type StreamStatus } from "./api/sse";
+import { hubEvents } from "./data/hubEvents";
 import { clearToken, loadToken, saveToken } from "./auth";
 import { announceHubMessage, parseHubMessage } from "./chat/hubMessage";
 import { announceProjectChanged, projectOfEvent } from "./project/liveProject";
@@ -130,8 +131,11 @@ function AuthedApp({ token, onLogout, onUnauthorized }: AuthedProps) {
         refreshNodes();
         setEpoch((e) => e + 1);
         setUiTick((n) => n + 1);
+        // the data layer (web/src/data) reloads its live resources
+        hubEvents.connected();
       },
       onEvent: (ev) => {
+        hubEvents.publish(ev);
         // the agent's progress (E3-01a): the task pages refetch
         if (
           ev.event === "agent_task" ||
