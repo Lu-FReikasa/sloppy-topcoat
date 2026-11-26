@@ -1,5 +1,5 @@
 """The rules that clean one sheet on its own (sheets/rules.py): chords written as text get real
-chords, tab staves become a tab part, header lines go. All sheets here are made up."""
+chords, tab staves go, header lines go. All sheets here are made up."""
 
 from topcoat_hub.sheets import chordpro, plaintext, rules, store, tidy
 from topcoat_hub.sheets.chordpro import Sheet
@@ -76,46 +76,39 @@ def test_a_remark_after_plain_chords_stays_text() -> None:
 STAFF = ["e|---0---3---|", "B|---1---0---|", "G|---0---0---|"]
 
 
-def test_tab_staves_from_a_plain_page_are_a_tab_part() -> None:
+def test_tab_staves_from_a_plain_page_go() -> None:
     page = "\n".join(
         ["[Verse 1]", "C         G", "paper boats are sailing", "", "[Riff]", *STAFF, "",
          *STAFF, "", "[Chorus]", "F       C", "sail away"]
     )  # fmt: skip
     s = cp(plaintext.to_chordpro(page))
     done = rules.apply(s)
-    assert done.tabs == 1
-    assert [(x.kind, x.label) for x in s.sections] == [
-        ("verse", "Verse 1"), ("tab", "Riff"), ("chorus", "Chorus"),
-    ]  # fmt: skip
-    tab = s.sections[1]
-    assert [ln.lyrics for ln in tab.lines] == STAFF * 2  # both staves, no comments
+    assert done.tabs >= 1
+    assert [(x.kind, x.label) for x in s.sections] == [("verse", "Verse 1"), ("chorus", "Chorus")]
     out = chordpro.write(s)
-    assert "{start_of_tab: Riff}\n" + STAFF[0] in out and "{comment: e|" not in out
-    assert all("e|" not in ln for ln in lyric_lines(cp("\n".join(
-        ln for ln in out.split("\n") if not ln.startswith(("e|", "B|", "G|"))
-    ))))  # fmt: skip
+    assert "e|" not in out and "start_of_tab" not in out
 
 
-def test_tab_lines_inside_a_part_are_split_off() -> None:
+def test_tab_lines_inside_a_part_go_and_its_lyrics_stay() -> None:
     text = "\n".join(
         ["{start_of_chorus}", "[C]sail away", *STAFF, "[G]sail back home", "{end_of_chorus}",
          "{chorus}"]
     )  # fmt: skip
     s = cp(text)
     rules.apply(s)
-    assert [x.kind for x in s.sections] == ["chorus", "tab", "chorus", "chorus"]
-    assert s.sections[1].label == "Tab"
-    assert s.sections[3].repeat_of == 0  # {chorus} still repeats the first part
-    assert lyric_lines(s)[0] == "sail away"
+    assert [x.kind for x in s.sections] == ["chorus", "chorus"]
+    assert s.sections[1].repeat_of == 0  # {chorus} still repeats the first part
+    assert lyric_lines(s) == ["sail away", "sail back home"]
 
 
-def test_tab_lines_carry_no_words_into_tidy() -> None:
-    s = cp("\n".join(["{start_of_verse}", "[C]paper boats", "{end_of_verse}", "", *STAFF]))
+def test_a_tab_part_and_its_repeat_go() -> None:
+    lines = ["{start_of_verse}", "[C]paper boats", "{end_of_verse}", "",
+             "{start_of_tab: Riff}", *STAFF, "{end_of_tab}", "{chorus: Riff}"]  # fmt: skip
+    s = cp("\n".join(lines))
     rules.apply(s)
-    assert s.sections[-1].kind == "tab"
-    assert tidy._part_words(s.sections[-1]) == []
+    assert [x.kind for x in s.sections] == ["verse"]
     tidy.tidy(s, [], "")
-    assert s.sections[-1].kind == "tab" and len(s.sections[-1].lines) == 3
+    assert lyric_lines(s) == ["paper boats"]
 
 
 # --- header ----------------------------------------------------------------------------------
@@ -199,3 +192,80 @@ def test_an_import_applies_the_rules() -> None:
     assert s.title == "Paper Boat"
     assert s.sections[0].kind == "intro" and len(s.chords()) == 4
     assert names(s.transpose(-2))[:3] == ["A#", "D#", "F"]
+
+
+# --- patterns found on the stored sheets (2026-11-26) ----------------------------------------
+
+
+def test_a_star_as_accent_does_not_hide_a_line_of_chords() -> None:
+    s = cp("{start_of_verse}\n *    A   D\npaper boats are sailing\n{end_of_verse}\n")
+    rules.apply(s)
+    assert [c.name() for c in s.sections[0].lines[0].chords] == ["A", "D"]
+    assert [c.name() for c in s.transpose(2).sections[0].lines[0].chords] == ["B", "E"]
+
+
+def test_chords_over_chords_become_one_line_of_the_written_chords() -> None:
+    s = cp("{start_of_verse}\n[A]A        [D]D     [D]F   *  A\n[A]little [D]paper boat\n"
+           "{end_of_verse}\n")  # fmt: skip
+    done = rules.apply(s)
+    assert done.chord_lines == 1
+    assert [c.name() for c in s.sections[0].lines[0].chords] == ["A", "D", "F", "A"]
+    assert [c.name() for c in s.sections[0].lines[1].chords] == ["A", "D"]  # lyrics untouched
+
+
+def test_a_lyric_line_with_one_chord_word_is_not_a_line_of_chords() -> None:
+    s = cp("{start_of_verse}\n[A]A little [D]boat\n{end_of_verse}\n")
+    rules.apply(s)
+    assert [c.name() for c in s.sections[0].lines[0].chords] == ["A", "D"]
+    assert lyric_lines(s) == ["A little boat"]
+
+
+def test_staves_side_by_side_with_a_fret_taken_for_a_chord_go_with_their_heading() -> None:
+    s = cp("{start_of_part: Other}\n *  Riff 1:        ** Riff 2:\n"
+           "e|-------[B]0-|         e|-------2-|\n"
+           "B|-------2-|         B|-------3-|\nG|-------2-|         G|-------2-|\n{end_of_part}\n"
+           "\n{start_of_verse}\n[A]paper boat\n{end_of_verse}\n")  # fmt: skip
+    done = rules.apply(s)
+    assert done.tabs == 1
+    assert [x.kind for x in s.sections] == ["verse"]
+    assert "e|" not in chordpro.write(s)
+
+
+def test_a_tuning_sentence_in_the_header_goes_to_the_facts() -> None:
+    s = cp("{start_of_part: Other}\nTune your guitar to 435 Hz to match the record.\n"
+           "{end_of_part}\n\n{start_of_verse}\n[C]paper boat\n{end_of_verse}\n")  # fmt: skip
+    done = rules.apply(s)
+    assert len(done.removed) == 1
+    assert s.meta.get("x_tuning") == "435 Hz"
+    assert lyric_lines(s) == ["paper boat"]
+
+
+def test_a_minor_major_ninth_is_a_chord_but_a_hum_is_not() -> None:
+    from topcoat_hub.sheets.chords import parse_chord
+
+    assert parse_chord("Ammaj9") is not None
+    assert parse_chord("Hmmm", german=True) is None
+
+
+def test_the_names_of_riffs_without_their_tab_go_from_the_header() -> None:
+    s = cp("{start_of_part: Other}\n *  Riff 1:        ** Riff 2:\n{end_of_part}\n"
+           "\n{start_of_verse}\n[A]paper boat\n{end_of_verse}\n")  # fmt: skip
+    done = rules.apply(s)
+    assert len(done.removed) == 1
+    assert [x.kind for x in s.sections] == ["verse"]
+
+
+def test_a_lyric_with_the_word_riff_stays() -> None:
+    s = cp("{start_of_part: Other}\nplay me that riff again\n{end_of_part}\n"
+           "\n{start_of_verse}\n[A]paper boat\n{end_of_verse}\n")  # fmt: skip
+    rules.apply(s)
+    assert lyric_lines(s)[0] == "play me that riff again"
+
+
+def test_accent_stars_on_chord_lines_go_and_a_star_in_lyrics_stays() -> None:
+    s = cp("{start_of_verse}\n *    A   D\n**\npaper *boats* are sailing\n{end_of_verse}\n")
+    rules.apply(s)
+    lines = s.sections[0].lines
+    assert len(lines) == 2  # the lone "**" line went
+    assert "*" not in lines[0].lyrics and [c.name() for c in lines[0].chords] == ["A", "D"]
+    assert lines[1].lyrics == "paper *boats* are sailing"
