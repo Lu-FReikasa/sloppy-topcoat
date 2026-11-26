@@ -1,6 +1,8 @@
 """The rules that clean one sheet on its own (sheets/rules.py): chords written as text get real
 chords, tab staves become a tab part, header lines go. All sheets here are made up."""
 
+import pytest
+
 from topcoat_hub.sheets import chordpro, plaintext, rules, store, tidy
 from topcoat_hub.sheets.chordpro import Sheet
 
@@ -72,6 +74,13 @@ def test_plain_chords_with_a_capo_are_shapes() -> None:
     s = store.read("{capo: 2}\n{start_of_verse}\n{comment: C  G}\n[C]boats [G]sail\n"
                    "{end_of_verse}\n")  # fmt: skip
     assert names(s) == ["D", "A", "D", "A"]  # sounding, like the chords in brackets
+
+
+def test_plain_chords_of_a_stored_sheet_already_sound() -> None:
+    # the stored form ({x_capo}, the editor's text) is in sounding pitch: nothing is moved
+    s = store.read("{x_capo: 2}\n{start_of_verse}\n{comment: D  A}\n[D]boats [A]sail\n"
+                   "{end_of_verse}\n")  # fmt: skip
+    assert names(s) == ["D", "A", "D", "A"]
 
 
 def test_a_remark_after_plain_chords_stays_text() -> None:
@@ -178,6 +187,17 @@ def test_a_line_with_the_title_and_artist_goes() -> None:
            "[G]paper boat on the water\n")  # fmt: skip
     rules.apply(s)
     assert lyric_lines(s) == ["paper boat on the water"]
+
+
+@pytest.mark.parametrize(
+    ("line", "tuning"),
+    [("Drop-D tuning", "Drop-D"), ("Half-step down tuning", "Half-step down"),
+     ("1/2 step down tuning", "1/2 step down"), ("DADGAD tuning", "DADGAD")],
+)  # fmt: skip
+def test_tuning_lines_with_hyphens_and_halves_are_facts(line: str, tuning: str) -> None:
+    s = cp(f"{line}\n\n[G]paper boats\n")
+    assert rules.apply(s).removed == [line]
+    assert s.meta["x_tuning"] == tuning
 
 
 def test_lyrics_before_the_first_chord_stay() -> None:

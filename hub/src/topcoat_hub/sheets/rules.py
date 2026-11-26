@@ -36,11 +36,13 @@ class Applied:
     removed: list[str] = field(default_factory=list)  # header lines dropped or made facts
 
 
-def apply(sheet: Sheet, german: bool = False) -> Applied:
+def apply(sheet: Sheet, german: bool = False, shapes: int = 0) -> Applied:
     """Clean ``sheet`` in place; what was done, for the report. ``german``: the source writes German
-    note names (its ``[...]`` chords had an ``H``), so a plain ``B`` is a B flat."""
+    note names (its ``[...]`` chords had an ``H``), so a plain ``B`` is a B flat. ``shapes``: the
+    source's ``{capo}`` (its chords are shapes, ``chordpro.shape_capo``); under ``{x_capo}`` they
+    sound as written."""
     done = Applied()
-    _chord_lines(sheet, done, german)
+    _chord_lines(sheet, done, german, shapes)
     _tab_blocks(sheet, done)
     _header(sheet, done)
     return done
@@ -111,7 +113,7 @@ def _sounding(ln: Line, capo: int) -> Line:
     return Line(segs, ln.comment)
 
 
-def _chord_lines(sheet: Sheet, done: Applied, german: bool) -> None:
+def _chord_lines(sheet: Sheet, done: Applied, german: bool, shapes: int) -> None:
     german = german or _german(sheet)
     out: list[Section] = []
     for sec in sheet.sections:
@@ -135,7 +137,7 @@ def _chord_lines(sheet: Sheet, done: Applied, german: bool) -> None:
                 part.kind, part.label = kind_of(label) or "other", label
             elif label:
                 chords = f"{label}: {chords}"
-            part.lines.append(_sounding(parse_line(chords, german), sheet.capo))
+            part.lines.append(_sounding(parse_line(chords, german), shapes))
             done.chord_lines += 1
     _replace(sheet, out)
 
@@ -236,9 +238,9 @@ _FACT_NAMES = {
 }  # fmt: skip
 # "Standard tuning", "Drop D tuning", "Eb tuning (half step down)"
 _TUNING = re.compile(r"^(\S+(?:\s+\S+){0,3})\s+tuning\s*((?:[:(\-].*)?)$", re.I)
-# the words in front of "tuning" ("we keep on tuning" is lyrics)
+# the words in front of "tuning" ("we keep on tuning" is lyrics; "Drop-D", "1/2 step down" are not)
 _TUNING_WORD = re.compile(
-    r"^(?:standard|drop|open|half|whole|step|down|[a-g][#b]?|[a-g#b]{4,8})$", re.I
+    r"^(?:standard|drop|open|half|whole|step|down|1/2|[a-g][#b]?|[a-g#b]{4,8})$", re.I
 )
 _SOURCE = re.compile(
     r"^(?:source|quelle|from|taken from|found (?:at|on))\s*:|https?://|www\.|"
@@ -288,7 +290,7 @@ def _header_line(text: str, sheet: Sheet) -> bool:
             sheet.meta.setdefault("x_tuning" if what == "tuning" else "tempo", value)
         return bool(what)
     m = _TUNING.match(t)
-    if m and all(_TUNING_WORD.match(w) for w in m.group(1).split()):
+    if m and all(_TUNING_WORD.match(w) for w in re.split(r"[\s-]+", m.group(1)) if w):
         sheet.meta.setdefault("x_tuning", (m.group(1) + m.group(2)).strip())
         return True
     return bool(_SOURCE.search(t) or _CREDIT.search(t) or _by_name(t) or _names_song(t, sheet))

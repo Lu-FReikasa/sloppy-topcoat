@@ -173,6 +173,17 @@ def writes_german(text: str) -> bool:
     return uses_german_names(_CHORD_TOKEN.findall(text))
 
 
+def shape_capo(text: str) -> int:
+    """The ``{capo}`` of a ChordPro text (its chords are shapes), 0 if none; ``{x_capo}`` is none
+    (the chords already sound as written). The last one counts, as in :func:`parse`."""
+    capo = 0
+    for raw in text.replace("\r\n", "\n").split("\n"):
+        d = _DIRECTIVE.match(raw.strip())
+        if d and d.group(1).lower() == "capo":
+            capo = _int(d.group(2) or "")
+    return capo
+
+
 def parse(text: str) -> Sheet:
     """A ChordPro text as a sheet in sounding pitch."""
     lines = text.replace("\r\n", "\n").split("\n")
