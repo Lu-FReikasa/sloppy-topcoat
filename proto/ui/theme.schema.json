@@ -14,7 +14,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["kind"],
-      "properties": { "kind": { "enum": ["tile", "columns", "rows", "focus", "cascade"] } }
+      "properties": { "kind": { "enum": ["tile", "columns", "rows", "focus", "cascade", "nest"] } }
     },
     "bar": {
       "type": "object",

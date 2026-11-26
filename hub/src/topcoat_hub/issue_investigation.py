@@ -92,6 +92,9 @@ Ask = Callable[[str, dict[str, Any]], Awaitable[tuple[str, str]]]
 # (number of the try, content of its test file) -> the output of its run, or why it did not run
 Try = Callable[[int, str], Awaitable[str]]
 Read = Callable[[list[str]], Awaitable[dict[str, str | None]]]
+# (a path or folder) -> the files of the workshop's ``repo.outline`` there (plan step 1.11), each
+# ``{path, lines, symbols: [{name, kind, start, end}], symbols_left?}``; [] when the node has none
+Outline = Callable[[str], Awaitable[list[dict[str, Any]]]]
 
 
 @dataclass
@@ -302,11 +305,68 @@ def outside_part(files: list[str], existing: dict[str, str | None]) -> str:
     return real[0].split("/", 1)[0] + "/" if real else ""
 
 
+# the map of the files the start found (repo.outline, plan step 1.11): their names and lines, so
+# round 0 and the rounds after it name symbols that exist instead of guessing them
+OUTLINE_FILES = 4
+OUTLINE_CHARS = 6000
+_ANY_PATH = re.compile(r"(?<![\w/.-])((?:hub|web/src|proto|docs|desktop|node)/[\w./-]+\.\w+)")
+
+
+def named_files(text: str, limit: int = OUTLINE_FILES) -> list[str]:
+    """The repository files a text names, the most named first (ties in order of appearance)."""
+    found = [m.group(1) for m in _ANY_PATH.finditer(text)]
+    order = list(dict.fromkeys(found))
+    return sorted(order, key=lambda f: -found.count(f))[:limit]
+
+
+def outline_text(files: list[dict[str, Any]], limit: int = OUTLINE_CHARS) -> str:
+    """The outline of files as the models read it: one line a file, its names with their lines."""
+    rows: list[str] = []
+    size = 0
+    for f in files:
+        names = [
+            f"{s.get('name')} [{s.get('start')}-{s.get('end')}]"
+            for s in f.get("symbols") or []
+            if isinstance(s, dict) and s.get("name")
+        ]
+        if left := f.get("symbols_left"):
+            names.append(f"… {left} weitere")
+        row = f"- `{f.get('path')}` ({f.get('lines') or 0} Zeilen): " + (", ".join(names) or "-")
+        if size + len(row) > limit:
+            rows.append("- …")
+            break
+        rows.append(row)
+        size += len(row) + 1
+    return "\n".join(rows)
+
+
+async def _outline_findings(outline: Outline, findings: list[str]) -> str:
+    """The outline of the files the findings name, or "" (no files, an old node, an error)."""
+    files: list[dict[str, Any]] = []
+    for path in named_files(_findings_text(findings)):
+        try:
+            files += [f for f in await outline(path) if isinstance(f, dict)]
+        except Exception:  # the map is a help, never a reason for the investigation to fail
+            return ""
+    return outline_text(files)
+
+
 async def _area_round(
-    ask: Ask, read: Read, question: str, findings: list[str], out: Investigation
+    ask: Ask,
+    read: Read,
+    question: str,
+    findings: list[str],
+    out: Investigation,
+    outline: Outline | None = None,
 ) -> tuple[str, list[str]] | None:
     """Round 0: the area, files and names before any question; they go into the findings. Returns
-    ``(part, files)`` when the issue lies outside the pipeline, else ``None``."""
+    ``(part, files)`` when the issue lies outside the pipeline, else ``None``. With ``outline``,
+    the names and lines of the files the start found go into the findings first."""
+    if outline is not None and (mapped := await _outline_findings(outline, findings)):
+        findings.append(
+            "## Übersicht der gefundenen Dateien (repo.outline: Namen und Zeilen)\n" + mapped
+        )
+        out.log.append("Runde 0: Übersicht der gefundenen Dateien gelesen")
     answer, who = await ask(
         "issue_area",
         {"question": question, "findings": _findings_text(findings)[-AREA_FINDINGS_CHARS:]},
@@ -352,15 +412,17 @@ async def investigate(
     start: str,
     try_run: Try | None = None,
     review: bool = False,
+    outline: Outline | None = None,
 ) -> Investigation:
     """The rounds of an issue's investigation; ``start`` is what ``issue_investigate`` read.
     ``review``: a plan that fits the code gets the second look (``review_plan``) before it is
     taken; a refusal of it is a refused plan like any other.
     ``try_run``: the workshop tries of the person's probe mandate (issue_probes.py), or ``None``
-    when there is none (then a question to "try" goes to Development)."""
+    when there is none (then a question to "try" goes to Development).
+    ``outline``: the workshop's map of a file (``repo.outline``) for round 0, or ``None``."""
     out = Investigation()
     findings = [f"## Zu Beginn gelesen (Code, live)\n{start.strip() or '(nichts)'}"]
-    stop = await _area_round(ask, read, question, findings, out)
+    stop = await _area_round(ask, read, question, findings, out, outline)
     if stop:
         return _outside(out, stop, findings)
     hint = ""

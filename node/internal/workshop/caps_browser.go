@@ -174,7 +174,7 @@ func (w *Workshop) capBrowserViewport() capability.Capability {
 	return wcap{
 		name: "browser.viewport",
 		desc: "Set the size of the page: width and height in CSS pixels, optionally the pixel ratio, " +
-			"orientation, colour scheme (light or dark) and reduced motion. Returns the effective viewport.",
+			"orientation, color scheme (light or dark) and reduced motion. Returns the effective viewport.",
 		schema: `{"type":"object","additionalProperties":false,"required":["width","height"],"properties":{` +
 			`"width":{"type":"integer","minimum":200,"maximum":4000},"height":{"type":"integer","minimum":200,"maximum":4000},` +
 			`"dpr":{"type":"number","minimum":1,"maximum":3},"orientation":{"enum":["portrait","landscape"]},` +

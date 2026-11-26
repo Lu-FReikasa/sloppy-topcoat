@@ -82,7 +82,7 @@ export function ActivityPanel({ view }: { view: ActivityView }) {
       </table>
       <p className="muted">{t("activity.backgroundNodes", { nodes: background })}</p>
       </details>
-      <p>
+      <p className="link-row">
         <a href={schedulingHref}>{t("activity.changeLink")}</a>
       </p>
     </>

@@ -20,6 +20,8 @@ type Model struct {
 	Own bool
 	// GGUF is what the file states in its header (nil = not read or not a GGUF file).
 	GGUF *gguf.Meta
+	// Projector is the file name of the vision projector loaded with the model ("" = none).
+	Projector string
 }
 
 // LoadedModel is a model currently loaded.

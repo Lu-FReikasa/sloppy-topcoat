@@ -10,6 +10,8 @@ import "./files/files.css";
 import "./desktop/desktop.css";
 import "./desktop/leitstand.css";
 import "./desktop/schreibtisch.css";
+// last: the floors of the narrow layout (16 px fields, 40 px targets) win over the pages above
+import "./touch.css";
 import { applyChatList, loadChatList } from "./chat/chatListModel";
 import { overlayOf } from "./desktop/state";
 

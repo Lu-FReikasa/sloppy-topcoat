@@ -475,6 +475,24 @@ func TestJinjaConfig(t *testing.T) {
 	}
 }
 
+func TestProjectorsConfig(t *testing.T) {
+	base := `{"roles":["gpu"],"runner":{"type":"llamaserver",%s},"allowed_actions":[],"heartbeat_interval_seconds":10,
+		"idle_ttl_seconds":0,"watcher":{"rules":[]},"capabilities":[]}`
+	c, err := protocol.ParseNodeConfig([]byte(fmt.Sprintf(base, `"projectors":{"a":"mmproj-F16.gguf","b":"none"}`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Runner.Projectors["a"] != "mmproj-F16.gguf" || c.Runner.Projectors["b"] != "none" {
+		t.Fatalf("%v", c.Runner.Projectors)
+	}
+	// only a file name in the model's own directory: no path, no other file type
+	for _, bad := range []string{`{"a":"../x/mmproj.gguf"}`, `{"a":"/etc/passwd"}`, `{"a":"x.bin"}`, `{"a":""}`, `{" ":"x.gguf"}`} {
+		if _, err := protocol.ParseNodeConfig([]byte(fmt.Sprintf(base, `"projectors":`+bad))); err == nil {
+			t.Errorf("accepted %s", bad)
+		}
+	}
+}
+
 func TestNParallelConfig(t *testing.T) {
 	base := `{"roles":["gpu"],"runner":{"type":"llamaserver",%s},"allowed_actions":[],"heartbeat_interval_seconds":10,
 		"idle_ttl_seconds":0,"watcher":{"rules":[]},"capabilities":[]}`

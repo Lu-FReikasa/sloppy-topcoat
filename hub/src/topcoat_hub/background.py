@@ -1,12 +1,11 @@
 """The work the hub does on its own (ARCHITECTURE D75): when each service runs and what it does.
 
 Every background service of the hub — the two looks at a finished chat and the Nachlese, the
-tidy-up of the memory, the care run, the re-check of pinned answers, continuing stuck tasks,
-re-reading the knowledge base — has a task here: a trigger (when it runs) and one step per part of
-the work (whether it is done, which model, how much in one go). The values come from the hub's
-settings (``TOPCOAT_*``); a service whose interval is 0 is not started at all. (Until the
-flows were taken out an admin could copy a background flow and change its values; none was
-ever in use.)"""
+tidy-up of the memory, the care run, continuing stuck tasks, re-reading the knowledge base — has a
+task here: a trigger (when it runs) and one step per part of the work (whether it is done, which
+model, how much in one go). The values come from the hub's settings (``TOPCOAT_*``); a service
+whose interval is 0 is not started at all. (Until the flows were taken out an admin could copy a
+background flow and change its values; none was ever in use.)"""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -129,8 +128,7 @@ TASKS: dict[str, TaskSpec] = {
             "care",
             "The care run",
             "At night and every few idle hours: expired notes are struck, useless ones archived, "
-            "the core reviewed (proposals only), the memories cross-checked, and notes about the "
-            "servers checked live.",
+            "the core reviewed (proposals only) and the memories cross-checked.",
             lambda s: {
                 "on": True,
                 "hour": s.memory_care_hour,
@@ -149,32 +147,6 @@ TASKS: dict[str, TaskSpec] = {
                     "crosscheck",
                     "Cross-check the memories",
                     "A discrepancy goes to the program responsible for its topic.",
-                ),
-                StepSpec(
-                    "checks",
-                    "Check notes live",
-                    "Notes about the servers are checked with a read-only look (limit = notes "
-                    "per run; empty model = the deep model).",
-                    lambda s: {"limit": s.memory_care_max_notes},
-                ),
-            ),
-        ),
-        TaskSpec(
-            "recheck",
-            "Re-check pinned answers",
-            "A pinned answer from another program is asked again regularly; it gets a mark: "
-            "still correct, or outdated.",
-            lambda s: {
-                "on": s.recheck_enabled,
-                "every_hours": s.recheck_interval_hours,
-                "event": "a pinned answer is older than the interval",
-            },
-            (
-                StepSpec(
-                    "recheck",
-                    "Ask again and compare",
-                    "The dossier is sent again (limit = answers per round).",
-                    lambda s: {"limit": s.recheck_max},
                 ),
             ),
         ),

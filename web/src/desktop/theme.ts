@@ -7,9 +7,10 @@
 // core hands it.
 import { tile, type Rect } from "./tiling";
 
-/** How the programs that are shown are laid out. */
-export type LayoutKind = "tile" | "columns" | "rows" | "focus" | "cascade";
-export const LAYOUT_KINDS: readonly LayoutKind[] = ["tile", "columns", "rows", "focus", "cascade"];
+/** How the programs that are shown are laid out. `nest`: splits that nest, with a view that zooms
+ *  to a part of them (nest.ts; the desktop places these itself, not with `layoutRects`). */
+export type LayoutKind = "tile" | "columns" | "rows" | "focus" | "cascade" | "nest";
+export const LAYOUT_KINDS: readonly LayoutKind[] = ["tile", "columns", "rows", "focus", "cascade", "nest"];
 
 /** Where the taskbar stands. `hidden`: not drawn; the palette (Ctrl+K) and the keys still work. */
 export type BarPosition = "bottom" | "top" | "left" | "right" | "hidden";
@@ -116,7 +117,8 @@ export function allThemes(custom: readonly ThemeManifest[] = []): ThemeManifest[
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
 /** Where each of `n` shown programs stands, as fractions of the stage. The last one is in front for
- *  `cascade` (the others lie under it); all other engines keep the programs apart. */
+ *  `cascade` (the others lie under it); all other engines keep the programs apart. `nest` keeps a
+ *  tree of its own (nest.ts); asked here, it tiles. */
 export function layoutRects(kind: LayoutKind, n: number): Rect[] {
   if (n <= 0) return [];
   switch (kind) {
@@ -159,6 +161,7 @@ export function layoutRects(kind: LayoutKind, n: number): Rect[] {
       }));
     }
     case "tile":
+    case "nest":
     default:
       return tile(n);
   }
@@ -317,7 +320,7 @@ export function safeCss(theme: ThemeManifest): string {
 export const DT_CLASSES: readonly string[] = [
   "dt-root", "dt-solo", "dt-overlay", "dt-arriving", "dt-leaving", "dt-meter", "dt-moving", "dt-snap-preview", "dt-tile", "dt-settings", "dt-overlay-hint", "dt-screen", "dt-pin", "dt-grip",
   "dt-grip-n", "dt-grip-s", "dt-grip-e", "dt-grip-w", "dt-grip-ne", "dt-grip-nw", "dt-grip-se", "dt-grip-sw", "dt-stage", "dt-view", "dt-banner", "dt-empty", "dt-note",
-  "dt-program", "dt-focused", "dt-maxi", "dt-closing", "dt-titlebar", "dt-lamp", "dt-code", "dt-title", "dt-icon",
+  "dt-program", "dt-focused", "dt-maxi", "dt-closing", "dt-scaled", "dt-unframed", "dt-titlebar", "dt-lamp", "dt-code", "dt-title", "dt-icon",
   "dt-titlebar-buttons", "dt-minimise", "dt-maximise", "dt-close", "dt-program-body", "dt-nav",
   "dt-taskbar", "dt-start", "dt-tasks", "dt-task", "dt-open", "dt-min", "dt-front", "dt-label",
   "dt-signal", "dt-signal-red", "dt-signal-amber", "dt-signal-green",

@@ -656,6 +656,20 @@ class FixService:
                 log.info("fix check: %s could not be read", path, exc_info=True)
         return files
 
+    async def outline_live(self, user_id: uuid.UUID, path: str) -> list[dict[str, Any]]:
+        """The workshop's map of ``path`` in the live code (``repo.outline``, plan step 1.11): its
+        files with their named places and lines; [] when no workshop or a node without the
+        capability is there (it needs a node release, D123)."""
+        caller = Caller(user_id, True, "agent", application="dev")
+        try:
+            node = await self._dev_node(caller)
+            out = await self._read(caller, node, "repo.outline", {"repo": LIVE_REPO, "path": path})
+        except Exception:
+            log.info("fix check: no outline of %s", path, exc_info=True)
+            return []
+        files = out.get("files") if isinstance(out, dict) else None
+        return [f for f in files or [] if isinstance(f, dict)]
+
     async def program_of(self, fix: IssueFix) -> str:
         """The program whose run wrote the draft (``issue_fix`` when that is not known)."""
         from topcoat_hub.models import AgentTask

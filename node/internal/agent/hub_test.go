@@ -378,6 +378,17 @@ func newHarness(t *testing.T, hubURL, dirPath string, profile fake.Profile, mods
 		t.Fatal(err)
 	}
 	h.agent = a
+	// A failed test shows the end of the node's log: a timeout on the hub side alone does not
+	// say where the node was (#72).
+	t.Cleanup(func() {
+		if t.Failed() {
+			l := h.logs.String()
+			if len(l) > 8<<10 {
+				l = "...\n" + l[len(l)-8<<10:]
+			}
+			t.Logf("node log:\n%s", l)
+		}
+	})
 	return h
 }
 
@@ -503,7 +514,7 @@ func TestPeriodicHeartbeat(t *testing.T) {
 	}
 }
 
-// The heartbeat carries the CPU utilisation when the system can measure it and leaves the field
+// The heartbeat carries the CPU utilization when the system can measure it and leaves the field
 // out when it cannot (an older node sends none either).
 func TestHeartbeatCarriesCPUUtilisationWhenKnown(t *testing.T) {
 	hub := newFakeHub(t)

@@ -345,9 +345,14 @@ func parseAddr(s string) (netip.Addr, error) {
 }
 
 // listenRange binds the first free port of min..max on all interfaces.
+//
+// All interfaces on purpose (gosec G102): this is the single-use transfer socket D51 allows. The
+// target tries several of the source's addresses in turn (those the node reported, then the one the
+// hub sees), so one bind address would not do. The socket accepts only the peer addresses the hub
+// gave, a one-time token and pinned TLS 1.3, and closes after one file or its TTL.
 func listenRange(min, max int) (net.Listener, int, error) {
 	if min == 0 && max == 0 {
-		ln, err := net.Listen("tcp", ":0")
+		ln, err := net.Listen("tcp", ":0") //nolint:gosec // G102: D51, see above
 		if err != nil {
 			return nil, 0, err
 		}
@@ -502,13 +507,14 @@ func request(ctx context.Context, endpoint, certSHA256, token string, from int64
 			conn := tls.Client(raw, &tls.Config{
 				MinVersion: tls.VersionTLS13,
 				NextProtos: []string{"http/1.1"},
-				// No CA: the certificate is self-signed and authenticated by its pin.
-				InsecureSkipVerify: true, //nolint:gosec // pinned in VerifyPeerCertificate
-				VerifyPeerCertificate: func(raw [][]byte, _ [][]*x509.Certificate) error {
-					if len(raw) == 0 {
+				// No CA: the certificate is self-signed and authenticated by its pin. The pin is
+				// checked in VerifyConnection, which also runs for resumed sessions.
+				InsecureSkipVerify: true, //nolint:gosec // pinned in VerifyConnection
+				VerifyConnection: func(cs tls.ConnectionState) error {
+					if len(cs.PeerCertificates) == 0 {
 						return errors.New("no certificate")
 					}
-					sum := sha256.Sum256(raw[0])
+					sum := sha256.Sum256(cs.PeerCertificates[0].Raw)
 					if subtle.ConstantTimeCompare([]byte(hex.EncodeToString(sum[:])), []byte(certSHA256)) != 1 {
 						return errors.New("certificate does not match the pinned fingerprint")
 					}

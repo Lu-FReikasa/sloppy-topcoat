@@ -79,13 +79,15 @@ const SAMPLE: Record<Route["view"], Route> = {
   handovers: { view: "handovers", id: "h1" },
   node: { view: "node", id: "n1" },
   w: { view: "w", key: "talk" },
+  research: { view: "research" },
+  unknown: { view: "unknown" },
 };
 
 describe("every address of a page (old bookmarks, links in pages) leads to a view", () => {
-  it("maps each route to a module, except the menu page and the workspaces themselves", () => {
+  it("maps each route to a module, except the bare address and the workspaces themselves", () => {
     for (const [view, route] of Object.entries(SAMPLE)) {
       const target = routeToModule(route);
-      if (view === "more" || view === "w") expect(target, view).toBeNull();
+      if (view === "start" || view === "w") expect(target, view).toBeNull();
       else {
         expect(target, view).not.toBeNull();
         expect(moduleMeta(target?.module ?? ""), view).toBeDefined();
@@ -130,7 +132,7 @@ describe("the workspace address", () => {
 
   it("is not an admin page and ignores what is not a key", () => {
     expect(isAdminView("w")).toBe(false);
-    expect(parseRoute("#/w/Bad Key")).toEqual({ view: "start" });
-    expect(parseRoute("#/wx")).toEqual({ view: "start" });
+    expect(parseRoute("#/w/Bad Key")).toEqual({ view: "unknown" });
+    expect(parseRoute("#/wx")).toEqual({ view: "unknown" });
   });
 });

@@ -22,13 +22,14 @@ SEARCHES: dict[str, str] = {
     "web.search": "url",
     "repo.search": "path",
     "repo.list": "path",
+    "repo.outline": "path",
 }
 READS: dict[str, str] = {"knowledge.read": "path", "web.fetch": "url", "repo.read": "path"}
 # which search feeds which read (a web page is never a file, a note is never a URL)
 FEEDS: dict[str, tuple[str, ...]] = {
     "knowledge.read": ("knowledge.search",),
     "web.fetch": ("web.search",),
-    "repo.read": ("repo.search", "repo.list"),
+    "repo.read": ("repo.search", "repo.list", "repo.outline"),
 }
 MAX_HITS = 200
 _REF = re.compile(r"^\s*\[?(E\d{1,4})\]?\s*$")

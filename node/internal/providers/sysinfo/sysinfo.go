@@ -16,7 +16,7 @@ type Info struct {
 	EfficiencyCores  int
 	RAMTotalMB       int64
 	RAMUsedMB        int64
-	// CPUPercent is the utilisation of all logical processors together since the previous call, in
+	// CPUPercent is the utilization of all logical processors together since the previous call, in
 	// percent (CPUKnown; the first call has no delta and the figure cannot be read on every system).
 	CPUPercent float64
 	CPUKnown   bool

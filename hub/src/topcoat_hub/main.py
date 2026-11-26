@@ -6,6 +6,7 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -16,6 +17,7 @@ from topcoat_hub import (
     hub_log,
     node_rename,
     output_schemas,
+    plugin_registry,
     project_events,
     tls,
     web_access,
@@ -41,6 +43,7 @@ from topcoat_hub.api import metrics as metrics_api
 from topcoat_hub.api import model_transfers as model_transfers_api
 from topcoat_hub.api import params as params_api
 from topcoat_hub.api import personas as personas_api
+from topcoat_hub.api import plugins as plugins_api
 from topcoat_hub.api import project as project_api
 from topcoat_hub.api import project_export as project_export_api
 from topcoat_hub.api import releases as releases_api
@@ -96,7 +99,6 @@ from topcoat_hub.project_tools import ProjectTools
 from topcoat_hub.proposals import ProposalService
 from topcoat_hub.protocol import PROTOCOL_VERSION, load_schema_sets
 from topcoat_hub.queue_watch import QueueWatch
-from topcoat_hub.recheck import Rechecker
 from topcoat_hub.releases import ReleaseService
 from topcoat_hub.report_knowledge import ReportIndex
 from topcoat_hub.resume_stuck import StuckTaskResumer
@@ -113,7 +115,7 @@ from topcoat_hub.trace_tool import TraceService
 from topcoat_hub.ui.runtime import build_runtime
 from topcoat_hub.ui.seeds import ensure_builtin as ensure_ui_builtin
 from topcoat_hub.updates import UpdateStore, parse_keys
-from topcoat_hub.wake import UdpWakeSender
+from topcoat_hub.wake import UdpWakeSender, demand_waker
 from topcoat_hub.wiki_tools import WikiTools
 
 log = logging.getLogger(__name__)
@@ -189,6 +191,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             settings.rollout_node,
         )
         app.state.wake = UdpWakeSender()
+        # a request for the house model of a sleeping node wakes it (plan step 1.7); the sender is
+        # looked up on each wake, so a test can swap it
+        app.state.gateway.waker = demand_waker(
+            app.state.sessionmaker, app.state.nodes, _LateSender(app), settings
+        )
         app.state.embedder = make_embedder(
             app.state.gateway, settings.embedding_model, settings.embedding_auto
         )
@@ -356,7 +363,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.memory_care = MemoryCare(
             app.state.sessionmaker,
             app.state.gateway,
-            app.state.agents,
             app.state.memory,
             settings,
             digester=app.state.digester,
@@ -397,10 +403,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.handovers.knowledge = app.state.knowledge
             app.state.handovers.start()
             handovers = app.state.handovers
-        recheck_scheduler = None
-        if handovers is not None and settings.recheck_enabled:
-            app.state.rechecker = Rechecker(app.state.sessionmaker, handovers, settings)
-            recheck_scheduler = asyncio.create_task(app.state.rechecker.scheduler())
         project_tick_scheduler = None
         if settings.project_reminder_tick_seconds > 0:
             app.state.project_tick = ReminderTick(app.state.sessionmaker, settings)
@@ -442,6 +444,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         written = await ensure_ui_builtin(app.state.sessionmaker)
         if written:
             log.info("ui: %d built-in workspace(s) or profile(s) written", written)
+        # the built-in programs as plug-ins of the registry (D105), after their rows are written
+        if registered := await plugin_registry.ensure_builtin(app.state.sessionmaker):
+            log.info("plug-ins: %d built-in program(s) registered or refreshed", registered)
         # earlier names of renamed nodes still reach them (node_rename.py)
         if aliases := await node_rename.load_aliases(app.state.sessionmaker):
             log.info("nodes: %d earlier name(s) lead to renamed nodes", aliases)
@@ -474,9 +479,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await asyncio.gather(retention_scheduler, return_exceptions=True)
             if stuck_resumer is not None:
                 await stuck_resumer.stop()
-            if recheck_scheduler is not None:
-                recheck_scheduler.cancel()
-                await asyncio.gather(recheck_scheduler, return_exceptions=True)
             if handovers is not None:
                 await handovers.stop()
             queue_watch_task.cancel()
@@ -529,6 +531,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(incognito_api.router)
     app.include_router(handovers_api.router)
     app.include_router(ui_api.router)
+    app.include_router(plugins_api.router)
     app.include_router(theme_workshop_api.router)
     app.include_router(keys.router)
     app.include_router(dev_repos.router)
@@ -558,3 +561,13 @@ def app() -> FastAPI:
     """Factory for ``uvicorn --factory topcoat_hub.main:app``."""
     logging.basicConfig(level=logging.INFO)
     return create_app()
+
+
+class _LateSender:
+    """Forwards to ``app.state.wake`` at send time (tests replace it with a fake)."""
+
+    def __init__(self, app: Any) -> None:
+        self._app = app
+
+    async def send(self, mac: str, broadcast: str, port: int) -> None:
+        await self._app.state.wake.send(mac, broadcast, port)

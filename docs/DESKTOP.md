@@ -38,9 +38,22 @@ it. The admin may still copy and change programs.
 | `Ctrl+K` | the **command palette**, in the middle: programs, views, settings and actions by name; Enter opens |
 | `Ctrl+Enter` | the conversation of the focused program (its chat, in its context) |
 | `Alt+1` … `Alt+9` | the n-th program of the taskbar: open, or bring forward |
-| `Escape` | close the palette; otherwise minimise the focused program |
+| `Escape` | close the palette; in a `nest` theme zoomed in (wide screen): out one level; otherwise minimise the focused program |
+| `Alt+↓` / `Alt+↑` / `Alt+0` | `nest` themes only: zoom in one level towards the focused program / out one level / the overview of all |
 
 A key does nothing while the person types in a field, except `Ctrl+K` and `Escape`.
+
+**The `nest` layout** (a theme's `layout.kind`, `nest.ts`): programs sit in splits that nest to any
+depth; each split is a level, and the view frames one of them (the overview frames the whole tree).
+Programs outside the frame lie off the stage and keep running (mounted, inert); a zoom moves every
+window from its old place to the new one as a transform, for the theme's `motion.ms` (none with
+reduced motion). A program smaller than its minimum size (`MIN_TILE`) is laid out at that size and
+drawn scaled down; its content takes no input then, and a click on it zooms to the first level where
+it has its full size and brings it forward. Bringing a program forward from outside the frame (taskbar,
+`Alt+n`) zooms out just far enough to show it. In the overlay `Escape` stays the client's key (it
+hides the overlay), so `Alt+↑` steps out there, and nest windows are not moved or sized by hand; a
+solo window shows its one program whole and keeps no nest. On a narrow screen, which shows the program in
+front alone, the zoom keys do nothing and `Escape` minimises. The zoom commands are also in the palette.
 
 ## 3. State
 
@@ -77,8 +90,9 @@ to both.
   normal, cyan is the selection and advice, amber wants attention, red is a warning; everything
   else is grey legends on dark glass. A program is a display in a bezel with a legend plate (its
   three-letter page code, e.g. `ADM`, and a lamp lit while it has the focus); the taskbar is the
-  annunciator panel (dark = closed, green text = open, lit green = in front, amber = the inbox has
-  something to read, flashing red = something urgent); a clock keeps UTC. The hue tints only the
+  annunciator panel (an unlit, dark key = closed, its legend still readable grey; green text = open,
+  lit green = in front, amber = the inbox has something to read, flashing red = something urgent); a
+  clock keeps UTC. The hue tints only the
   housing, never a signal. A display comes on with a short flicker.
 
 - **Schreibtisch** (desk; back from the desk shell of the layout prototypes): programs are slips of

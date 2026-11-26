@@ -194,12 +194,15 @@
   pointer-events: none;
 }
 
-.dt-look-leitstand .dt-nav {
+.dt-look-leitstand .dt-nav,
+.dt-look-leitstand .dt-program-body > .open-chats {
   background: #070d0f;
   border-color: #16302a;
 }
 
-.dt-look-leitstand .dt-nav button {
+/* Start's open conversations keep the rail's lettering now that they sit beside it, not in it (#77) */
+.dt-look-leitstand .dt-nav button,
+.dt-look-leitstand .open-chats button {
   font-family: var(--label);
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -237,7 +240,8 @@
 .dt-look-leitstand .dt-task {
   justify-content: center;
   padding: 0.35rem 0.6rem;
-  color: #4c585d;
+  /* a closed program: the key stays dark and unlit, its legend readable grey (#75) */
+  color: #737f84;
   background: #0a0e10;
   border: 1px solid #000;
   box-shadow: inset 0 0 0 1px #262f33;
