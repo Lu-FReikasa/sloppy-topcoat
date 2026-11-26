@@ -103,6 +103,7 @@ import { MIN_TILE, fits, inTiles, pct } from "./tiling";
 import {
   keysOf,
   loadNests,
+  followZoom,
   rects as nestRects,
   reveal,
   saveNests,
@@ -819,7 +820,9 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
     : nest.tree;
   // the program in front is always in view: brought forward from outside the frame, the view zooms
   // out just far enough
-  const nestZoom = nesting && state.focus ? reveal(nestTree, nest.zoom, state.focus) : validZoom(nestTree, nest.zoom);
+  // (the zoom path is made of indices: when the tree changed, it follows the programs it framed)
+  const followed = nestTree === nest.tree ? nest.zoom : followZoom(nest.tree, nest.zoom, nestTree);
+  const nestZoom = nesting && state.focus ? reveal(nestTree, followed, state.focus) : validZoom(nestTree, followed);
   if (nesting && (nestTree !== nest.tree || !sameZoom(nestZoom, nest.zoom))) {
     // adjusted while drawing, like the stack above: the next drawing has the tree it shows
     setNest({ tree: nestTree, zoom: nestZoom });
