@@ -123,6 +123,17 @@ describe("NodeDetailView", () => {
     expect((await screen.findByRole("alert")).textContent).toBe("Fehler: out of memory");
   });
 
+  it("shows the node's own reason when it refuses a load as busy", async () => {
+    setup(makeDetail(), {
+      ok: false,
+      error: { code: "busy", message: "node is busy gaming; models cannot be loaded now" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Laden" }));
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Fehler: node is busy gaming; models cannot be loaded now",
+    );
+  });
+
   it("shows a translated error for HTTP 409 node_offline", async () => {
     setup(makeDetail(), () =>
       jsonResponse({ detail: { code: "node_offline", message: "offline" } }, 409),
