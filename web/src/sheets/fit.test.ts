@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseFit, isTabLine, maxColumns, MAX_FONT, MIN_FONT, neighbour, positionOf, sortGroups, visibleGroups } from "./fit";
+import { balanceColumns, chooseFit, packColumns, maxColumns, MAX_FONT, MIN_FONT, neighbour, positionOf, sortGroups, visibleGroups } from "./fit";
 import { groupSheets } from "./group";
 import type { SheetSummary } from "./types";
 
@@ -37,9 +37,9 @@ describe("chooseFit", () => {
     expect(chooseFit(3, () => false)).toEqual({ columns: 3, font: MIN_FONT, fits: false });
   });
 
-  it("uses three columns across and two upright", () => {
-    expect(maxColumns(1920)).toBe(3);
-    expect(maxColumns(1200)).toBe(2);
+  it("lets a scaled laptop screen try several columns", () => {
+    expect(maxColumns(1920)).toBe(4);
+    expect(maxColumns(800)).toBe(3);
     expect(maxColumns(400)).toBe(1);
   });
 });
@@ -80,11 +80,23 @@ describe("sorting and paging", () => {
   });
 });
 
-describe("isTabLine", () => {
-  it("spots tablature, not lyrics or chords", () => {
-    expect(isTabLine("e|-----3---5---|")).toBe(true);
-    expect(isTabLine("--0--2--3--2--0--")).toBe(true);
-    expect(isTabLine("Walking down the road - again")).toBe(false);
-    expect(isTabLine("C   G   Am   F")).toBe(false);
+
+describe("packColumns", () => {
+  it("fills each column before the next and never breaks a part", () => {
+    expect(packColumns([3, 3, 3, 3], 2, 7)).toEqual([[0, 1], [2, 3]]);
+    expect(packColumns([3, 3, 3, 3], 2, 5)).toBeNull();
+    expect(packColumns([8], 3, 7)).toBeNull();
+    expect(packColumns([1, 1], 3, 10)).toEqual([[0, 1]]);
+  });
+
+  it("balances a song that does not fit over the columns", () => {
+    expect(balanceColumns([4, 4, 4, 4, 4, 4], 3)).toEqual([[0, 1], [2, 3], [4, 5]]);
+    expect(balanceColumns([10, 1, 1], 2)).toHaveLength(2);
+  });
+
+  it("handles no parts and a part taller than the screen", () => {
+    expect(balanceColumns([], 3)).toEqual([[]]);
+    expect(packColumns([], 2, 5)).toEqual([[]]);
+    expect(balanceColumns([20, 2, 2], 2)).toEqual([[0], [1, 2]]);
   });
 });

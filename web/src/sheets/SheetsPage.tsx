@@ -15,8 +15,9 @@ import type {
   SheetSummary,
 } from "./types";
 import {
+  balanceColumns,
   chooseFit,
-  isTabLine,
+  packColumns,
   maxColumns,
   neighbour,
   positionOf,
@@ -41,7 +42,6 @@ interface Props {
 
 const POLL_MS = 3000;
 const SORT_KEY = "topcoat.sheets.sort";
-const TABS_KEY = "topcoat.sheets.hideTabs";
 const COLLAPSE_KEY = "topcoat.sheets.stageCollapse";
 const STAGE_KEY = "topcoat.sheets.stage";
 const SIDE_KEY = "topcoat.sheets.side";
@@ -699,18 +699,20 @@ function Flow({ sheet }: { sheet: SheetDetail }) {
   );
 }
 
-function Body({ items }: { items: BodyItem[] }) {
+/** `anchors` off for the stage's hidden measuring copy, so ids stay unique on the page. */
+function Body({ items, anchors: withAnchors = true }: { items: BodyItem[]; anchors?: boolean }) {
   const { t } = useTranslation();
   const name = (s: SheetSection) => s.label || t(`sheets.kind.${KINDS.includes(s.kind) ? s.kind : "other"}`);
   return (
     <div className="sheet-body">
       {items.map(({ section: s, again, times, indices }) => {
         // the flow links to every part; parts merged into this block keep their anchor here
-        const anchors = indices.slice(1).map((i) => <span key={i} id={`sheet-part-${i}`} />);
+        const id = (i: number) => (withAnchors ? `sheet-part-${i}` : undefined);
+        const anchors = withAnchors && indices.slice(1).map((i) => <span key={i} id={id(i)} />);
         const count = times > 1 && <span className="sheet-times"> ×{times}</span>;
         if (again)
           return (
-            <section key={s.index} id={`sheet-part-${s.index}`} className={`sheet-part sheet-again ${kindClass(s.kind)}`} data-testid="sheet-again">
+            <section key={s.index} id={id(s.index)} className={`sheet-part sheet-again ${kindClass(s.kind)}`} data-testid="sheet-again">
               {anchors}
               <h3 className="sheet-part-label">
                 {name(s)}
@@ -720,7 +722,7 @@ function Body({ items }: { items: BodyItem[] }) {
             </section>
           );
         return (
-          <section key={s.index} id={`sheet-part-${s.index}`} className={`sheet-part ${kindClass(s.kind)}`}>
+          <section key={s.index} id={id(s.index)} className={`sheet-part ${kindClass(s.kind)}`}>
             {anchors}
             <h3 className="sheet-part-label">
               {name(s)}
@@ -842,19 +844,6 @@ function Comparison({ cmp }: { cmp: SheetComparison }) {
   );
 }
 
-/** The text of a line as it reads, chords included (to spot tab lines). */
-function lineText(line: SheetLine): string {
-  return line.comment ?? (line.segments ?? []).map((g) => (g.chord ?? "") + g.text).join("");
-}
-
-/** The sections without tab parts and tab lines; a part left empty goes too. */
-export function withoutTabs(sections: SheetSection[]): SheetSection[] {
-  return sections
-    .filter((s) => s.kind !== "tab")
-    .map((s) => ({ ...s, lines: s.lines.filter((ln) => !isTabLine(lineText(ln))) }))
-    .filter((s) => s.lines.length > 0 || s.repeat_of !== null);
-}
-
 /** The stage mode: the sheet alone, full screen, fitted on one screen in columns. ←/→ and
  *  PageUp/PageDown (a foot pedal sends these) page through the songs of the list as it is
  *  filtered and sorted, or through a setlist (`setlistName`; `at` is where `id` is in it, since a
@@ -884,16 +873,11 @@ function Stage({
   const opened = from ?? startId;
   const [sheet, setSheet] = useState<SheetDetail | null>(null);
   const [error, setError] = useState("");
-  const [hideTabs, setHideTabsState] = useState(() => remembered(TABS_KEY) !== "0");
   // default on: a repeat written out once saves lines when a song has to fit one screen
   const [collapse, setCollapseState] = useState(() => remembered(COLLAPSE_KEY) !== "0");
   const [fit, setFit] = useState<Fit | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
-  const setHideTabs = (on: boolean) => {
-    setHideTabsState(on);
-    remember(TABS_KEY, on ? "1" : "0");
-  };
   const setCollapse = (on: boolean) => {
     setCollapseState(on);
     remember(COLLAPSE_KEY, on ? "1" : "0");
@@ -941,38 +925,66 @@ function Stage({
   }, []);
 
   const items = useMemo(() => {
-    const sections = sheet ? (hideTabs ? withoutTabs(sheet.view.sections) : sheet.view.sections) : [];
+    const sections = sheet ? sheet.view.sections : [];
     return collapse ? collapseRepeats(sections) : asWritten(sections);
-  }, [sheet, hideTabs, collapse]);
+  }, [sheet, collapse]);
 
-  // fit: columns and the largest font at which nothing spills into an extra column
+  // fit: columns and the largest font at which every part has its place. The parts are measured in
+  // a hidden copy one column wide and placed into the columns here (packColumns): browsers differ in
+  // how CSS columns overflow (some wrap them below), so the layout does not rely on that.
+  const [cols, setCols] = useState<number[][]>([]);
   useLayoutEffect(() => {
     const b = box.current;
-    const c = body.current;
-    if (!b || !c || items.length === 0) return;
+    const m = body.current;
+    if (!b || !m || items.length === 0) return;
+    const heights = (columns: number, font: number): number[] => {
+      const gap = 2 * font;
+      m.style.width = `${(b.clientWidth - gap * (columns - 1)) / columns}px`;
+      m.style.fontSize = `${font}px`;
+      const parts = [...(m.firstElementChild?.children ?? [])] as HTMLElement[];
+      return parts.map((p) => p.getBoundingClientRect().height + (parseFloat(getComputedStyle(p).marginBottom) || 0));
+    };
     const measure = () => {
       const height = b.clientHeight;
-      c.style.height = `${height}px`;
-      const f = chooseFit(maxColumns(b.clientWidth), (columns, font) => {
-        c.style.columnCount = String(columns);
-        c.style.fontSize = `${font}px`;
-        return c.scrollWidth <= c.clientWidth + 1;
-      });
-      c.style.columnCount = String(f.columns);
-      c.style.fontSize = `${f.font}px`;
-      c.style.height = f.fits ? `${height}px` : "auto";
+      const f = chooseFit(maxColumns(b.clientWidth), (columns, font) => packColumns(heights(columns, font), columns, height) !== null);
+      const hs = heights(f.columns, f.font);
+      setCols((f.fits && packColumns(hs, f.columns, height)) || balanceColumns(hs, f.columns));
       setFit((old) => (old && old.columns === f.columns && old.font === f.font && old.fits === f.fits ? old : f));
     };
     measure();
-    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    // turning the screen comes in steps (full screen, rotation, scrollbar): measure once the layout
+    // has settled, in the next frame and again a moment later; resize events cover what the
+    // observer of the box misses on some devices
+    let frame = 0;
+    let later = 0;
+    const again = () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(later);
+      frame = requestAnimationFrame(measure);
+      later = window.setTimeout(measure, 400);
+    };
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(again);
     ro?.observe(b);
-    return () => ro?.disconnect();
+    window.addEventListener("resize", again);
+    window.addEventListener("orientationchange", again);
+    screen.orientation?.addEventListener?.("change", again);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", again);
+      window.removeEventListener("orientationchange", again);
+      screen.orientation?.removeEventListener?.("change", again);
+      cancelAnimationFrame(frame);
+      window.clearTimeout(later);
+    };
   }, [items]);
 
   const v = sheet?.view;
   return (
-    <div className="sheet-stage" data-testid="sheet-stage">
+    <>
+      <div className="sheet-stage" data-testid="sheet-stage">
       <header className="sheet-stage-head">
+        {/* one line: a long title or artist is cut short, the buttons keep their place */}
+        <div className="sheet-stage-info">
         {setlistName && here >= 0 && (
           <span className="sheet-stage-set" data-testid="sheet-stage-set">
             {t("sheets.setlists.position", { name: setlistName, n: here + 1, total: groups.length })}
@@ -993,15 +1005,13 @@ function Stage({
         ) : (
           <span className="muted">{error || t("sheets.loading")}</span>
         )}
+        </div>
         <div className="sheet-stage-tools">
-          <button type="button" onClick={() => go(prev, -1)} disabled={!prev} aria-label={t("sheets.stage.prev")} title={t("sheets.stage.prev")}>
+          <button type="button" className="sheet-stage-arrow" onClick={() => go(prev, -1)} disabled={!prev} aria-label={t("sheets.stage.prev")} title={t("sheets.stage.prev")}>
             ←
           </button>
-          <button type="button" onClick={() => go(next, 1)} disabled={!next} aria-label={t("sheets.stage.next")} title={t("sheets.stage.next")}>
+          <button type="button" className="sheet-stage-arrow" onClick={() => go(next, 1)} disabled={!next} aria-label={t("sheets.stage.next")} title={t("sheets.stage.next")}>
             →
-          </button>
-          <button type="button" aria-pressed={hideTabs} onClick={() => setHideTabs(!hideTabs)}>
-            {t("sheets.stage.hideTabs")}
           </button>
           <button type="button" aria-pressed={collapse} onClick={() => setCollapse(!collapse)}>
             {t("sheets.collapse")}
@@ -1012,10 +1022,24 @@ function Stage({
         </div>
       </header>
       <div ref={box} className={`sheet-stage-box${fit && !fit.fits ? " is-scroll" : ""}`}>
-        <div ref={body} className="sheet-stage-body">
-          {v && <Body items={items} />}
-        </div>
+        {v && fit && (
+          <div
+            className="sheet-stage-cols"
+            style={{ gridTemplateColumns: `repeat(${fit.columns}, minmax(0, 1fr))`, fontSize: `${fit.font}px`, columnGap: `${2 * fit.font}px` }}
+          >
+            {cols.map((idx, k) => (
+              <div key={k} className="sheet-stage-body sheet-stage-col">
+                <Body items={idx.map((i) => items[i]!).filter(Boolean)} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+      </div>
+      {/* the measuring copy: out of sight, one column wide, at the font being tried */}
+      <div ref={body} className="sheet-stage-body sheet-stage-measure" aria-hidden="true">
+        {v && <Body items={items} anchors={false} />}
+      </div>
+    </>
   );
 }
