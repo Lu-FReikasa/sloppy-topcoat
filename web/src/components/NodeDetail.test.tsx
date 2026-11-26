@@ -644,4 +644,34 @@ describe("NodeDetailView", () => {
     expect(await screen.findByRole("heading", { name: "Fähigkeiten" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Modelle" })).toBeNull();
   });
+
+  it("loads again after a rename and hands each loaded detail to onLoaded (the node list)", async () => {
+    // the hub publishes no node_updated on a rename: only the reload brings the new name
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    let name = "node-nvidia";
+    const mock = mockFetch({
+      "GET /api/nodes/n1": () => jsonResponse(makeDetail({ name })),
+      "POST /api/nodes/n1/rename": () => {
+        name = "office-pc";
+        return jsonResponse({ id: "n1", from: "node-nvidia", to: name, rewritten: {} });
+      },
+    });
+    const onLoaded = vi.fn();
+    const api = new ApiClient({ token: "t", fetchImpl: mock.fetch });
+    render(<NodeDetailView api={api} nodeId="n1" events={bus} onLoaded={onLoaded} />);
+    await screen.findByRole("heading", { name: "node-nvidia" });
+    expect(onLoaded).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Umbenennen" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Neuer Name" }), {
+      target: { value: "office-pc" },
+    });
+    const form = screen.getByRole("textbox", { name: "Neuer Name" }).closest("form");
+    if (!form) throw new Error("no rename form");
+    fireEvent.submit(form);
+
+    expect(await screen.findByRole("heading", { name: "office-pc" })).toBeTruthy();
+    expect(onLoaded).toHaveBeenCalledTimes(2);
+    expect(onLoaded).toHaveBeenLastCalledWith(expect.objectContaining({ id: "n1", name: "office-pc" }));
+  });
 });
