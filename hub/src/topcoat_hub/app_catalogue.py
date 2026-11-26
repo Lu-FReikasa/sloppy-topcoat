@@ -12,7 +12,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from topcoat_hub import tool_groups
+from topcoat_hub import plugin_registry, tool_groups
 from topcoat_hub.ui.store import TemplateStore
 
 # the applications a task names in "Zielanwendung:" (project_runs.APPLICATIONS), with their name
@@ -62,7 +62,8 @@ async def catalogue(db: AsyncSession) -> str:
         template = await store.get(key)
         if template is None:
             continue
-        agent = template.agent if isinstance(template.agent, dict) else {}
+        # as the runs see it: with the narrowing of the program's plug-in (D105)
+        agent = await plugin_registry.program_agent(db, template)
         scope = agent.get("tool_scope") if "tool_scope" in agent else None
         lines.append(describe(key, name, scope if isinstance(scope, dict) else None))
     return "\n".join(lines)
