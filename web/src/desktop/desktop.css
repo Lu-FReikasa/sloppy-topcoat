@@ -250,6 +250,20 @@
   min-width: 0;
 }
 
+/* the containing block of the hidden column title (.sr-only, absolute): without it the title
+   escapes the scrolling wrap and the whole page scrolls sideways at 320 px */
+.plugins-page .table-wrap {
+  position: relative;
+}
+
+/* a phone keeps the switch and remove buttons inside the screen (390 px) */
+@media (max-width: 480px) {
+  .plugins-page .ws-admin-table th,
+  .plugins-page .ws-admin-table td {
+    padding-inline: 0.25rem;
+  }
+}
+
 .plugin-actions {
   display: flex;
   flex-wrap: wrap;
@@ -266,7 +280,8 @@
 .plugin-install textarea {
   width: 100%;
   font-family: var(--mono, ui-monospace, monospace);
-  font-size: 0.85rem;
+  /* 16 px at least, or phones zoom in on focus and stay zoomed */
+  font-size: 16px;
 }
 
 .plugin-install-row {
