@@ -2,6 +2,7 @@
 
 import base64
 import io
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
@@ -13,7 +14,7 @@ from tests.fakenode import online_node
 from tests.test_chat import ask, chat_requests, new_conv, sse_events, use_model
 from tests.users import make_user
 from topcoat_hub import chat_images
-from topcoat_hub.chat_images import Seer, choose, expand, pick_for_prompt
+from topcoat_hub.chat_images import Seer, choose, expand, pick_for_prompt, seers
 
 
 def picture(
@@ -32,6 +33,9 @@ def with_location() -> bytes:
     exif[0xA431] = "SERIAL-1234"  # BodySerialNumber
     exif[0x8825] = {1: "N", 2: (52.0, 31.0, 12.0), 3: "E", 4: (13.0, 24.0, 18.0)}  # GPS
     return picture((80, 40), exif=exif.tobytes(), comment=b"private note")
+
+
+EYE = {"eye-vl": "mmproj-eye-vl.gguf"}  # the node loads the projector with it (D125)
 
 
 def b64(data: bytes) -> str:
@@ -62,6 +66,30 @@ def test_large_pictures_are_scaled_within_the_limits() -> None:
     assert max(out.width, out.height) <= chat_images.MAX_SIDE
     assert len(out.data) <= chat_images.MAX_STORED_BYTES
     assert out.width / out.height == pytest.approx(4 / 3, rel=0.01)
+
+
+def test_a_phone_photo_with_appended_pictures_is_read() -> None:
+    """Many phone cameras write MPO: a JPEG with further pictures after it; the first is kept."""
+    photo, extra = (
+        Image.new("RGB", (64, 48), (200, 30, 30)),
+        Image.new("RGB", (64, 48), (0, 0, 200)),
+    )
+    buf = io.BytesIO()
+    photo.save(buf, "MPO", save_all=True, append_images=[extra])
+    out = chat_images.reencode(buf.getvalue())
+    with Image.open(io.BytesIO(out.data)) as img:
+        assert img.format == "JPEG" and getattr(img, "n_frames", 1) == 1
+        r, _, b = img.convert("RGB").getpixel((5, 5))  # type: ignore[misc]
+        assert r > 150 and b < 100
+
+
+def test_a_decompression_bomb_is_refused_before_it_is_decoded() -> None:
+    bomb = io.BytesIO()
+    Image.new("1", (9000, 5000)).save(bomb, "PNG")  # 45 Mpx in a few KB
+    assert len(bomb.getvalue()) < 64_000
+    with pytest.raises(chat_images.ImageError) as err:
+        chat_images.reencode(bomb.getvalue())
+    assert err.value.code == "image_too_large"
 
 
 def test_transparency_is_flattened_on_white() -> None:
@@ -122,6 +150,21 @@ def test_a_blind_answer_goes_to_a_house_model_that_sees_first() -> None:
     assert sight.routed_from == "small" and sight.node == "node-b"
     # without a house model: the first loaded one that sees
     assert choose(found[1:2], "small", picked=False).requested == "loose-vl@node-a"
+
+
+def test_a_vision_name_without_a_loaded_projector_does_not_see() -> None:
+    @dataclass
+    class View:
+        name: str
+        models: dict[str, bool]
+        gguf: dict[str, dict[str, Any]]
+        connected: bool = True
+
+    views = [
+        View("node-a", {"eye-vl": True}, {}),  # the name says vision, no projector loaded
+        View("node-b", {"eye-vl": True}, {"eye-vl": {"projector": "mmproj-eye-vl.gguf"}}),
+    ]
+    assert [(s.node, s.model) for s in seers(views, None, {})] == [("node-b", "eye-vl")]
 
 
 def test_a_picked_blind_model_and_no_seeing_model_mean_nobody_sees() -> None:
@@ -198,7 +241,7 @@ def all_text(body: dict[str, Any]) -> str:
 def test_an_image_goes_to_a_model_that_sees_and_stays_with_its_person(
     client: TestClient, connect, clean_db: str
 ) -> None:
-    node = online_node(client, connect, "node-a", loaded=["eye-vl"])
+    node = online_node(client, connect, "node-a", loaded=["eye-vl"], projectors=EYE)
     use_model(client, "eye-vl")
     conv = new_conv(client)
     status, events, r = send(client, conv, "What is in the picture?", [with_location()])
@@ -263,7 +306,7 @@ def test_an_answer_with_an_image_is_routed_to_a_loaded_model_that_sees(
     client: TestClient, connect
 ) -> None:
     blind = online_node(client, connect, "node-a", loaded=["small"])
-    seeing = online_node(client, connect, "node-b", loaded=["eye-vl"])
+    seeing = online_node(client, connect, "node-b", loaded=["eye-vl"], projectors=EYE)
     use_model(client)
     conv = new_conv(client)
     status, events, r = send(client, conv, "Look", [picture()])
@@ -290,7 +333,7 @@ def test_an_answer_with_an_image_is_routed_to_a_loaded_model_that_sees(
 
 def test_a_model_the_person_picked_is_not_replaced(client: TestClient, connect) -> None:
     blind = online_node(client, connect, "node-a", loaded=["small"])
-    online_node(client, connect, "node-b", loaded=["eye-vl"])
+    online_node(client, connect, "node-b", loaded=["eye-vl"], projectors=EYE)
     conv = new_conv(client, model="small", node="node-a")
     status, events, _ = send(client, conv, "Look", [picture()])
     assert status == 200
@@ -301,7 +344,7 @@ def test_a_model_the_person_picked_is_not_replaced(client: TestClient, connect) 
 def test_a_message_with_a_broken_image_is_refused_and_not_stored(
     client: TestClient, connect
 ) -> None:
-    online_node(client, connect, "node-a", loaded=["eye-vl"])
+    online_node(client, connect, "node-a", loaded=["eye-vl"], projectors=EYE)
     use_model(client, "eye-vl")
     conv = new_conv(client)
     status, _, r = send(client, conv, "Look", [b"this is no picture"])
@@ -330,7 +373,7 @@ def test_an_incognito_image_is_seen_kept_in_the_tab_and_never_written(
     from tests.test_incognito import new_tab, requests_to_the_model, row_counts
 
     online_node(client, connect, "node-a", loaded=["small"])
-    seeing = online_node(client, connect, "node-b", loaded=["eye-vl"])
+    seeing = online_node(client, connect, "node-b", loaded=["eye-vl"], projectors=EYE)
     use_model(client)
     tab = new_tab(client, internet=False)
     before = row_counts()
