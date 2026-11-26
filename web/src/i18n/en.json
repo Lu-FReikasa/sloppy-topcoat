@@ -4372,6 +4372,20 @@
       "artist": "Artist",
       "allArtists": "All artists",
       "none": "No sheet matches."
+    },
+    "sort": {
+      "label": "Sort",
+      "title": "By title",
+      "artist": "By artist",
+      "added": "Newest first"
+    },
+    "stage": {
+      "open": "Stage mode",
+      "exit": "Leave",
+      "prev": "Previous song",
+      "next": "Next song",
+      "hideTabs": "Hide tabs",
+      "scroll": "Too long for one screen: scroll"
     }
   },
   "images": {

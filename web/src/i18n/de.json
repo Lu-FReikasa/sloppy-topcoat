@@ -4372,6 +4372,20 @@
       "artist": "Interpret",
       "allArtists": "Alle Interpreten",
       "none": "Kein Sheet passt."
+    },
+    "sort": {
+      "label": "Sortierung",
+      "title": "Nach Titel",
+      "artist": "Nach Artist",
+      "added": "Neueste zuerst"
+    },
+    "stage": {
+      "open": "Bühnenmodus",
+      "exit": "Verlassen",
+      "prev": "Vorheriges Lied",
+      "next": "Nächstes Lied",
+      "hideTabs": "Tabs ausblenden",
+      "scroll": "Zu lang für einen Bildschirm: scrollen"
     }
   },
   "images": {
