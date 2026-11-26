@@ -326,8 +326,22 @@ def test_two_admins_storing_the_same_version_get_a_conflict_not_an_error(
     assert r.status_code == 409 and r.json()["detail"]["code"] == "conflict"
 
 
+def test_the_schema_allows_no_longer_version_than_the_columns_hold() -> None:
+    from topcoat_hub import plugins
+    from topcoat_hub.models import Plugin, PluginChange, PluginVersion
+
+    most = plugins.schema()["properties"]["version"]["maxLength"]
+    columns = (
+        Plugin.__table__.c.version,
+        PluginVersion.__table__.c.version,
+        PluginChange.__table__.c.from_version,
+        PluginChange.__table__.c.to_version,
+    )
+    assert all(c.type.length >= most for c in columns)
+
+
 def test_a_version_longer_than_its_column_is_refused_not_an_error(client: TestClient) -> None:
-    # the schema allows any number of digits; the column holds 20 characters
+    # the pattern alone allows any number of digits; the columns hold 20 characters
     long = "1.0." + "1" * 20
     r = client.post("/api/plugins", headers=AUTH, json=manifest(version=long))
     assert r.status_code == 422, r.text

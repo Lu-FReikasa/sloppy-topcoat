@@ -36,7 +36,6 @@ from topcoat_hub.models import Plugin, PluginChange, PluginVersion, UiTemplate, 
 log = logging.getLogger(__name__)
 
 BUILTIN_VERSION = "1.0.0"
-VERSION_MAX = 20  # the length of the version columns
 INTERNET = plugins.INTERNET
 EVENT = "ui_plugins"
 
@@ -234,8 +233,6 @@ class Registry:
         if found or not isinstance(manifest, dict):
             return found or ["(root): a manifest is an object"]
         key = manifest["id"]
-        if len(manifest["version"]) > VERSION_MAX:  # the column holds no more (plugins.version)
-            found.append(f"version: at most {VERSION_MAX} characters")
         if manifest.get("builtin") and not builtin:
             found.append("builtin: only the hub registers built-in programs")
         template = await self.db.get(UiTemplate, key)
