@@ -610,8 +610,10 @@ export function withoutTabs(sections: SheetSection[]): SheetSection[] {
 /** The stage mode: the sheet alone, full screen, fitted on one screen in columns. ←/→ and
  *  PageUp/PageDown (a foot pedal sends these) page through the songs of the list as it is
  *  filtered and sorted; Esc leaves. */
-function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups: SheetGroup[]; onExit: () => void }) {
+function Stage({ api, id: startId, groups, onExit }: { api: ApiClient; id: string; groups: SheetGroup[]; onExit: () => void }) {
   const { t, i18n } = useTranslation();
+  // paging stays inside the stage: a new address would be taken over by the desktop shell
+  const [id, setId] = useState(startId);
   const [sheet, setSheet] = useState<SheetDetail | null>(null);
   const [error, setError] = useState("");
   const [hideTabs, setHideTabsState] = useState(() => remembered(TABS_KEY) !== "0");
@@ -636,12 +638,16 @@ function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups
   const prev = neighbour(groups, id, -1);
   const next = neighbour(groups, id, 1);
   const go = (to: string | null) => {
-    if (to) window.location.hash = sheetsHref(to);
+    if (to) setId(to);
   };
+  const leave = useCallback(() => {
+    onExit();
+    if (id !== startId) window.location.hash = sheetsHref(id);
+  }, [onExit, id, startId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onExit();
+      if (e.key === "Escape") leave();
       else if (e.key === "ArrowRight" || e.key === "PageDown") go(next);
       else if (e.key === "ArrowLeft" || e.key === "PageUp") go(prev);
       else return;
@@ -651,9 +657,13 @@ function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  const leaveRef = useRef(leave);
+  useEffect(() => {
+    leaveRef.current = leave;
+  }, [leave]);
+
   // full screen where the browser allows it; leaving full screen (Esc there) leaves the stage too
   useEffect(() => {
-    // paging may mount a new stage while the old one's full screen is still on: keep it then
     let entered = !!document.fullscreenElement;
     if (!entered)
       document.documentElement.requestFullscreen?.().then(
@@ -661,11 +671,11 @@ function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups
         () => undefined,
       );
     const onChange = () => {
-      if (entered && !document.fullscreenElement) onExit();
+      if (entered && !document.fullscreenElement) leaveRef.current();
     };
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
-  }, [onExit]);
+  }, []);
 
   const sections = useMemo(
     () => (sheet ? (hideTabs ? withoutTabs(sheet.view.sections) : sheet.view.sections) : []),
@@ -725,7 +735,7 @@ function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups
           <button type="button" aria-pressed={hideTabs} onClick={() => setHideTabs(!hideTabs)}>
             {t("sheets.stage.hideTabs")}
           </button>
-          <button type="button" onClick={onExit}>
+          <button type="button" onClick={leave}>
             {t("sheets.stage.exit")}
           </button>
         </div>

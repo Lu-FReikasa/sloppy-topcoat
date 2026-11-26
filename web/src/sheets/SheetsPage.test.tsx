@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ApiClient } from "../api/client";
 import { parseRoute } from "../route";
@@ -209,6 +209,7 @@ describe("Sheets", () => {
       "GET /api/sheets": { sheets: [SUMMARY, other] },
       "GET /api/sheets/research": { jobs: [] },
       "GET /api/sheets/s1": detail(true, ["G", "D"]),
+      "GET /api/sheets/s9": { ...detail(true, ["G", "D"]), id: "s9", view: { ...detail(true, ["G", "D"]).view, title: "Zebra Song" } },
     });
     window.location.hash = "#/sheets/s1";
     render(<SheetsPage api={api} id="s1" />);
@@ -217,12 +218,12 @@ describe("Sheets", () => {
     await waitFor(() => expect(chordsOf(stage)).toEqual(["G", "D", "C"]));
     expect(screen.queryByTestId("sheets-list")).toBeNull();
     fireEvent.keyDown(window, { key: "PageDown" });
-    expect(window.location.hash).toBe("#/sheets/s9");
-    // a fresh mount at the new address (as the shell does) stays on stage
-    cleanup();
-    render(<SheetsPage api={api} id="s1" />);
-    expect(await screen.findByTestId("sheet-stage")).toBeTruthy();
+    // paging stays on stage and does not touch the address (the desktop shell would take it over)
+    await waitFor(() => expect(within(screen.getByTestId("sheet-stage")).queryByText("Zebra Song")).not.toBeNull());
+    expect(window.location.hash).toBe("#/sheets/s1");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByTestId("sheet-stage")).toBeNull();
+    // leaving opens the song paged to in the normal view
+    expect(window.location.hash).toBe("#/sheets/s9");
   });
 });
