@@ -153,22 +153,21 @@ function DetailBody({
           <>
             <dt>{t("detail.glanceGpu")}</dt>
             <dd data-testid="glance-gpus">
-              {glance.gpus
-                .map(
-                  (g) =>
-                    t("detail.glanceGpuValue", {
-                      name: g.name,
-                      used: g.usedMb === null ? "?" : gb(g.usedMb),
-                      total: gb(g.totalMb),
-                    }) +
+              {glance.gpus.map((g, i) => (
+                <span className="fact-item" key={i}>
+                  {t("detail.glanceGpuValue", {
+                    name: g.name,
+                    used: g.usedMb === null ? "?" : gb(g.usedMb),
+                    total: gb(g.totalMb),
+                  }) +
                     (g.shared
                       ? `, ${t("detail.glanceGpuShared", {
                           used: g.shared.usedMb === null ? "?" : gb(g.shared.usedMb),
                           total: gb(g.shared.totalMb),
                         })}`
-                      : ""),
-                )
-                .join(" · ")}
+                      : "")}
+                </span>
+              ))}
             </dd>
           </>
         )}
@@ -178,13 +177,13 @@ function DetailBody({
             <dd data-testid="glance-loaded">
               {glance.loaded.length === 0
                 ? t("detail.glanceNone")
-                : glance.loaded
-                    .map((m) =>
-                      m.vramMb === null
+                : glance.loaded.map((m) => (
+                    <span className="fact-item" key={m.name}>
+                      {m.vramMb === null
                         ? m.name
-                        : t("detail.glanceLoadedValue", { name: m.name, vram: gb(m.vramMb) }),
-                    )
-                    .join(" · ")}
+                        : t("detail.glanceLoadedValue", { name: m.name, vram: gb(m.vramMb) })}
+                    </span>
+                  ))}
             </dd>
           </>
         )}
@@ -206,7 +205,11 @@ function DetailBody({
             <>
               <dt>{t("node.network")}</dt>
               <dd data-testid="node-network">
-                {node.network?.map((i) => `${i.name} ${i.mac}`).join(" · ")}
+                {node.network?.map((i) => (
+                  <span className="fact-item" key={`${i.name} ${i.mac}`}>
+                    {i.name} {i.mac}
+                  </span>
+                ))}
               </dd>
             </>
           )}

@@ -4187,6 +4187,7 @@
     "testsFailed": "{{n}} failed",
     "testsErrored": "{{n}} errored",
     "testsSkipped": "{{n}} skipped",
+    "testsNoFailure": "No failing test in the log: the run failed elsewhere (lint, type check, a crash or a cut-off part). The full output says where.",
     "firstFailure": "First failure:",
     "testOutput": "Full test output",
     "sameFailure": "{{count}}× the same failure",

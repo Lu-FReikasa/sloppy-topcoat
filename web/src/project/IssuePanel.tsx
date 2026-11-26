@@ -364,6 +364,10 @@ function TestRun({ state, output }: { state: string | undefined; output: string 
         ...(counts.skipped > 0 ? [t("issues.testsSkipped", { n: n(counts.skipped) })] : []),
       ]
     : [];
+  // a red run whose log names no failing test (lint, type check, a crash, or the hub's summary
+  // cut off): "0 failed" alone would read as a contradiction
+  const unexplained =
+    state === "failed" && !firstFailure && (!counts || counts.failed + counts.errors === 0);
   return (
     <div className="test-run" data-testid="test-run">
       <p className="small">
@@ -381,6 +385,7 @@ function TestRun({ state, output }: { state: string | undefined; output: string 
           )}
         </p>
       )}
+      {unexplained && <p className="small">{t("issues.testsNoFailure")}</p>}
       <details>
         <summary>{t("issues.testOutput")}</summary>
         <pre className="project-diff">{output}</pre>

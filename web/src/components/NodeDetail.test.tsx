@@ -463,7 +463,11 @@ describe("NodeDetailView", () => {
       }),
     );
     const net = await screen.findByTestId("node-network");
-    expect(net.textContent).toBe("eth0 02:00:00:00:00:01 · wlan0 02:00:00:00:00:02");
+    // one card per line: a run of names and MACs is hard to read on a phone
+    expect([...net.querySelectorAll(".fact-item")].map((e) => e.textContent)).toEqual([
+      "eth0 02:00:00:00:00:01",
+      "wlan0 02:00:00:00:00:02",
+    ]);
   });
 
   it("does not offer waking without a known address, or sleeping without the permission", async () => {

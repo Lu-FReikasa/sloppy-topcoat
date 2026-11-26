@@ -4187,6 +4187,7 @@
     "testsFailed": "{{n}} fehlgeschlagen",
     "testsErrored": "{{n}} abgebrochen",
     "testsSkipped": "{{n}} übersprungen",
+    "testsNoFailure": "Kein fehlgeschlagener Test im Log: Der Lauf ist woanders gescheitert (Lint, Typprüfung, Absturz oder ein abgeschnittener Teil). Die vollständige Ausgabe zeigt, wo.",
     "firstFailure": "Erster Fehler:",
     "testOutput": "Vollständige Testausgabe",
     "sameFailure": "{{count}}× derselbe Fehler",

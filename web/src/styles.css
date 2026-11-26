@@ -393,6 +393,11 @@ input {
   overflow-wrap: anywhere;
 }
 
+/* several GPUs, models or network cards in one fact: one per line, not one run of text */
+.facts dd > .fact-item {
+  display: block;
+}
+
 .gpu-list {
   max-width: 560px;
 }
@@ -2603,6 +2608,10 @@ details.one-line > summary,
   cursor: pointer;
 }
 /* the table keeps its cells on one line; the opened description wraps */
+details.one-line > summary,
+details.one-line > p {
+  overflow-wrap: anywhere;
+}
 details.one-line > p {
   margin: 0.25rem 0 0;
   white-space: normal;
