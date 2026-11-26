@@ -6,7 +6,7 @@ import { APPLICATIONS } from "../chat/applications";
 import { LanguageSwitch } from "../components/LanguageSwitch";
 import { CommandPalette, type PaletteEntry } from "../desktop/CommandPalette";
 import { navViews, programInfo, programTitle, viewTitle } from "../desktop/programs";
-import { programFor, viewFor, type ProgramView } from "../desktop/state";
+import { programFor, startKey, viewFor, type ProgramView } from "../desktop/state";
 import { allThemes, resolveTheme, safeCss } from "../desktop/theme";
 import type { Language } from "../i18n";
 import { PersonaPrompt } from "../instructions/PersonaPrompt";
@@ -70,7 +70,7 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
         ? routeKey
         : (ui.prefs?.desktop?.focus && programs.some((p) => p.key === ui.prefs?.desktop?.focus)
             ? ui.prefs.desktop.focus
-            : (programs[0]?.key ?? null));
+            : startKey(programs));
   const shownInfo = infos.find((p) => p.key === shownKey);
   const view: ProgramView | null = shownKey
     ? (views[shownKey] ?? (shownInfo ? { module: shownInfo.first, props: {} } : null))

@@ -390,6 +390,87 @@ describe("Desktop", () => {
   });
 });
 
+// A load with no program in front opens Start once (#115). Start is not the first program here.
+describe("a load with nothing in front", () => {
+  const START = workspace("chat", ["page.library"], { icon: ">", title: "Start", position: 50 });
+  function start(open: string[], focus: string | null = open[open.length - 1] ?? null, routeKey?: string) {
+    const b = bootstrap([...PROGRAMS, START]);
+    const h = hub({ ...b, prefs: { hue: 140, look: "terminal", desktop: { open, minimised: [], focus, maximised: null, views: {} } } });
+    render(
+      <Desktop
+        api={h.api}
+        ctx={ctx(h.api)}
+        routeKey={routeKey}
+        uiTick={0}
+        status="live"
+        onSaveLanguage={() => undefined}
+        onLogout={() => undefined}
+      />,
+    );
+    return h;
+  }
+  const settled = () => new Promise((r) => setTimeout(r, 100));
+  const puts = (h: ReturnType<typeof hub>) =>
+    h.mock.calls.filter((c) => c.method === "PUT" && c.url === "/api/ui/prefs");
+
+  beforeEach(() => {
+    setNarrow(false);
+    window.location.hash = "#/w";
+  });
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("opens Start and brings it to the front", async () => {
+    const h = start([]);
+    expect(await screen.findByRole("region", { name: "Start" })).toBeTruthy();
+    await waitFor(() => expect(h.prefs().desktop.focus).toBe("chat"));
+    expect(h.prefs().desktop.open).toEqual(["chat"]);
+  });
+
+  it("opens Start when the program remembered is gone", async () => {
+    const h = start(["gone"], "gone");
+    expect(await screen.findByRole("region", { name: "Start" })).toBeTruthy();
+    await waitFor(() => expect(h.prefs().desktop.focus).toBe("chat"));
+  });
+
+  it("leaves the program the person has in front", async () => {
+    const h = start(["archive"]);
+    await screen.findByRole("region", { name: "Archive" });
+    await settled();
+    expect(screen.queryByRole("region", { name: "Start" })).toBeNull();
+    expect(puts(h)).toHaveLength(0);
+  });
+
+  it("opens the program the address names instead", async () => {
+    window.location.hash = "#/w/archive";
+    const h = start([], null, "archive");
+    await screen.findByRole("region", { name: "Archive" });
+    await settled();
+    expect(screen.queryByRole("region", { name: "Start" })).toBeNull();
+    expect(h.prefs().desktop.open).toEqual(["archive"]);
+  });
+
+  it("opens the view a link asked for instead", async () => {
+    requestOpen({ module: "page.access", props: {} });
+    const h = start([]);
+    await screen.findByRole("region", { name: "Settings" });
+    await settled();
+    expect(screen.queryByRole("region", { name: "Start" })).toBeNull();
+    expect(h.prefs().desktop.open).toEqual(["settings"]);
+  });
+
+  it("does it once: Start closed stays closed", async () => {
+    const h = start([]);
+    const s = await screen.findByRole("region", { name: "Start" });
+    fireEvent.click(within(s).getByRole("button", { name: "Start schließen" }));
+    await waitFor(() => expect(h.prefs().desktop.open).toEqual([]));
+    await settled();
+    expect(screen.queryByRole("region", { name: "Start" })).toBeNull();
+  });
+});
+
 describe("the palette's search", () => {
   it("finds every word in the label or the hint, in any order and case", () => {
     const entry = { id: "x", label: "Modelle", hint: "Verwaltung", run: () => undefined };

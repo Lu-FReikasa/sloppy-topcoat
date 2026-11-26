@@ -44,13 +44,13 @@ function boot() {
 const slow = (body: unknown) => () =>
   new Promise<Response>((done) => setTimeout(() => done(jsonResponse(body)), 30));
 
-async function load(address: string) {
+async function load(address: string, b = boot()) {
   window.history.replaceState(null, "", `/${address}`);
   const mock = mockFetch({
     "GET /api/me": { id: "u1", name: "Admin", role: "admin", language: "en" },
     "GET /api/nodes": [],
     "GET /api/stream": () => new Promise<Response>(() => undefined),
-    "GET /api/ui/bootstrap": slow(boot()),
+    "GET /api/ui/bootstrap": slow(b),
     "GET /api/inbox/counts": { unread: 0, urgent: 0, applications: {} },
   });
   vi.stubGlobal("fetch", mock.fetch);
@@ -179,6 +179,39 @@ describe("an address loaded fresh in the navigation shell shows the page it name
     window.history.forward();
     await waitFor(() => expect(window.location.hash).toBe("#/w/sheets"));
     await waitFor(() => expect(document.querySelector(".ws-crumb > span")?.textContent).toBe("Sheets"));
+  });
+
+  // nothing used last (a fresh account, cleared preferences, a program that is gone): Start (#115)
+  describe("a bare address with no program used last opens Start", () => {
+    const remembering = (focus: string | null, startAt = 10) => {
+      const b = boot();
+      b.prefs.desktop = { ...b.prefs.desktop!, open: focus ? [focus] : [], focus };
+      // the hub lists the programs by position
+      b.workspaces = b.workspaces
+        .map((w) => (w.key === "chat" ? { ...w, position: startAt } : w))
+        .sort((x, y) => x.position - y.position);
+      return b;
+    };
+    for (const address of ["#/", "#/w"]) {
+      it(`${address}, nothing remembered`, async () => {
+        const got = await load(address, remembering(null));
+        expect(got.hash).toBe("#/w/chat");
+        expect(got.crumb).toMatch(/^Start/);
+      });
+    }
+    it("Start is not the first program by position", async () => {
+      const got = await load("#/", remembering(null, 30));
+      expect(got.hash).toBe("#/w/chat");
+      expect(got.crumb).toMatch(/^Start/);
+    });
+    it("the program remembered no longer exists", async () => {
+      const got = await load("#/", remembering("gone", 30));
+      expect(got.hash).toBe("#/w/chat");
+    });
+    it("the program remembered is still there: that program", async () => {
+      const got = await load("#/", remembering("wiki", 30));
+      expect(got.hash).toBe("#/w/wiki");
+    });
   });
 
   it("tells where tasks come from on the bare tasks address", async () => {
