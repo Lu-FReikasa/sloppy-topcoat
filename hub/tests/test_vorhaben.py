@@ -123,9 +123,7 @@ def test_branch_scope_text_and_the_spec_in_the_body() -> None:
     back = vh.spec_of("Teil", body)
     assert back == s
     assert vh.spec_of("x", "no spec here") is None
-    assert vh.large_of("Ein freies Issue.
-Vorhaben: 3.2
-") is None  # no spec, no sub-task
+    assert vh.large_of("Ein freies Issue.\nVorhaben: 3.2\n") is None  # no spec, no sub-task
     research = vh.body_of(dc.Subtask("r", "R", "g", "research"), "1")
     assert "Zielanwendung: research" in research and "Art: issue" not in research
 
