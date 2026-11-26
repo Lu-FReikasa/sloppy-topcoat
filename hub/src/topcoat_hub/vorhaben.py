@@ -132,7 +132,10 @@ def spec_of(title: str, body: str) -> dc.Subtask | None:
 
 
 def large_of(body: str) -> str | None:
-    """The number of the large task a sub-task's text names."""
+    """The number of the large task a sub-task's text names: only a text that holds a sub-task's
+    spec, so a line "Vorhaben: x" in a free issue text makes no sub-task."""
+    if spec_of("", body) is None:
+        return None
     m = _LARGE.search(body or "")
     return m.group(1) if m else None
 
@@ -163,10 +166,10 @@ def state_of(status: str | None, deps_done: bool, fix_state: str | None) -> str:
         return "blocked"
     if fix_state in ("applying", "testing"):
         return "running"
+    if fix_state == "failed":  # before the node's status: a failed fix leaves it in_progress
+        return "failed"
     if status in ("in_progress", "in_review"):
         return "running"
-    if fix_state == "failed":
-        return "failed"
     return "waiting" if not deps_done or status == "todo" else "running"
 
 

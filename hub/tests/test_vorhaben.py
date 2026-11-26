@@ -123,6 +123,9 @@ def test_branch_scope_text_and_the_spec_in_the_body() -> None:
     back = vh.spec_of("Teil", body)
     assert back == s
     assert vh.spec_of("x", "no spec here") is None
+    assert vh.large_of("Ein freies Issue.
+Vorhaben: 3.2
+") is None  # no spec, no sub-task
     research = vh.body_of(dc.Subtask("r", "R", "g", "research"), "1")
     assert "Zielanwendung: research" in research and "Art: issue" not in research
 
@@ -137,6 +140,8 @@ def test_branch_scope_text_and_the_spec_in_the_body() -> None:
         ("in_progress", True, None, "running"),
         ("todo", True, "testing", "running"),
         ("todo", True, "failed", "failed"),
+        ("in_progress", True, "failed", "failed"),  # the fix failed, the node still says so
+        ("in_review", True, "failed", "failed"),
     ],
 )
 def test_the_state_of_a_sub_task(status: str, deps_done: bool, fix: str | None, state: str) -> None:
