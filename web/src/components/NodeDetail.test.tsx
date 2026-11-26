@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiClient } from "../api/client";
 import { createHubEvents, type HubEvents } from "../data/hubEvents";
@@ -50,6 +50,37 @@ describe("NodeDetailView", () => {
     // copy and move live on the Models page now
     expect(screen.queryByRole("button", { name: /Kopieren nach/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Verschieben nach/ })).toBeNull();
+  });
+
+  it("opens with state, memory, GPU and loaded models and folds the inventory", async () => {
+    setup(
+      makeDetail({
+        network: [{ name: "eth0", mac: "02:00:00:00:00:01", kind: "ethernet" }],
+      }),
+    );
+    const glance = await screen.findByTestId("node-glance");
+    expect(screen.getByText("Verfügbar")).toBeTruthy();
+    expect(glance.textContent).toContain("8,0 / 32,0 GB");
+    expect(screen.getByTestId("glance-gpus").textContent).toBe("Fake GPU: 8,0 / 24,0 GB VRAM");
+    expect(screen.getByTestId("glance-loaded").textContent).toBe("llama-8b (5,9 GB VRAM)");
+    // the inventory is one click away, not gone
+    const more = document.querySelector("details.facts-more") as HTMLDetailsElement;
+    expect(more.open).toBe(false);
+    expect(more.querySelector("summary")?.textContent).toBe(
+      "Details: System, CPU, Netzwerk, Versionen",
+    );
+    expect(within(more).getByTestId("node-network").textContent).toBe("eth0 02:00:00:00:00:01");
+    expect(within(more).getByText("Fake CPU (8 Kerne)")).toBeTruthy();
+    expect(glance.textContent).not.toContain("02:00:00:00:00:01");
+  });
+
+  it("says when nothing is loaded and leaves the figures of an offline node out", async () => {
+    setup(makeDetail({ loaded: [], models: [] }));
+    expect((await screen.findByTestId("glance-loaded")).textContent).toBe("keins");
+    cleanup();
+    setup(makeDetail({ state: "offline", connected: false }));
+    const glance = await screen.findByTestId("node-glance");
+    expect(glance.textContent).toBe("RAM–");
   });
 
   it("shows the free space of the model drive and warns when it is low", async () => {
@@ -232,8 +263,10 @@ describe("NodeDetailView", () => {
     ).toBeTruthy();
     expect(screen.getByText("b11223")).toBeTruthy();
     expect(screen.getByText("6")).toBeTruthy();
-    const facts = document.querySelector("dl.facts") as HTMLElement;
+    const facts = document.querySelector(".facts-more dl.facts") as HTMLElement;
     expect(facts.textContent).toContain("Vulkan");
+    // the summary names the iGPU's shared memory next to its VRAM
+    expect(screen.getByTestId("glance-gpus").textContent).toContain("GB geteilt");
     expect(screen.getByRole("meter", { name: "VRAM Iris Xe" }).getAttribute("aria-valuenow")).toBe(
       "70",
     );
@@ -441,7 +474,11 @@ describe("NodeDetailView", () => {
       }),
     );
     const net = await screen.findByTestId("node-network");
-    expect(net.textContent).toBe("eth0 02:00:00:00:00:01 · wlan0 02:00:00:00:00:02");
+    // one card per line: a run of names and MACs is hard to read on a phone
+    expect([...net.querySelectorAll(".fact-item")].map((e) => e.textContent)).toEqual([
+      "eth0 02:00:00:00:00:01",
+      "wlan0 02:00:00:00:00:02",
+    ]);
   });
 
   it("does not offer waking without a known address, or sleeping without the permission", async () => {
