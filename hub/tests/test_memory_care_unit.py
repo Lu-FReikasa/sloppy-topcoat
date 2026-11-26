@@ -1,5 +1,5 @@
 """Memory care (E3-05), the rules without a database: reliability and its half-life, the stages
-the model sees, usefulness and "used", the check threshold, expiry, archive, the plan of a care run
+the model sees, usefulness and "used", expiry, archive, the plan of a care run
 and the night boundary — all with an explicit ``now`` (a fake clock)."""
 
 from datetime import UTC, datetime, timedelta
@@ -11,7 +11,7 @@ import pytest
 from topcoat_hub import chat
 from topcoat_hub import memory_care as mc
 from topcoat_hub.config import Settings
-from topcoat_hub.memory_care_service import night_boundary, plan_for, vet_verdict
+from topcoat_hub.memory_care_service import night_boundary, plan_for
 
 NOW = datetime(2026, 10, 1, 3, 0, tzinfo=UTC)
 
@@ -115,11 +115,10 @@ def test_a_live_check_counts_more_than_a_statement() -> None:
     assert mc.reliability(checked, NOW) > 0.5
 
 
-def test_a_dispute_lowers_the_trust_strongly_and_an_unverifiable_check_a_little() -> None:
+def test_a_dispute_lowers_the_trust_strongly() -> None:
     plain = mc.reliability(note(), NOW)
     assert mc.reliability(note(status="disputed"), NOW) == pytest.approx(plain * 0.3, abs=1e-3)
     assert mc.reliability(note(trust=0.7), NOW) == pytest.approx(plain * 0.7, abs=1e-3)
-    assert mc.UNVERIFIABLE_FACTOR == 0.7 and mc.TRUST_FLOOR == 0.2
 
 
 def test_the_model_sees_three_stages_never_numbers() -> None:
@@ -134,26 +133,7 @@ def test_the_model_sees_three_stages_never_numbers() -> None:
     assert "ask once, in passing" in chat.note_hint("doc", "active", 0, "ask")
 
 
-# --- when a note is checked, expires, is archived ---------------------------------------------
-
-
-def test_a_note_is_checked_below_the_threshold_and_not_again_right_away() -> None:
-    fresh = note(kind="operational", created_at=days(1))
-    stale = note(kind="operational", created_at=days(30))
-    assert not mc.needs_check(fresh, NOW)
-    assert mc.needs_check(stale, NOW)
-    # just checked: left alone for the recheck period
-    assert not mc.needs_check(
-        note(kind="operational", created_at=days(30), care_checked_at=days(1)), NOW
-    )
-    assert mc.needs_check(
-        note(kind="operational", created_at=days(30), care_checked_at=days(4)), NOW
-    )
-    # only live notes are looked at
-    assert not mc.needs_check(note(kind="operational", created_at=days(30), status="archived"), NOW)
-    # the threshold is a setting
-    strict = mc.CareConfig(halflife_days=mc.DEFAULT.halflife_days, check_threshold=0.9)
-    assert mc.needs_check(note(created_at=days(1)), NOW, strict)
+# --- when a note expires, is archived -------------------------------------------------------
 
 
 def test_a_volatile_note_expires_at_expires_at_and_never_before() -> None:
@@ -213,20 +193,18 @@ def test_a_note_is_archived_only_when_useless_unreliable_and_unused_for_long() -
     assert not mc.archive_due(note(created_at=days(5000), recalled_count=30, status="deleted"), NOW)
 
 
-def test_an_old_note_that_is_often_used_stays_and_is_only_checked() -> None:
+def test_an_old_note_that_is_often_used_stays() -> None:
     old = note(
         kind="operational",
         created_at=days(400),
         recalled_count=45,
         used_count=40,
         last_used_at=days(3),
-        verify_with={"capability": "docker.ps", "input": {}},
     )
     assert mc.reliability(old, NOW) < 0.01
     assert mc.usefulness(old, NOW) > 0.8
     assert not mc.archive_due(old, NOW)
-    plan = plan_for([old], [], NOW, mc.DEFAULT)
-    assert plan.checks == [old] and plan.archive == []
+    assert plan_for([old], [], NOW, mc.DEFAULT).archive == []
 
 
 def test_recall_ranks_by_reliability_and_never_by_use_counts() -> None:
@@ -270,92 +248,23 @@ def test_term_overlap_matches_forms_of_a_word_and_ignores_filler() -> None:
     assert mc.overlap("", answer) == 0.0
 
 
-# --- what the model may propose, what a care run does with it ------------------------------------
+# --- what a care run does with the notes --------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "value, ok",
-    [
-        ({"capability": "docker.ps", "input": {}}, True),
-        ({"capability": "kuma.monitors", "input": {"name": "web"}}, True),
-        ({"capability": "docker", "input": {}}, False),  # not a capability name
-        ({"capability": "rm -rf /", "input": {}}, False),
-        ({"capability": "docker.ps", "input": "x"}, False),
-        ({"capability": "docker.ps", "input": {"a": "x" * 500}}, False),
-        ("docker.ps", False),
-        (None, False),
-    ],
-)
-def test_a_verify_with_must_look_like_a_capability_and_a_small_input(value: Any, ok: bool) -> None:
-    assert (mc.verify_input_ok(value) is not None) is ok
-
-
-def test_the_plan_sorts_notes_into_what_the_run_does() -> None:
+def test_the_plan_strikes_the_expired_and_archives_the_useless_and_nothing_else() -> None:
     ps = {"capability": "docker.ps", "input": {}}
     doomed = note(kind="operational", expires_at=NOW - timedelta(hours=1))
     pending = note(kind="operational", expires_at=NOW - timedelta(hours=1), created_at=days(3))
+    # D124: a doubtful note with a way to check it is no work for the run any more
     checkable = note(kind="operational", created_at=days(40), verify_with=ps)
-    blind = note(kind="operational", created_at=days(40))  # nothing to run
-    person = note(kind="person", created_at=days(900))  # nothing a server can show
-    volatile = note(kind="operational", created_at=days(3), expires_at=NOW + timedelta(hours=2))
-    in_notes = note(
-        kind="operational",
-        created_at=days(40),
-        verify_with={"capability": "docs.read", "input": {"path": "servers/SENSIBEL/x.md"}},
-    )
-    on_web = note(
-        kind="operational",
-        created_at=days(40),
-        verify_with={"capability": "web.fetch", "input": {"url": "https://example.org"}},
-    )
-    fine = note(kind="operational", created_at=days(1), verify_with=ps)
+    blind = note(kind="operational", created_at=days(40))
+    person = note(kind="person", created_at=days(900))
     useless = note(kind="preference", created_at=days(5000), recalled_count=30)
-    plan = plan_for(
-        [pending, checkable, blind, person, volatile, in_notes, on_web, fine, useless],
-        [doomed],
-        NOW,
-        mc.DEFAULT,
-    )
+    plan = plan_for([pending, checkable, blind, person, useless], [doomed], NOW, mc.DEFAULT)
     assert plan.expired == [doomed]
-    assert plan.checks == [checkable]
-    assert plan.unverifiable == [blind, in_notes, on_web]  # the notes and the web are never used
     assert plan.archive == [useless]
-    assert plan.skipped == 3  # person, volatile, and the pending one (expires, not checked)
     assert plan.has_work
-    assert not plan_for([fine], [], NOW, mc.DEFAULT).has_work
-
-
-def test_the_most_doubtful_note_is_checked_first() -> None:
-    ps = {"capability": "docker.ps", "input": {}}
-    a = note(kind="operational", created_at=days(20), verify_with=ps)
-    b = note(kind="operational", created_at=days(90), verify_with=ps)
-    c = note(kind="operational", created_at=days(45), verify_with=ps)
-    assert plan_for([a, b, c], [], NOW, mc.DEFAULT).checks == [b, c, a]
-
-
-# --- the verdict of the judge ---------------------------------------------------------------------
-
-
-def test_a_verdict_is_vetted_before_it_is_believed() -> None:
-    ok = vet_verdict({"verdict": "confirmed", "evidence": ["E1", 7], "reason": " fine  here "})
-    assert ok == {
-        "verdict": "confirmed",
-        "text": "",
-        "quote": "",
-        "evidence": ["E1"],
-        "reason": "fine here",
-    }
-    changed = vet_verdict({"verdict": "changed", "text": "Port 8081", "evidence": ["E1"]})
-    assert changed is not None and changed["text"] == "Port 8081"
-    for bad in (
-        None,
-        "confirmed",
-        {"verdict": "maybe"},
-        {"verdict": "changed", "evidence": ["E1"]},  # no corrected text
-        {"verdict": "changed", "text": "x" * 400, "evidence": ["E1"]},  # not a note
-        {"verdict": "changed", "text": "Das Passwort ist hunter2x", "evidence": ["E1"]},  # secret
-    ):
-        assert vet_verdict(bad) is None  # type: ignore[arg-type]
+    assert not plan_for([checkable, blind, person], [], NOW, mc.DEFAULT).has_work
 
 
 # --- when a run is due ----------------------------------------------------------------------------
@@ -374,94 +283,26 @@ def test_the_night_boundary_is_the_latest_care_hour_not_after_now() -> None:
 def test_the_settings_reach_the_rules() -> None:
     s = Settings(
         memory_halflife_operational_days=7,
-        memory_check_threshold=0.6,
         memory_archive_idle_days=30,
         memory_volatile_ttl_hours=12,
     )
     cfg = mc.CareConfig.of(s)
     assert cfg.halflife_days["operational"] == 7
-    assert (cfg.check_threshold, cfg.archive_idle_days, cfg.volatile_ttl_hours) == (0.6, 30, 12)
+    assert (cfg.archive_idle_days, cfg.volatile_ttl_hours) == (30, 12)
     assert mc.halflife_days(note(kind="operational"), cfg) == 7
 
 
 # --- mirrored profiles with a check hint --------------------------------------------------------
 
 
-def profile(host: str = "alpha", hint: str = "`occ status`", **kw: Any) -> SimpleNamespace:
-    return note(
+def test_a_mirrored_profile_with_a_check_hint_is_no_work_for_the_run() -> None:
+    """D124: the file wins; nothing checks a profile against a live system."""
+    profile = note(
         kind="operational",
         source_type="kb",
-        source_ref={"host": host, "check_hint": hint},
-        evidence="doc",
-        created_at=days(2),
-        **kw,
+        source_ref={"host": "alpha", "check_hint": "`occ status`"},
+        created_at=days(5000),
+        recalled_count=30,
     )
-
-
-def test_a_profile_is_checked_when_its_host_has_a_node_and_left_alone_when_not() -> None:
-    near, far = profile("alpha"), profile("charlie")
-    plan = plan_for([near, far], [], NOW, mc.DEFAULT, {"alpha": "tools-alpha"})
-    assert plan.checks == [near]
-    assert plan.no_node == 1 and plan.skipped == 0  # no error, no failed check
-    # more nodes later widen the run without any other change
-    both = plan_for(
-        [near, far], [], NOW, mc.DEFAULT, {"alpha": "tools-alpha", "charlie": "tools-charlie"}
-    )
-    assert both.checks == [near, far]
-
-
-def test_a_profile_is_rechecked_only_after_the_recheck_days() -> None:
-    reach = {"alpha": "tools-alpha"}
-    fresh = profile(care_checked_at=days(1))
-    stale = profile(care_checked_at=days(4))
-    plan = plan_for([fresh, stale], [], NOW, mc.DEFAULT, reach)
-    assert plan.checks == [stale] and plan.no_node == 0
-
-
-def test_a_profile_without_a_hint_is_not_checked() -> None:
-    bare = profile(hint="")
-    plan = plan_for([bare], [], NOW, mc.DEFAULT, {"alpha": "tools-alpha"})
-    assert plan.checks == [] and not plan.has_work
-
-
-def test_reachable_hosts_come_from_the_nodes_that_offer_the_shell() -> None:
-    from topcoat_hub.memory_care_service import reachable_hosts
-
-    available = [
-        {"node": "tools-alpha", "capability": "shell.read"},
-        {"node": "tools-bravo", "capability": "docker.ps"},  # no shell: no host
-        {"node": "delta", "capability": "shell.read"},
-    ]
-    assert reachable_hosts(available) == {"alpha": "tools-alpha", "delta": "delta"}
-
-
-def test_a_care_check_may_wait_for_a_slow_model() -> None:
-    from topcoat_hub.memory_care_service import MemoryCare
-
-    care = MemoryCare.__new__(MemoryCare)  # only the settings matter for the limits
-    care.settings = Settings(
-        memory_care_model_timeout_seconds=777.0, memory_care_task_seconds=1500.0
-    )
-    limits = care.limits()
-    assert limits.model_timeout_seconds == 777.0
-    assert limits.time_budget_seconds == 1500.0
-    # the defaults let a 30B model on a CPU laptop read a prompt (it took more than 2 minutes)
-    default = Settings()
-    assert default.memory_care_model_timeout_seconds >= 600
-    assert default.memory_care_run_max_seconds >= default.memory_care_task_seconds
-
-
-def test_a_difference_needs_a_quote_that_stands_in_a_non_empty_answer() -> None:
-    from topcoat_hub.memory_care_service import is_empty_answer, quote_proves
-
-    seen = SimpleNamespace(excerpt='{"containers":[{"name":"web","ports":"0.0.0.0:8081->80/tcp"}]}')
-    empty = SimpleNamespace(excerpt='{"containers":[],"counts":{},"total":0}')
-    assert quote_proves("8081->80/tcp", [seen])
-    assert quote_proves("  8081->80/TCP ", [seen])  # case and spaces do not matter
-    assert not quote_proves("8082", [seen])  # not in the answer
-    assert not quote_proves("", [seen])
-    assert not quote_proves("ab", [seen])  # too short to prove anything
-    assert not quote_proves("containers", [empty])  # found, but an empty answer shows nothing
-    assert is_empty_answer('{"containers":[],"total":0}')
-    assert is_empty_answer("")
-    assert not is_empty_answer('{"total":2}')
+    plan = plan_for([profile], [], NOW, mc.DEFAULT)
+    assert plan.archive == [] and not plan.has_work  # never archived either: the file wins
