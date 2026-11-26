@@ -621,6 +621,17 @@ registered repositories and offers only named, schema-checked operations (no she
   answer is `{repo, pushed, branch, commit, compare_url?}`. `capability.execute` also carries the
   `repo` object of `capability.invoke` (URL, branch, token), and nothing else is added to its keys.
   `repo.diff` (without `stat`) reports `sha256`, `bytes` and `branch` of the whole change.
+- **Large tasks (D109, D110).** The sub-tasks of a large task write one after another on its local
+  branch `topcoat/v-<nr>`. `repo.start` takes `continue: true` for such a topic only (`v-<nr>`; for any
+  other topic it is an input error): when the local branch exists it is checked out as it is, not reset,
+  and the answer is `{repo, branch, based_on: branch, continued: true}`; when it does not exist yet the
+  branch starts from the default branch as usual and the answer carries `continued: false`. Without the
+  flag nothing changes. `repo.read` and `repo.outline` take an optional `branch` (only `topcoat/v-<nr>`,
+  and it must exist in the workshop): they then read that branch from git's objects (`ls-tree`,
+  `cat-file`) and check nothing out, with the checks of a worktree read (a clean relative path, no
+  `.git`, no file that may hold credentials, the size limit, plain files only: no links, no
+  submodules) and the same masking; the answer names the `branch`. Older nodes refuse both fields
+  (`additionalProperties: false`).
 - **Local repositories (D76).** The origin of a repository can live in the workshop itself, a bare
   repository at `<dir>/.origin/<name>.git` computed from the name (never a path from the hub). The
   call's `repo` object is then `{local: true, branch, template?, url: "", token: ""}`: `repo.sync`
