@@ -211,6 +211,13 @@ describe("Sheets", () => {
     fireEvent.keyDown(field, { key: "Escape" });
     expect(window.location.hash).toBe("#/sheets/s1");
     field.remove();
+    // a menu of the shell is open (the web shell's drawer, the taskbar menu): that Esc is the menu's
+    const menu = document.createElement("button");
+    menu.setAttribute("aria-expanded", "true");
+    document.body.appendChild(menu);
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+    expect(window.location.hash).toBe("#/sheets/s1");
+    menu.remove();
     // taken by the page (the desktop shell then does not minimise the window)
     expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(false);
     expect(window.location.hash).toBe("#/sheets");
@@ -274,6 +281,29 @@ describe("Sheets", () => {
     });
     // a started research closes the dialog; its progress shows in the library
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("shows a refused research inside the dialog, not behind it", async () => {
+    const { api } = client({
+      "GET /api/sheets": { sheets: [SUMMARY] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/setlists": { setlists: [] },
+      "POST /api/sheets/research": () =>
+        new Response(JSON.stringify({ detail: "no node can research" }), { status: 409, headers: { "Content-Type": "application/json" } }),
+    });
+    render(<SheetsPage api={api} />);
+    fireEvent.click(await screen.findByTestId("sheets-new"));
+    const dialog = screen.getByRole("dialog", { name: /New sheet|Neues Sheet/ });
+    const form = within(dialog).getByRole("form", { name: /Research a song|Song recherchieren/ });
+    fireEvent.change(within(form).getByLabelText(/^Song$/), { target: { value: "Example Song" } });
+    fireEvent.click(within(form).getByRole("button", { name: /Research|Recherchieren/ }));
+    expect(await within(dialog).findByRole("alert")).toBeTruthy();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    // closed, the message stays in the library; opened again, the dialog starts clean
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Close$|^Schließen$/ }));
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    fireEvent.click(screen.getByTestId("sheets-new"));
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("opens the stage mode, pages with the keys of a foot pedal and leaves with Esc", async () => {

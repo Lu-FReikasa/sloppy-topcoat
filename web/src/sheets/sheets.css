@@ -125,6 +125,26 @@
 /* the artist under the title on narrow screens, in its own column on wide ones */
 .sheets-row-artist {
   display: block;
+  overflow-wrap: anywhere;
+}
+
+/* on a narrow page the key ("A · Capo 2") may break and the column titles get small, or the
+   versions column is pushed out of the page at 320 px (or at 390 with a long artist name) */
+@container (max-width: 559.98px) {
+  .sheets-col-key {
+    white-space: normal;
+  }
+
+  .sheets-table th {
+    letter-spacing: 0;
+    hyphens: auto;
+    overflow-wrap: anywhere;
+  }
+
+  .sheets-table th,
+  .sheets-table td {
+    padding-inline: 0.3rem;
+  }
 }
 
 .sheets-col-artist {

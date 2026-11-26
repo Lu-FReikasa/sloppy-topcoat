@@ -182,7 +182,7 @@ export function SheetsPage({ api, id }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || !inFront(shell.current)) return;
       const find = (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) || ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "f");
-      if (id && e.key === "Escape" && !typing(e.target)) {
+      if (id && e.key === "Escape" && !typing(e.target) && !shellPopupOpen(shell.current)) {
         e.preventDefault();
         window.location.hash = sheetsHref();
       } else if (!id && find && (e.key !== "/" || !typing(e.target)) && search.current) {
@@ -246,11 +246,18 @@ export function SheetsPage({ api, id }: Props) {
         <div className="sheets-library" aria-label={t("sheets.list")} role="region">
           <header className="sheets-head">
             <h1 className="sheets-title">{t("sheets.title")}</h1>
-            <button type="button" onClick={() => setAdding(true)} data-testid="sheets-new">
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                setAdding(true);
+              }}
+              data-testid="sheets-new"
+            >
               {t("sheets.new.open")}
             </button>
           </header>
-          {error && (
+          {error && !adding && (
             <p className="error" role="alert">
               {error}
             </p>
@@ -275,6 +282,12 @@ export function SheetsPage({ api, id }: Props) {
       {adding && (
         <Dialog title={t("sheets.new.title")} onClose={() => setAdding(false)}>
           <div className="sheets-new">
+            {/* a refused research or paste shows here: the library's own line is behind the dialog */}
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
             <ResearchForm
               api={api}
               onStarted={() => {
@@ -302,6 +315,13 @@ function inFront(el: HTMLElement | null): boolean {
   if (!el || document.querySelector('[aria-modal="true"]')) return false;
   const win = el.closest(".dt-program");
   return !win || win.classList.contains("dt-focused");
+}
+
+/** Whether the shell around the page has a menu or drawer open (the web shell's drawer or user
+ *  menu, the taskbar menu): Esc then closes that, it does not leave the sheet. Expanded controls
+ *  inside this page or in other windows do not count. */
+function shellPopupOpen(el: HTMLElement | null): boolean {
+  return [...document.querySelectorAll('[aria-expanded="true"]')].some((x) => !el?.contains(x) && !x.closest(".dt-program"));
 }
 
 function typing(target: EventTarget | null): boolean {
