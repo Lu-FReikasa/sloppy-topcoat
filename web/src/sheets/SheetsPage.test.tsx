@@ -4,7 +4,7 @@ import { ApiClient } from "../api/client";
 import { parseRoute } from "../route";
 import { mockFetch } from "../test/mockFetch";
 import { artistsOf, flowLabel, groupSheets, kindClass, SheetsPage } from "./SheetsPage";
-import type { SheetDetail, SheetResearchJob, SheetSummary } from "./types";
+import type { Setlist, SheetDetail, SheetResearchJob, SheetSummary } from "./types";
 
 const SUMMARY: SheetSummary = {
   id: "s1",
@@ -238,5 +238,104 @@ describe("Sheets", () => {
     expect(screen.queryByTestId("sheet-stage")).toBeNull();
     // leaving opens the song paged to in the normal view
     expect(window.location.hash).toBe("#/sheets/s9");
+  });
+
+  it("plays a setlist on the stage: the pedal pages in setlist order, the newest version, a song twice", async () => {
+    // "Example Song" in two versions (s1 older, s2 newer), "Zebra Song" once
+    const s2 = { ...SUMMARY, id: "s2", created_at: "2026-11-21T10:00:00Z" };
+    const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song", created_at: "2026-11-20T10:00:00Z" };
+    const s1 = { ...SUMMARY, created_at: "2026-11-20T09:00:00Z" };
+    const gig: Setlist = {
+      id: "L1",
+      name: "Gig",
+      items: [
+        { sheet_id: "s9", newest: false },
+        { sheet_id: "s1", newest: true },
+        { sheet_id: "s9", newest: false },
+      ],
+      updated_at: null,
+      created_at: null,
+    };
+    const { api, calls } = client({
+      "GET /api/sheets": { sheets: [s1, s2, zebra] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/setlists": { setlists: [gig] },
+      "GET /api/sheets/s1": detail(true, ["G", "D"]),
+      "GET /api/sheets/s2": { ...detail(true, ["G", "D"]), id: "s2" },
+      "GET /api/sheets/s9": { ...detail(true, ["G", "D"]), id: "s9" },
+    });
+    window.sessionStorage.clear();
+    window.localStorage.setItem("topcoat.sheets.setlist", "L1");
+    window.location.hash = "#/sheets";
+    render(<SheetsPage api={api} />);
+    const panel = await screen.findByTestId("setlists");
+    const items = await within(panel).findByTestId("setlist-items");
+    expect(within(items).getAllByRole("listitem").map((li) => li.getAttribute("aria-label"))).toEqual([
+      "Zebra Song",
+      "Example Song",
+      "Zebra Song",
+    ]);
+    // the newest item names the version it plays now
+    expect(items.textContent).toMatch(/(newest|neueste) \(v2\)/);
+    fireEvent.click(within(panel).getByTestId("setlist-play"));
+    // paging happens inside the stage: the address stays until the stage is left
+    const at = async (n: number) =>
+      waitFor(() => expect(screen.getByTestId("sheet-stage-set").textContent).toMatch(new RegExp(`Gig · ${n} (of|von) 3`)));
+    const asked = () => calls.filter((c) => c.method === "GET" && /\/api\/sheets\/s\d$/.test(c.url)).map((c) => c.url.slice(-2));
+    await at(1);
+    fireEvent.keyDown(window, { key: "PageDown" });
+    await at(2);
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    await at(3);
+    // the end of the setlist: the pedal does nothing, back goes to the song before
+    fireEvent.keyDown(window, { key: "PageDown" });
+    await at(3);
+    fireEvent.keyDown(window, { key: "PageUp" });
+    await at(2);
+    await waitFor(() => expect(asked()).toEqual(["s9", "s2", "s9", "s2"]));
+    expect(window.location.hash).toBe("#/sheets");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByTestId("sheet-stage")).toBeNull();
+    // leaving opens the song the setlist was at (the newest version of Example Song)
+    expect(window.location.hash).toBe("#/sheets/s2");
+  });
+
+  it("adds the open sheet to a setlist and reorders with Alt+arrow keys", async () => {
+    const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song" };
+    const gig: Setlist = { id: "L1", name: "Gig", items: [{ sheet_id: "s9", newest: false }], updated_at: null, created_at: null };
+    const { api, calls } = client({
+      "GET /api/sheets": { sheets: [SUMMARY, zebra] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/setlists": { setlists: [gig] },
+      "GET /api/sheets/s1": detail(true, ["G", "D"]),
+      "PATCH /api/sheets/setlists/L1": gig,
+    });
+    window.localStorage.setItem("topcoat.sheets.setlist", "L1");
+    render(<SheetsPage api={api} id="s1" />);
+    const panel = await screen.findByTestId("setlists");
+    await within(panel).findByTestId("setlist-items");
+    fireEvent.change(within(panel).getByLabelText(/^(Version)$/), { target: { value: "this" } });
+    fireEvent.click(within(panel).getByTestId("setlist-add"));
+    const patches = () => calls.filter((c) => c.method === "PATCH").map((c) => c.body);
+    await waitFor(() =>
+      expect(patches().at(-1)).toEqual({
+        items: [
+          { sheet_id: "s9", newest: false },
+          { sheet_id: "s1", newest: false },
+        ],
+      }),
+    );
+    const rows = within(within(panel).getByTestId("setlist-items")).getAllByRole("listitem");
+    fireEvent.keyDown(rows[1]!, { key: "ArrowUp", altKey: true });
+    await waitFor(() =>
+      expect(patches().at(-1)).toEqual({
+        items: [
+          { sheet_id: "s1", newest: false },
+          { sheet_id: "s9", newest: false },
+        ],
+      }),
+    );
+    // the moved song keeps the focus, so it can be moved on
+    await waitFor(() => expect(document.activeElement?.getAttribute("aria-label")).toBe("Example Song"));
   });
 });

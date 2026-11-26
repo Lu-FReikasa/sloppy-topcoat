@@ -4388,6 +4388,30 @@
       "next": "Next song",
       "hideTabs": "Hide tabs",
       "scroll": "Too long for one screen: scroll"
+    },
+    "setlists": {
+      "title": "Setlists",
+      "choose": "Choose a setlist",
+      "new": "New setlist",
+      "name": "Name of the setlist",
+      "create": "Create",
+      "play": "Play on stage",
+      "playFrom": "Play on stage from this song",
+      "delete": "Delete setlist",
+      "deleteConfirm": "Delete the setlist \"{{name}}\"? Its sheets stay.",
+      "empty": "No songs yet.",
+      "keys": "Drag to reorder, or Alt + ↑/↓ on a song.",
+      "add": "Add \"{{title}}\"",
+      "addHint": "Open a sheet to add it to the setlist.",
+      "which": "Version",
+      "newestOption": "Always the newest version",
+      "thisOption": "This version (v{{n}})",
+      "newest": "newest (v{{n}})",
+      "up": "Move up",
+      "down": "Move down",
+      "remove": "Remove from the setlist",
+      "missing": "Sheet deleted",
+      "position": "{{name}} · {{n}} of {{total}}"
     }
   },
   "images": {
