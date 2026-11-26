@@ -307,3 +307,20 @@ def test_narrow_agent_only_removes(
     assert (
         plugin_registry.narrow_agent(off, ["wiki", "internet"])["tool_scope"]["internet"] is False
     )
+
+
+def test_two_admins_storing_the_same_version_get_a_conflict_not_an_error(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    install(client, manifest())
+
+    # the other admin's 1.1.0 lands between this one's check and its write
+    async def nothing_stored(self: Any, key: str) -> list[Any]:
+        return []
+
+    client.post("/api/plugins/notes-board/versions", headers=AUTH, json=manifest(version="1.1.0"))
+    monkeypatch.setattr(plugin_registry.Registry, "versions", nothing_stored)
+    r = client.post(
+        "/api/plugins/notes-board/versions", headers=AUTH, json=manifest(version="1.1.0")
+    )
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "conflict"

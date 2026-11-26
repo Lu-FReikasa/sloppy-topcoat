@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy.exc import IntegrityError
 
 from topcoat_hub import plugin_registry as registry
 from topcoat_hub.auth import CurrentUser, require_admin
@@ -21,6 +22,18 @@ router = APIRouter(prefix="/api/plugins")
 def _fail(exc: registry.RegistryError) -> HTTPException:
     return HTTPException(
         exc.status, detail={"code": exc.code, "message": str(exc), "problems": exc.problems}
+    )
+
+
+def _conflict() -> HTTPException:
+    """Another admin stored the same key or version a moment earlier."""
+    return HTTPException(
+        409,
+        detail={
+            "code": "conflict",
+            "message": "another change came first; look again and retry",
+            "problems": [],
+        },
     )
 
 
@@ -138,6 +151,8 @@ async def install_plugin(
             view = _row(row, manifest)
     except registry.RegistryError as exc:
         raise _fail(exc) from exc
+    except IntegrityError as exc:
+        raise _conflict() from exc
     _publish(request, view["key"])
     return view
 
@@ -157,6 +172,8 @@ async def update_plugin(
             view = _row(row, manifest)
     except registry.RegistryError as exc:
         raise _fail(exc) from exc
+    except IntegrityError as exc:
+        raise _conflict() from exc
     _publish(request, key)
     return view
 
