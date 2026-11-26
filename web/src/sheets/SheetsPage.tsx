@@ -970,9 +970,30 @@ function Stage({
       setFit((old) => (old && old.columns === f.columns && old.font === f.font && old.fits === f.fits ? old : f));
     };
     measure();
-    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    // turning the screen comes in steps (full screen, rotation, scrollbar): measure once the layout
+    // has settled, in the next frame and again a moment later; resize events cover what the
+    // observer of the box misses on some devices
+    let frame = 0;
+    let later = 0;
+    const again = () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(later);
+      frame = requestAnimationFrame(measure);
+      later = window.setTimeout(measure, 400);
+    };
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(again);
     ro?.observe(b);
-    return () => ro?.disconnect();
+    window.addEventListener("resize", again);
+    window.addEventListener("orientationchange", again);
+    screen.orientation?.addEventListener?.("change", again);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", again);
+      window.removeEventListener("orientationchange", again);
+      screen.orientation?.removeEventListener?.("change", again);
+      cancelAnimationFrame(frame);
+      window.clearTimeout(later);
+    };
   }, [items]);
 
   const v = sheet?.view;
