@@ -54,12 +54,20 @@ export class WebMicrophone implements Microphone {
   private stream: MediaStream | null = null;
   private ctx: AudioContext | null = null;
   private node: ScriptProcessorNode | null = null;
+  /** counts starts and stops: a stream granted after a stop (Esc while the browser still asked)
+   *  is closed at once, so the microphone is never left on */
+  private generation = 0;
 
   async start(onChunk: (pcm: ArrayBuffer) => void): Promise<number> {
     this.stop();
+    const generation = this.generation;
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
+    if (generation !== this.generation) {
+      stream.getTracks().forEach((t) => t.stop());
+      throw new DOMException("the recording was stopped before the microphone started", "AbortError");
+    }
     const ctx = new AudioContext();
     const source = ctx.createMediaStreamSource(stream);
     const node = ctx.createScriptProcessor(SAMPLES_PER_CHUNK, 1, 1);
@@ -76,6 +84,7 @@ export class WebMicrophone implements Microphone {
   }
 
   stop(): void {
+    this.generation++;
     this.node?.disconnect();
     this.stream?.getTracks().forEach((t) => t.stop());
     void closeQuietly(this.ctx);

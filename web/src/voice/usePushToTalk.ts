@@ -34,7 +34,7 @@ export interface PushToTalkHandle extends VoiceSnapshot {
 export function usePushToTalk(
   api: ApiClient,
   target: Omit<TalkTarget, "speak">,
-  send: (text: string) => void,
+  send: (text: string, conversationId?: string) => void,
 ): PushToTalkHandle {
   const makeDeps = useContext(VoiceDepsContext) ?? realDeps;
   const [can, setCan] = useState<Availability>(NONE);
@@ -66,7 +66,7 @@ export function usePushToTalk(
   const [ptt, setPtt] = useState<PushToTalk | null>(null);
   useEffect(() => {
     if (!can.transcribe) return;
-    const made = new PushToTalk(makeDeps(api), targetRef.current, (text) => sendRef.current(text));
+    const made = new PushToTalk(makeDeps(api), targetRef.current, (text, chat) => sendRef.current(text, chat));
     setPtt(made);
     return () => {
       made.dispose();

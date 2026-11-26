@@ -918,6 +918,43 @@ describe("push to talk (D127)", () => {
     );
   });
 
+  it("what was said while an answer was written never goes into another chat", async () => {
+    const live = controlledSse();
+    const other: Conversation = { ...CONV, id: "c2", title: "Anderes" };
+    const mock = mockFetch({
+      "GET /api/conversations": [CONV, other],
+      "GET /api/conversations/c1": {
+        ...CONV,
+        messages: [msg(1, "user", "Prüf Plex"), msg(2, "assistant", "", { status: "running" })],
+      },
+      "GET /api/conversations/c2": { ...other, messages: [msg(5, "assistant", "Anderer Chat")] },
+      "GET /api/conversations/c1/memory": [],
+      "GET /api/conversations/c2/memory": [],
+      "GET /api/chat/messages/2/stream?offset=0": () => live.response,
+      "GET /api/voice": { transcribe: true, speak: true },
+      "POST /api/conversations/c2/section": { created: false, conversation: other },
+    });
+    const api = new ApiClient({ token: "t", fetchImpl: mock.fetch });
+    const page = (id: string) => (
+      <VoiceDepsContext.Provider value={voiceDeps}>
+        <TalkPage api={api} conversationId={id} />
+      </VoiceDepsContext.Provider>
+    );
+    const { rerender } = render(page("c1"));
+    live.push("meta", META, 0);
+    link.transcripts.push("Und wie spät ist es?");
+    const key = await screen.findByRole("button", { name: "Gedrückt halten zum Sprechen" });
+    fireEvent.pointerDown(key, { button: 0, pointerId: 1 });
+    await waitFor(() => expect(key.getAttribute("aria-pressed")).toBe("true"));
+    fireEvent.pointerUp(key, { pointerId: 1 });
+    await screen.findByText("Ich denke nach …"); // it waits for the answer being written
+    rerender(page("c2"));
+    await screen.findByText("Anderer Chat");
+    await waitFor(() => expect(screen.queryByText("Ich denke nach …")).toBeNull());
+    expect(mock.calls.filter((c) => c.method === "POST").map((c) => c.url)).toEqual([]);
+    expect(link.spoken).toEqual([]);
+  });
+
   it("a spoken yes is sent as text and confirms nothing (D15, D83)", async () => {
     const mock = talkSetup({ transcribe: true, speak: true }, "Gut.");
     link.transcripts.push("Ja, mach das");

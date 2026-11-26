@@ -72,11 +72,14 @@ export class PushToTalk {
   private cutter = new SentenceCutter();
   private outstanding = 0;
   private turn = 0;
+  /** the chat the key went down in: the transcript belongs there */
+  private saidIn: string | undefined;
 
   constructor(
     private readonly deps: VoiceDeps,
     private target: TalkTarget,
-    private readonly send: (text: string) => void,
+    /** the transcript, and the chat the key was pressed in */
+    private readonly send: (text: string, conversationId?: string) => void,
   ) {}
 
   // --- the store the hook reads -----------------------------------------------------------------
@@ -108,6 +111,7 @@ export class PushToTalk {
     this.held = true;
     this.silence();
     const turn = ++this.turn;
+    this.saidIn = this.target.conversationId;
     const recording = this.deps.link.listen({
       rate: SPEECH_RATE,
       language: this.target.language,
@@ -152,7 +156,7 @@ export class PushToTalk {
       this.awaiting = this.target.speak;
       this.answerDone = false;
       this.cutter = new SentenceCutter();
-      this.send(text.trim());
+      this.send(text.trim(), this.saidIn);
       if (!this.awaiting) this.set("idle");
     } catch (err) {
       if (turn !== this.turn) return;

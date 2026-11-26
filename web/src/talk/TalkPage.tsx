@@ -364,35 +364,56 @@ export function TalkPage({
   // that is still being written gets it once it is done (half duplex)
   // the answer to the spoken message is the first one after it: the stream while it is written,
   // then the stored answer; a stream that ends without one (an error) ends it with what there is
-  const voiceAsked = useRef<{ after: number; stale: unknown } | null>(null);
-  const spoken = useRef<string | null>(null);
+  // a text said in one chat goes into that chat only: when the person opened another chat while
+  // it waited, it is dropped (and nothing is read out), never posted into the other one
+  const voiceAsked = useRef<{ after: number; stale: unknown; chat: string } | null>(null);
+  const spoken = useRef<{ text: string; chat: string } | null>(null);
   const sendSpoken = useRef<() => void>(() => undefined);
+  const stopVoice = useRef<() => void>(() => undefined);
   useLayoutEffect(() => {
     sendSpoken.current = () => {
-      const text = spoken.current;
-      if (text === null || !detail || running) return;
+      const said = spoken.current;
+      if (said === null || !detail) return;
+      if (said.chat !== detail.id) {
+        spoken.current = null;
+        stopVoice.current();
+        return;
+      }
+      if (running) return;
       spoken.current = null;
-      voiceAsked.current = { after: detail.messages.at(-1)?.id ?? 0, stale: stream };
+      voiceAsked.current = {
+        after: detail.messages.at(-1)?.id ?? 0,
+        stale: stream,
+        chat: detail.id,
+      };
       stick();
-      void post(detail.id, text);
+      void post(detail.id, said.text);
     };
   });
   const voice = usePushToTalk(
     api,
     { conversationId: detail?.id, language: (i18n.language || "auto").slice(0, 2) },
-    (text) => {
-      spoken.current = text;
+    (text, chat) => {
+      spoken.current = { text, chat: chat ?? "" };
       sendSpoken.current();
     },
   );
+  useLayoutEffect(() => {
+    stopVoice.current = voice.cancel;
+  });
   useEffect(() => {
-    if (!running) sendSpoken.current(); // what was said while an answer was still written
-  }, [running]);
+    sendSpoken.current(); // what was said while an answer was still written (or in another chat)
+  }, [running, detail?.id]);
   const storedAnswer = detail?.messages.findLast((m) => m.role === "assistant");
   const { answer: voiceAnswer } = voice;
   useEffect(() => {
     const waiting = voiceAsked.current;
-    if (!waiting) return;
+    if (!waiting || !detail) return;
+    if (detail.id !== waiting.chat && detail.continues_id !== waiting.chat) {
+      voiceAsked.current = null; // another chat was opened: its answers are not read out
+      voice.cancel();
+      return;
+    }
     if (running) {
       voiceAnswer(stream?.text ?? "", false);
     } else if (stream && stream !== waiting.stale) {
@@ -403,7 +424,7 @@ export function TalkPage({
       voiceAnswer(storedAnswer.content, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, stream, storedAnswer?.id]);
+  }, [running, stream, storedAnswer?.id, detail?.id]);
 
   function submit() {
     const text = draft.trim();
