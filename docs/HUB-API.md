@@ -369,7 +369,7 @@ to the E2-02 fields: `kind` (`person` | `preference` | `operational`), `stage` (
 `stale`, the only form of reliability the model sees), `reliability` and `usefulness` (0..1, for the GUI),
 `last_verified_at`, `verified_count` (live checks; a check counts `TOPCOAT_MEMORY_LIVE_CHECK_WEIGHT`
 = 2 times a statement), `expires_at` (volatile notes only), `verify_with` (`{capability, input}` of a
-read-only capability, or `null`), `recalled_count`, `used_count`, `last_used_at`, `feedback_positive`,
+read-only capability, or `null`; no longer written or used since D124, older notes may still carry one), `recalled_count`, `used_count`, `last_used_at`, `feedback_positive`,
 `feedback_negative`, `halflife_days` (this note's, grown by its confirmations). `status` may now be
 `archived`.
 
@@ -381,10 +381,12 @@ read-only capability, or `null`), `recalled_count`, `used_count`, `last_used_at`
 | `POST /api/memory/{id}/restore` | now also brings an archived note back |
 | `POST /api/memory/care` → `202 {started}` | start a care run for the caller (`409 memory_disabled`, `already_running`, `no_node_available`) |
 
-**A run** (`memory_runs`, `kind` `consolidation` | `care`; `trigger` `nightly` | `idle` | `manual` for a care run; `status` `running` | `ok` | `stopped_budget` | `paused` | `no_model` | `error`) of kind `care` has
-`stats = {checked, unchanged, changed, asked, unverifiable, expired, archived, skipped, failed, model,
-changes[]}`. Each `changes[]` entry is `{action, item_id, text, kind, version, reason, undo}` with `action`
-`verified` | `changed` | `asked` | `unverifiable` | `expired` | `archived`; `undo` is `restore` (bring the
+**A run** (`memory_runs`, `kind` `consolidation` | `care`; `trigger` `nightly` | `idle` | `manual` for a care run; `status` `running` | `ok` | `stopped_budget` | `paused` | `no_model` | `error`; a care run no longer stops at a budget since D124) of kind `care` has
+`stats = {expired, archived, proposed, changes[]}` plus the cross-check's counts (`crosschecked`,
+`discrepancies`, `agreed`, `decided`, `asked_person`, `tokens`) and `core_review` when the core was looked at.
+Runs from before D124 also carry `checked`, `unchanged`, `changed`, `asked`, `unverifiable`, `skipped`,
+`failed`, `no_node` and `model`. Each `changes[]` entry is `{action, item_id, text, kind, version, reason, undo}` with `action`
+`expired` | `archived` | `proposed` (older runs also `verified` | `changed` | `asked` | `unverifiable`); `undo` is `restore` (bring the
 note back: `POST /api/memory/{id}/restore`), `revert` (back to `from_version`: `POST
 /api/memory/{id}/revert`) or `null` (nothing changed in the content). `changed` adds `from_version`,
 `new_text`, `evidence[]`; `asked` adds `question_id`, `observed`, `evidence[]`. The versions the run writes have `actor: "care"` and

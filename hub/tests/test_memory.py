@@ -1,6 +1,7 @@
 """Memory (E2-02, D19): extraction after a turn, recall into the prompt, merge, versions with
 reasons, undo, secret filter, idle consolidation with a fake model."""
 
+import asyncio
 import json
 import re
 import uuid
@@ -92,15 +93,21 @@ def chat_once(client: TestClient, text: str, conv: str | None = None) -> list[An
 
 
 def run_consolidation(client: TestClient) -> dict[str, Any]:
+    """Start a consolidation run and return it once it has finished. The run starts in the
+    background after the 202: wait for *this* run, never the one before it, and return the row
+    that was seen finished (a second look could find the next run still running, #118)."""
+    before = {r["id"] for r in client.get("/api/memory", headers=AUTH).json()["runs"]}
     r = client.post("/api/memory/consolidate", headers=AUTH)
     assert r.status_code == 202, r.text
+    seen: list[dict[str, Any]] = []
 
     def finished() -> None:
-        body = client.get("/api/memory", headers=AUTH).json()
-        assert not body["running"] and body["runs"] and body["runs"][0]["status"] != "running"
+        runs = client.get("/api/memory", headers=AUTH).json()["runs"]
+        assert runs and runs[0]["id"] not in before and runs[0]["status"] != "running"
+        seen.append(runs[0])
 
     eventually(finished)
-    return client.get("/api/memory", headers=AUTH).json()["runs"][0]
+    return seen[-1]
 
 
 def setup_node(client: TestClient, connect: Any, **kw: Any) -> FakeNode:
@@ -673,6 +680,26 @@ def test_the_scheduler_only_runs_when_idle(client: TestClient, connect) -> None:
     assert tick() == 1
     assert client.get("/api/memory", headers=AUTH).json()["runs"][0]["trigger"] == "scheduled"
     assert tick() == 0  # nothing left to check
+
+
+def test_the_consolidation_helper_returns_its_own_run_even_when_it_starts_late(
+    client: TestClient, connect: Any, monkeypatch: Any
+) -> None:
+    """#118: the run starts in the background after the 202; the helper must not hand back the
+    run before it (or the next one, still running and without stats)."""
+    setup_node(client, connect)
+    first = run_consolidation(client)
+    memory = client.app.state.memory
+    consolidate = memory.consolidate
+
+    async def late(user_id: uuid.UUID, trigger: str) -> Any:
+        await asyncio.sleep(0.5)
+        return await consolidate(user_id, trigger)
+
+    monkeypatch.setattr(memory, "consolidate", late)
+    second = run_consolidation(client)
+    assert second["id"] != first["id"] and second["status"] != "running"
+    assert "resolved" in second["stats"]
 
 
 def test_switching_the_embedder_re_embeds_the_old_notes_during_consolidation(

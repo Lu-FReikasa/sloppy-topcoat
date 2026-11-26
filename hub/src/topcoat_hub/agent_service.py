@@ -440,6 +440,9 @@ class AgentService:
         self._canceled: set[uuid.UUID] = set()
         self._limits: dict[uuid.UUID, Limits] = {}  # per-task limits of this process's lifetime
         self._hooks: dict[uuid.UUID, dict[str, Any]] = {}  # the hooks a block program set
+        # a run writes the task's end before it leaves ``_running``; how long a /continue waits
+        # for those last lines before it calls the task still running (#114)
+        self.tail_wait_seconds = 5.0
         self.coordinator: Any = None  # set by main (E3-08)
 
     # --- entry points, all per user --------------------------------------------------------
@@ -557,10 +560,13 @@ class AgentService:
             task = await store.get(task_id)
             if task is None:
                 return None
-            resumable = task.status in ("canceled", "failed") or (
-                task.status == "done" and task.stop_reason
-            )
-            if not resumable or task_id in self._running:
+            running = self._running.get(task_id)
+            if running is not None and running is not asyncio.current_task() and _resumable(task):
+                # the run has written the task's end and is in its last lines (its ``finally``
+                # still has to run): wait for it, so that it does not clear the new run's entries
+                await asyncio.wait({running}, timeout=self.tail_wait_seconds)
+                await db.refresh(task)
+            if not _resumable(task) or task_id in self._running:
                 raise AgentError(
                     409, "not_resumable", "only a stopped, failed or cut-off task can continue"
                 )
@@ -651,3 +657,8 @@ class AgentService:
             self._running.pop(task_id, None)
             self._limits.pop(task_id, None)
             self._hooks.pop(task_id, None)
+
+
+def _resumable(task: AgentTask) -> bool:
+    """A stopped, failed or cut-off task can continue."""
+    return task.status in ("canceled", "failed") or bool(task.status == "done" and task.stop_reason)

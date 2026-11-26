@@ -27,6 +27,7 @@ const READS: Record<string, readonly Field[]> = {
   "page.theme-workshop": [],
   "page.applications": [],
   "page.task_kinds": [],
+  "page.plugins": [],
   "page.chat": [],
   "page.chat.research": [],
   "page.chat.dev": [],

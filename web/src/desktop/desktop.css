@@ -242,6 +242,91 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* ---------- the plug-in registry (D105, plugins/PluginsPage.tsx) ---------- */
+
+.plugins-page {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.plugin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.plugin-detail,
+.plugin-install {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.plugin-install textarea {
+  width: 100%;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+}
+
+.plugin-install-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.plugin-versions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plugin-versions > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.plugin-diff-box {
+  margin: 0;
+  min-width: 0;
+}
+
+/* the sign at the start of each line says added or removed; the colour only repeats it */
+.plugin-diff {
+  margin: 0.25rem 0 0;
+  padding: 0.5rem;
+  max-height: 24rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  white-space: pre;
+}
+
+.plugin-diff-add {
+  color: var(--ok);
+}
+
+.plugin-diff-del {
+  color: var(--bad);
+}
+
+.plugin-diff-hunk,
+.plugin-diff-head {
+  color: var(--muted);
+}
+
+.plugin-changes {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
 /* ---------- the taskbar ---------- */
 
 .dt-taskbar {

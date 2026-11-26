@@ -5,7 +5,7 @@ import { useNode } from "../data/useNode";
 import { useNodeActions, type ModelAction, type NodeActions } from "../data/useNodeActions";
 import type { HubEvents } from "../data/hubEvents";
 import { describeError } from "../errors";
-import { bytesToGb, formatDateTime, formatDecimal, formatInt } from "../format";
+import { bytesToGb, formatDateTime, formatDecimal, formatInt, mbToGb } from "../format";
 import { eventDetailKey, loadEventText } from "../nodeActivity";
 import {
   DEFAULT_RESIDENT_PRIORITY,
@@ -14,6 +14,7 @@ import {
   residentsOf,
 } from "../pressure";
 import { modelHref, modelsHref, overviewHref } from "../route";
+import { nodeGlance } from "../summaries";
 import type { CpuInfo, ModelInfo, NodeDetail, NodeEvent, Resident, ResidentUpdate } from "../types";
 import { BenchmarkSection } from "./BenchmarkSection";
 import { NodeConfigForm } from "./NodeConfigForm";
@@ -135,6 +136,9 @@ function DetailBody({
   const allowed = node.config?.allowed_actions;
   const canSleep = !offline && Array.isArray(allowed) && allowed.includes("node.sleep");
   const lastSeen = formatDateTime(node.last_seen, locale) ?? t("node.never");
+  // what matters first (issue #22): state, memory, GPU, loaded models; the inventory is folded
+  const glance = nodeGlance(node);
+  const gb = (mb: number) => formatDecimal(mbToGb(mb), locale);
 
   return (
     <>
@@ -142,68 +146,108 @@ function DetailBody({
         <h1>{node.name}</h1>
         <StateBadge state={node.state} />
       </div>
-      <dl className="facts">
-        <dt>{t("node.os")}</dt>
-        <dd>
-          {node.os} / {node.arch}
-        </dd>
-        <dt>{t("node.cpu")}</dt>
-        <dd>
-          <CpuText cpu={node.cpu} />
-        </dd>
+      <dl className="facts" data-testid="node-glance">
         <dt>{t("node.ram")}</dt>
         <dd>{offline ? "–" : ram}</dd>
-        {disk && (
+        {glance.gpus.length > 0 && (
           <>
-            <dt>{t("node.disk")}</dt>
-            <dd data-testid="node-disk" className={diskLow(node) ? "warn-text" : undefined}>
-              {disk}
-              {diskLow(node) && ` – ${t("node.diskLow")}`}
+            <dt>{t("detail.glanceGpu")}</dt>
+            <dd data-testid="glance-gpus">
+              {glance.gpus.map((g, i) => (
+                <span className="fact-item" key={i}>
+                  {t("detail.glanceGpuValue", {
+                    name: g.name,
+                    used: g.usedMb === null ? "?" : gb(g.usedMb),
+                    total: gb(g.totalMb),
+                  }) +
+                    (g.shared
+                      ? `, ${t("detail.glanceGpuShared", {
+                          used: g.shared.usedMb === null ? "?" : gb(g.shared.usedMb),
+                          total: gb(g.shared.totalMb),
+                        })}`
+                      : "")}
+                </span>
+              ))}
             </dd>
           </>
         )}
-        {(node.network?.length ?? 0) > 0 && (
+        {!isTools && glance.live && (
           <>
-            <dt>{t("node.network")}</dt>
-            <dd data-testid="node-network">
-              {node.network?.map((i) => `${i.name} ${i.mac}`).join(" · ")}
+            <dt>{t("detail.glanceLoaded")}</dt>
+            <dd data-testid="glance-loaded">
+              {glance.loaded.length === 0
+                ? t("detail.glanceNone")
+                : glance.loaded.map((m) => (
+                    <span className="fact-item" key={m.name}>
+                      {m.vramMb === null
+                        ? m.name
+                        : t("detail.glanceLoadedValue", { name: m.name, vram: gb(m.vramMb) })}
+                    </span>
+                  ))}
             </dd>
           </>
         )}
-        <dt>{t("node.connected")}</dt>
-        <dd>{node.connected ? t("node.yes") : t("node.no")}</dd>
-        <dt>{t("node.lastSeen")}</dt>
-        <dd>{lastSeen}</dd>
-        <dt>{t("node.agentVersion")}</dt>
-        <dd>{node.agent_version ?? t("node.unknown")}</dd>
-        <dt>{t("detail.runner")}</dt>
-        <dd>
-          {node.runner ? (
-            <>
-              {t(`runnerType.${node.runner.type}`, { defaultValue: node.runner.type })}
-              {" – "}
-              {node.runner.available ? t("detail.runnerAvailable") : t("detail.runnerUnavailable")}
-              {node.runner.detail ? ` (${node.runner.detail})` : ""}
-            </>
-          ) : (
-            t("detail.noRunner")
-          )}
-        </dd>
-        {!isTools && (
-          <>
-            <dt>{t("detail.backend")}</dt>
-            <dd>
-              {node.runner?.backend
-                ? t(`backend.${node.runner.backend}`, { defaultValue: node.runner.backend })
-                : t("node.unknown")}
-            </dd>
-            <dt>{t("detail.llamacpp")}</dt>
-            <dd>{node.runner?.llamacpp_release ?? t("node.unknown")}</dd>
-            <dt>{t("detail.threads")}</dt>
-            <dd>{configuredThreads(node) ?? t("detail.threadsAuto")}</dd>
-          </>
-        )}
+        {disk && diskLow(node) && <DiskFact disk={disk} low />}
       </dl>
+      <details className="facts-more">
+        <summary>{t("detail.factsMore")}</summary>
+        <dl className="facts">
+          <dt>{t("node.os")}</dt>
+          <dd>
+            {node.os} / {node.arch}
+          </dd>
+          <dt>{t("node.cpu")}</dt>
+          <dd>
+            <CpuText cpu={node.cpu} />
+          </dd>
+          {disk && !diskLow(node) && <DiskFact disk={disk} low={false} />}
+          {(node.network?.length ?? 0) > 0 && (
+            <>
+              <dt>{t("node.network")}</dt>
+              <dd data-testid="node-network">
+                {node.network?.map((i) => (
+                  <span className="fact-item" key={`${i.name} ${i.mac}`}>
+                    {i.name} {i.mac}
+                  </span>
+                ))}
+              </dd>
+            </>
+          )}
+          <dt>{t("node.connected")}</dt>
+          <dd>{node.connected ? t("node.yes") : t("node.no")}</dd>
+          <dt>{t("node.lastSeen")}</dt>
+          <dd>{lastSeen}</dd>
+          <dt>{t("node.agentVersion")}</dt>
+          <dd>{node.agent_version ?? t("node.unknown")}</dd>
+          <dt>{t("detail.runner")}</dt>
+          <dd>
+            {node.runner ? (
+              <>
+                {t(`runnerType.${node.runner.type}`, { defaultValue: node.runner.type })}
+                {" – "}
+                {node.runner.available ? t("detail.runnerAvailable") : t("detail.runnerUnavailable")}
+                {node.runner.detail ? ` (${node.runner.detail})` : ""}
+              </>
+            ) : (
+              t("detail.noRunner")
+            )}
+          </dd>
+          {!isTools && (
+            <>
+              <dt>{t("detail.backend")}</dt>
+              <dd>
+                {node.runner?.backend
+                  ? t(`backend.${node.runner.backend}`, { defaultValue: node.runner.backend })
+                  : t("node.unknown")}
+              </dd>
+              <dt>{t("detail.llamacpp")}</dt>
+              <dd>{node.runner?.llamacpp_release ?? t("node.unknown")}</dd>
+              <dt>{t("detail.threads")}</dt>
+              <dd>{configuredThreads(node) ?? t("detail.threadsAuto")}</dd>
+            </>
+          )}
+        </dl>
+      </details>
       <NodeKindSwitch node={node} compute={actions.compute} />
 
       {isTools ? (
@@ -409,6 +453,20 @@ function DetailBody({
       <Fold title={t("detail.events")}>
         <EventList events={node.events} />
       </Fold>
+    </>
+  );
+}
+
+/** The model drive's free space: in the summary while it is low, else among the details. */
+function DiskFact({ disk, low }: { disk: string; low: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <dt>{t("node.disk")}</dt>
+      <dd data-testid="node-disk" className={low ? "warn-text" : undefined}>
+        {disk}
+        {low && ` – ${t("node.diskLow")}`}
+      </dd>
     </>
   );
 }
