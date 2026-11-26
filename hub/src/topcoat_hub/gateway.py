@@ -901,10 +901,15 @@ class Gateway:
                             for m in summary["models"]
                             if m.get("loaded") and m.get("context_length")
                         },
+                        # the header facts, plus the projector the node loads with the model
+                        # (D125): model_facts reads "can see" from it
                         gguf={
-                            m["name"]: m["gguf"]
+                            m["name"]: {
+                                **(m.get("gguf") if isinstance(m.get("gguf"), dict) else {}),
+                                **({"projector": m["projector"]} if m.get("projector") else {}),
+                            }
                             for m in summary["models"]
-                            if isinstance(m.get("gguf"), dict)
+                            if isinstance(m.get("gguf"), dict) or m.get("projector")
                         },
                         parallel={
                             m["name"]: max(1, int(m.get("n_parallel") or 1))

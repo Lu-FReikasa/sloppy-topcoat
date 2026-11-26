@@ -60,6 +60,10 @@ def kinds_of(
         return tuple(manual[name])
     if proven and name in proven:
         return tuple(proven[name])
+    if gguf and gguf.get("projector"):
+        # the node loads a vision projector with it (--mmproj, D125): the model can see
+        base = from_gguf(gguf) or detect(name)
+        return (*base, *(() if "vision" in base else ("vision",)))
     if (stated := from_gguf(gguf)) is not None:
         # the header knows chat, embedding and rerank; that a chat model also looks at pictures is
         # not in the header of the language model (its projector is another file): the name says it
@@ -79,7 +83,7 @@ def source_of(
         return "manual"
     if proven and name in proven:
         return "proven"
-    if from_gguf(gguf) is not None:
+    if from_gguf(gguf) is not None or (gguf and gguf.get("projector")):
         return "gguf"
     return "detected"
 
