@@ -99,7 +99,8 @@
     "plan_v2",
     "investigate",
     "verdict",
-    "area"
+    "area",
+    "decompose"
   ],
   "talks_to": [
     {
@@ -123,6 +124,7 @@
     "issue_steps",
     "fix_step",
     "issue_plan",
-    "review_plan"
+    "review_plan",
+    "decompose"
   ]
 }
