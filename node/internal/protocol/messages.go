@@ -278,6 +278,25 @@ type Inventory struct {
 	Capabilities []CapabilityInfo `json:"capabilities,omitempty"`
 	// Update is the state of the update channel on this node (E2-06, D50).
 	Update *UpdateInfo `json:"update,omitempty"`
+	// Images is the image runner (D126); absent = switched off.
+	Images *ImagesInfo `json:"images,omitempty"`
+}
+
+// ImagesInfo describes the image runner: its pinned build, the image models on disk and the one
+// that runs.
+type ImagesInfo struct {
+	Release   string       `json:"release"`
+	Backend   string       `json:"backend"`
+	Installed bool         `json:"installed"`
+	Models    []ImageModel `json:"models"`
+	Loaded    []string     `json:"loaded"`
+}
+
+// ImageModel is an image model file the image runner can load.
+type ImageModel struct {
+	Name      string `json:"name"`
+	SizeBytes int64  `json:"size_bytes,omitempty"`
+	Format    string `json:"format"`
 }
 
 // Updater states in Inventory.Update.

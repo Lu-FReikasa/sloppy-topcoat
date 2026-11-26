@@ -1,0 +1,19 @@
+{
+  "comment": "Pinned official stable-diffusion.cpp release artifacts (https://github.com/leejet/stable-diffusion.cpp/releases), D126. SHA-256 values are GitHub's asset digests of the release. There is no official Linux CUDA build: Linux uses Vulkan (NVIDIA and AMD) or the CPU. The Linux builds are made on Ubuntu 26.04 and need glibc 2.43.",
+  "default": "master-1088-32d516c",
+  "base_url": "https://github.com/leejet/stable-diffusion.cpp/releases/download",
+  "releases": {
+    "master-1088-32d516c": {
+      "builds": [
+        {"os": "windows", "backend": "vulkan", "assets": [{"name": "sd-master-32d516c-bin-win-vulkan-x64.zip", "sha256": "956853799eb2af71a02c8088ac88ad96978cda902277de75feef8dcf918e7dfc"}]},
+        {"os": "windows", "backend": "cpu", "assets": [{"name": "sd-master-32d516c-bin-win-cpu-x64.zip", "sha256": "f53571cf4fcc2b1b546478eaf0c8fb6055d7df34478904c753a6d564db756383"}]},
+        {"os": "windows", "backend": "cuda", "assets": [
+          {"name": "sd-master-32d516c-bin-win-cuda12-x64.zip", "sha256": "e76d90e0ad0aedb3bcd9e24e7ecb20e7c3e0be9700a7e9e94fbd26226e67f597"},
+          {"name": "cudart-sd-bin-win-cu12-x64.zip", "sha256": "fe20366827d357c00797eebb58244dddab7fd9a348d70090c3871004c320f38d"}
+        ]},
+        {"os": "linux", "backend": "vulkan", "assets": [{"name": "sd-master-32d516c-bin-Linux-Ubuntu-26.04-x86_64-vulkan.zip", "sha256": "1063fe0a55d81265b8f332c7c5b9aba78598d23313a520ec82763b2d536beb11"}]},
+        {"os": "linux", "backend": "cpu", "assets": [{"name": "sd-master-32d516c-bin-Linux-Ubuntu-26.04-x86_64.zip", "sha256": "b8b160ebe5dcc0fb701428a04896fe5d25ff834609f4fd5429cc7bc21b5edfc0"}]}
+      ]
+    }
+  }
+}

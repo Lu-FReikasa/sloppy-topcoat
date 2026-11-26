@@ -40,6 +40,10 @@ type Installer struct {
 	BaseURL string
 	Client  *http.Client
 	GOOS    string
+	// Executables are the programs a build must contain (without .exe): the first is the server
+	// (Installation.Server), the second, if any, the benchmark (Installation.Bench). Default:
+	// llama-server, llama-bench. The stable-diffusion.cpp runner uses the same installer (D126).
+	Executables []string
 
 	mu sync.Mutex // one installation at a time
 }
@@ -120,13 +124,19 @@ func (i *Installer) Ensure(ctx context.Context, release, backend string, progres
 			return Installation{}, fmt.Errorf("unpack %s: %w", a.Name, err)
 		}
 	}
-	server, err := find(tmp, exeName(i.goos(), "llama-server"))
+	exes := i.Executables
+	if len(exes) == 0 {
+		exes = []string{"llama-server", "llama-bench"}
+	}
+	server, err := find(tmp, exeName(i.goos(), exes[0]))
 	if err != nil {
 		return Installation{}, err
 	}
-	bench, err := find(tmp, exeName(i.goos(), "llama-bench"))
-	if err != nil {
-		return Installation{}, err
+	bench := ""
+	if len(exes) > 1 {
+		if bench, err = find(tmp, exeName(i.goos(), exes[1])); err != nil {
+			return Installation{}, err
+		}
 	}
 	final := i.dir(release, backend)
 	_ = os.RemoveAll(final)
@@ -134,7 +144,10 @@ func (i *Installer) Ensure(ctx context.Context, release, backend string, progres
 		return Installation{}, err
 	}
 	rel := func(p string) string { r, _ := filepath.Rel(tmp, p); return filepath.Join(final, r) }
-	inst := Installation{Release: release, Backend: backend, Server: rel(server), Bench: rel(bench)}
+	inst := Installation{Release: release, Backend: backend, Server: rel(server)}
+	if bench != "" {
+		inst.Bench = rel(bench)
+	}
 	inst.Dir = filepath.Dir(inst.Server)
 	b, _ := json.MarshalIndent(inst, "", "  ")
 	if err := os.WriteFile(filepath.Join(final, markerFile), b, 0o600); err != nil {
