@@ -27,7 +27,7 @@ interface Draft {
 }
 
 const MOTIONS = ["none", "fade", "slide", "flicker", "zoom"] as const;
-const LAYOUTS = ["cascade", "tile", "columns", "rows", "focus"] as const;
+const LAYOUTS = ["cascade", "tile", "columns", "rows", "focus", "nest"] as const;
 const BARS = ["bottom", "top", "left", "right", "hidden"] as const;
 const BASES = ["terminal", "leitstand", "schreibtisch"] as const;
 const MAX_UNDO = 60;
