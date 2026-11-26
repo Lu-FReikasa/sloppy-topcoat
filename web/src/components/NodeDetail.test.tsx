@@ -1,25 +1,30 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useEffect, useReducer } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiClient } from "../api/client";
-import { initialState, reducer, type Action } from "../state/store";
+import { createHubEvents, type HubEvents } from "../data/hubEvents";
 import { makeDetail, makeNode } from "../test/fixtures";
 import { jsonResponse, mockFetch } from "../test/mockFetch";
-import type { NodeDetail } from "../types";
+import type { NodeDetail, NodeEvent, NodeSummary } from "../types";
 import { NodeDetailView } from "./NodeDetail";
 
-let dispatchRef: ((a: Action) => void) | null = null;
+// the stream as the page sees it (web/src/data/hubEvents.ts)
+let bus: HubEvents = createHubEvents();
+
+function nodeUpdated(node: NodeSummary) {
+  bus.publish({ event: "node_updated", data: JSON.stringify(node) });
+}
+
+function nodeEvent(nodeId: string, event: NodeEvent) {
+  bus.publish({ event: "node_event", data: JSON.stringify({ node_id: nodeId, event }) });
+}
 
 function Harness({ api, nodeId }: { api: ApiClient; nodeId: string }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
-  useEffect(() => {
-    dispatchRef = dispatch;
-  }, [dispatch]);
-  return <NodeDetailView api={api} nodeId={nodeId} detail={state.detail} dispatch={dispatch} />;
+  return <NodeDetailView api={api} nodeId={nodeId} events={bus} />;
 }
 
 afterEach(() => {
   vi.restoreAllMocks();
+  bus = createHubEvents();
 });
 
 function setup(detail: NodeDetail, actionRoute?: unknown, extra: Record<string, unknown> = {}) {
@@ -143,17 +148,13 @@ describe("NodeDetailView", () => {
     setup(makeDetail());
     await screen.findByRole("heading", { name: "node-nvidia" });
     act(() => {
-      dispatchRef?.({ type: "node_updated", node: makeNode({ state: "busy_gaming" }) });
-      dispatchRef?.({
-        type: "node_event",
-        nodeId: "n1",
-        event: {
-          id: 9,
-          kind: "game_detected",
-          data: { game: "x" },
-          ts: "2026-01-01T12:01:00Z",
-          received_at: "",
-        },
+      nodeUpdated(makeNode({ state: "busy_gaming" }));
+      nodeEvent("n1", {
+        id: 9,
+        kind: "game_detected",
+        data: { game: "x" },
+        ts: "2026-01-01T12:01:00Z",
+        received_at: "",
       });
     });
     expect(screen.getByText("Spielt")).toBeTruthy();
@@ -304,31 +305,23 @@ describe("NodeDetailView", () => {
     const gets = () => mock.calls.filter((c) => c.method === "GET" && c.url === "/api/nodes/n1").length;
     expect(gets()).toBe(1);
     act(() => {
-      dispatchRef?.({
-        type: "node_event",
-        nodeId: "n1",
-        event: {
-          id: 20,
-          kind: "benchmark_started",
-          data: { benchmark_id: "b" },
-          ts: "2026-01-01T12:01:00Z",
-          received_at: "",
-        },
+      nodeEvent("n1", {
+        id: 20,
+        kind: "benchmark_started",
+        data: { benchmark_id: "b" },
+        ts: "2026-01-01T12:01:00Z",
+        received_at: "",
       });
     });
     expect(gets()).toBe(1);
     expect(screen.getByText("Benchmark gestartet")).toBeTruthy();
     act(() => {
-      dispatchRef?.({
-        type: "node_event",
-        nodeId: "n1",
-        event: {
-          id: 21,
-          kind: "benchmark_finished",
-          data: { benchmark_id: "b", ok: true },
-          ts: "2026-01-01T12:02:00Z",
-          received_at: "",
-        },
+      nodeEvent("n1", {
+        id: 21,
+        kind: "benchmark_finished",
+        data: { benchmark_id: "b", ok: true },
+        ts: "2026-01-01T12:02:00Z",
+        received_at: "",
       });
     });
     await waitFor(() => expect(gets()).toBe(2));
@@ -599,16 +592,12 @@ describe("NodeDetailView", () => {
     await screen.findByRole("heading", { name: "node-nvidia" });
     const gets = () => mock.calls.filter((c) => c.method === "GET" && c.url === "/api/nodes/n1").length;
     act(() => {
-      dispatchRef?.({
-        type: "node_event",
-        nodeId: "n1",
-        event: {
-          id: 30,
-          kind: "config_changed",
-          data: { source: "manual_unload", models: ["llama-8b"], auto_reload: false },
-          ts: "2026-01-01T12:03:00Z",
-          received_at: "",
-        },
+      nodeEvent("n1", {
+        id: 30,
+        kind: "config_changed",
+        data: { source: "manual_unload", models: ["llama-8b"], auto_reload: false },
+        ts: "2026-01-01T12:03:00Z",
+        received_at: "",
       });
     });
     expect(
@@ -654,5 +643,35 @@ describe("NodeDetailView", () => {
     );
     expect(await screen.findByRole("heading", { name: "Fähigkeiten" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Modelle" })).toBeNull();
+  });
+
+  it("loads again after a rename and hands each loaded detail to onLoaded (the node list)", async () => {
+    // the hub publishes no node_updated on a rename: only the reload brings the new name
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    let name = "node-nvidia";
+    const mock = mockFetch({
+      "GET /api/nodes/n1": () => jsonResponse(makeDetail({ name })),
+      "POST /api/nodes/n1/rename": () => {
+        name = "office-pc";
+        return jsonResponse({ id: "n1", from: "node-nvidia", to: name, rewritten: {} });
+      },
+    });
+    const onLoaded = vi.fn();
+    const api = new ApiClient({ token: "t", fetchImpl: mock.fetch });
+    render(<NodeDetailView api={api} nodeId="n1" events={bus} onLoaded={onLoaded} />);
+    await screen.findByRole("heading", { name: "node-nvidia" });
+    expect(onLoaded).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Umbenennen" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Neuer Name" }), {
+      target: { value: "office-pc" },
+    });
+    const form = screen.getByRole("textbox", { name: "Neuer Name" }).closest("form");
+    if (!form) throw new Error("no rename form");
+    fireEvent.submit(form);
+
+    expect(await screen.findByRole("heading", { name: "office-pc" })).toBeTruthy();
+    expect(onLoaded).toHaveBeenCalledTimes(2);
+    expect(onLoaded).toHaveBeenLastCalledWith(expect.objectContaining({ id: "n1", name: "office-pc" }));
   });
 });

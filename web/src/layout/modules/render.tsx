@@ -54,7 +54,7 @@ import { HomePage } from "../../home/HomePage";
 import { InboxPage } from "../../inbox/InboxPage";
 import type { Action } from "../../state/store";
 import { TalkPage } from "../../talk/TalkPage";
-import type { Me, NodeDetail, NodeSummary, ToolScope } from "../../types";
+import type { Me, NodeSummary, ToolScope } from "../../types";
 import type { PropValue, UiBootstrap } from "../types";
 import { requestOpen } from "../intent";
 import { Tabbed, type TabSpec } from "./Tabbed";
@@ -79,8 +79,7 @@ export interface ModuleCtx {
   tick: number;
   /** Bumped when the hub says the inbox changed. */
   inboxTick: number;
-  epoch: number;
-  detail: NodeDetail | null;
+  /** The node page tells the node list what it loaded. */
   dispatch: Dispatch<Action>;
 }
 
@@ -314,9 +313,7 @@ export function renderModule(
           key={nodeId}
           api={api}
           nodeId={nodeId}
-          detail={ctx.detail}
-          dispatch={ctx.dispatch}
-          epoch={ctx.epoch}
+          onLoaded={(detail) => ctx.dispatch({ type: "detail_loaded", detail })}
         />
       ) : null;
     }
