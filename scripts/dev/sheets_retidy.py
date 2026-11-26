@@ -1,6 +1,6 @@
 """Clean the stored chord sheets with the rules that now apply to every import (sheets/rules.py,
 #145): chords written as text become chords, tab staff lines a tab part, header lines (title,
-artist, source, tuning) facts or nothing. Runs inside the hub container:
+artist, source, tuning) facts or nothing; tab goes (a sheet is lyrics and chords). Runs inside the hub container:
     docker cp scripts/dev/sheets_retidy.py topcoat-hub-1:/tmp/sheets_retidy.py
     docker exec topcoat-hub-1 /app/hub/.venv/bin/python /tmp/sheets_retidy.py          # dry run
     docker exec topcoat-hub-1 /app/hub/.venv/bin/python /tmp/sheets_retidy.py --apply
@@ -23,7 +23,7 @@ from topcoat_hub.models import SheetRow
 from topcoat_hub.sheets import chordpro, rules
 from topcoat_hub.sheets.store import SheetError, SheetStore
 
-NOTE = "tidy rules (#145): chords as text, tab blocks, header"
+NOTE = "tidy rules (#145): chords as text, tab blocks, header"  # kept: the written versions carry it
 
 
 def _plain(text: str) -> str:
@@ -66,6 +66,10 @@ async def retidy(db, user_id, apply: bool, out: defaultdict) -> None:
         if not apply:
             continue
         try:
+            if row.version_note == NOTE:  # a version this script wrote: cleaned again in place
+                await store.update(row.id, text=text, title=row.title, artist=row.artist)
+                out["updated"] += 1
+                continue
             new = await store.create(
                 row.chordpro,  # read() applies the same rules again
                 instrument=row.instrument,

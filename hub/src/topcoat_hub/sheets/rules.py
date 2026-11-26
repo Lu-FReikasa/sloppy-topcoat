@@ -7,8 +7,8 @@ Imported sheets carry the same patterns over and over; they are fixed here as ru
                  transposition and the instrument view cover it. A line with a word that is no chord
                  (:func:`topcoat_hub.sheets.chords.parse_chord`) stays text; a heading in front
                  ("Intro:") and bar lines or repeat marks ("|", "x2") may stand with the chords.
-``tab blocks``   tab staff lines (``e|--3--``) are a part of kind ``tab`` (``{start_of_tab}``), no
-                 lyrics and no comments, so a reader can show or hide them.
+``tab``          tab staff lines (``e|--3--``) and tab parts go: a chord sheet is lyrics and chords
+                 only. A part that keeps no chord without its staves (a riff's heading) goes too.
 ``header``       the lines before the first chord that name the title, artist, tuning, source or a
                  credit ("Title: …", "by …", "Standard tuning", a web address) go: title, artist,
                  key, tempo and tuning into the sheet's facts when it has none, the rest away.
@@ -19,7 +19,7 @@ Every rule leaves a sheet it has cleaned as it is, so running them twice changes
 import re
 from dataclasses import dataclass, field
 
-from topcoat_hub.sheets.chordpro import Line, Section, Segment, Sheet, kind_of, parse_line
+from topcoat_hub.sheets.chordpro import Line, Section, Sheet, kind_of, parse_line
 from topcoat_hub.sheets.chords import Key, parse_chord, uses_german_names
 from topcoat_hub.sheets.plaintext import _FILLER, _TAB, _without_remark
 
@@ -32,7 +32,7 @@ _LABELLED = re.compile(r"^(\s*\[?\s*)([^:\]\[]{2,30}?)(\s*\]?\s*:\s*|\s*\]\s*)(\
 @dataclass
 class Applied:
     chord_lines: int = 0  # lines whose chords were plain text
-    tabs: int = 0  # tab blocks made a part of their own
+    tabs: int = 0  # parts with tab lines (dropped)
     removed: list[str] = field(default_factory=list)  # header lines dropped or made facts
 
 
@@ -163,59 +163,26 @@ def _is_tab(ln: Line) -> bool:
 
 
 def _tab_blocks(sheet: Sheet, done: Applied) -> None:
+    """Tab goes: a chord sheet holds lyrics and chords only (the maintainer's call, 2026-11-26).
+    A tab part, the tab lines of a part, and a part left with no chord after them (a riff's
+    heading over its staves) are dropped."""
     out: list[Section] = []
     for sec in sheet.sections:
-        if sec.kind == "tab" or sec.repeat_of is not None or not any(map(_is_tab, sec.lines)):
+        if sec.repeat_of is not None:
             out.append(sec)
             continue
-        name = sec.label if sec.kind in _PLAYED and sec.label else "Tab"
-        # a part of tab and comments ("(let ring)") is one tab block: the comments stay in it
-        if all(_is_tab(ln) or ln.comment is not None for ln in sec.lines):
-            prev = out[-1] if out else None
-            if _unnamed(sec) and prev is not None and prev.kind == "tab" and prev.repeat_of is None:
-                prev.lines.extend(_staff(ln) for ln in sec.lines)  # the next staves of a block
-                continue
-            sec.kind, sec.label = "tab", name
-            sec.lines = [_staff(ln) for ln in sec.lines]
-            _add(out, sec, done)
+        if sec.kind == "tab":
+            done.tabs += 1
             continue
-        pieces: list[tuple[bool, list[Line]]] = []
-        for ln in sec.lines:
-            tab = _is_tab(ln)
-            if pieces and pieces[-1][0] == tab:
-                pieces[-1][1].append(ln)
-            else:
-                pieces.append((tab, [ln]))
-        used = False  # the part keeps its place (a {chorus} may repeat it) with its first lines
-        for tab, lines in pieces:
-            if tab:
-                _add(out, Section("tab", name, [_staff(ln) for ln in lines]), done)
-            elif not used:
-                sec.lines, used = lines, True
-                out.append(sec)
-            else:
-                out.append(Section(sec.kind, sec.label, lines))
+        lines = [ln for ln in sec.lines if not _is_tab(ln)]
+        if len(lines) < len(sec.lines):
+            done.tabs += 1
+            text = [ln for ln in lines if (ln.comment or ln.lyrics).strip()]
+            if not any(ln.chords for ln in lines) and len(text) <= 1:
+                continue  # a riff's heading ("Riff 1:") over its staves, nothing to play from
+            sec.lines = lines
+        out.append(sec)
     _replace(sheet, out)
-
-
-def _staff(ln: Line) -> Line:
-    """A tab line as a line of its own (no comment): the tab block shows it as it is."""
-    return Line([Segment(_line_text(ln))]) if _is_tab(ln) else ln
-
-
-def _add(out: list[Section], sec: Section, done: Applied) -> None:
-    """A tab block; one right after another of the same name (the next staves) joins it."""
-    prev = out[-1] if out else None
-    if (
-        prev is not None
-        and prev.kind == "tab"
-        and prev.repeat_of is None
-        and prev.label == sec.label
-    ):
-        prev.lines.extend(sec.lines)
-        return
-    out.append(sec)
-    done.tabs += 1
 
 
 def _replace(sheet: Sheet, sections: list[Section]) -> None:
@@ -226,7 +193,8 @@ def _replace(sheet: Sheet, sections: list[Section]) -> None:
     for s in keep:
         if s.repeat_of is not None:
             s.repeat_of = new_of_old.get(s.repeat_of)
-    sheet.sections = keep
+    # a repeat of a part that went (a tab) goes with it
+    sheet.sections = [s for s in keep if s.repeat_of is not None or s.lines]
 
 
 # --- header ----------------------------------------------------------------------------------
