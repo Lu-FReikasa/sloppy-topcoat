@@ -934,6 +934,7 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
       // zoomed into the nest, Esc steps out one level before it minimises anything
       if (
         e.key === "Escape" &&
+        !e.defaultPrevented &&
         nestKeys &&
         !overlay &&
         nestZoom.length > 0 &&

@@ -152,7 +152,9 @@ export function SheetsPage({ api, id }: Props) {
     const at = Math.max(0, songs.findIndex((g) => Number(g.key) >= from));
     if (!songs[at]) return;
     setPlaying({ setlist, at });
-    setStage(true);
+    // not kept for the session: the setlist being played is not either, so a page mounted afresh
+    // (the window minimised and restored) shows the library and the next song opens normally
+    setStageState(true);
   };
 
   useEffect(() => {
@@ -924,14 +926,18 @@ function Stage({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // a dialog over the stage (the desktop's command palette) keeps its keys
+      if (e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
       if (e.key === "Escape") leave();
       else if (e.key === "ArrowRight" || e.key === "PageDown") go(next, 1);
       else if (e.key === "ArrowLeft" || e.key === "PageUp") go(prev, -1);
       else return;
       e.preventDefault();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // capture, before the desktop shell's Esc (minimise the window, which it skips for a key taken
+    // here): otherwise the window goes and the stage never sees its Esc
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   });
 
   // full screen where the browser allows it. Leaving full screen does not end the stage (some

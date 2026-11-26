@@ -395,6 +395,54 @@ describe("Sheets", () => {
     expect(window.location.hash).toBe("#/sheets/s2");
   });
 
+  it("keeps the stage's Esc from the desktop shell, and a played setlist's stage ends with the page", async () => {
+    const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song" };
+    const gig: Setlist = { id: "L1", name: "Gig", items: [{ sheet_id: "s9", newest: false }, { sheet_id: "s1", newest: false }], updated_at: null, created_at: null };
+    const { api } = client({
+      "GET /api/sheets": { sheets: [SUMMARY, zebra] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/setlists": { setlists: [gig] },
+      "GET /api/sheets/s1": detail(true, ["G", "D"]),
+      "GET /api/sheets/s9": { ...detail(true, ["G", "D"]), id: "s9" },
+    });
+    // the desktop shell minimises the window in front on an Esc nobody took (registered first,
+    // as the shell mounts before its pages)
+    const minimised: string[] = [];
+    const shell = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented) minimised.push("sheets");
+    };
+    window.addEventListener("keydown", shell);
+    try {
+      window.sessionStorage.clear();
+      window.localStorage.setItem("topcoat.sheets.setlist", "L1");
+      window.location.hash = "#/sheets/s1";
+      const first = render(<SheetsPage api={api} id="s1" />);
+      fireEvent.click(await screen.findByTestId("sheet-stage-open"));
+      await screen.findByTestId("sheet-stage");
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(screen.queryByTestId("sheet-stage")).toBeNull();
+      expect(minimised).toEqual([]);
+      expect(window.sessionStorage.getItem("topcoat.sheets.stage")).toBeNull();
+
+      // a setlist on the stage from the library: the window is minimised (the page unmounts)
+      first.unmount();
+      window.location.hash = "#/sheets";
+      const library = render(<SheetsPage api={api} />);
+      fireEvent.click(await within(await screen.findByTestId("setlists")).findByTestId("setlist-play"));
+      await screen.findByTestId("sheet-stage-set");
+      library.unmount();
+      // restored, the page shows the song, and the next song opened is not on the stage
+      window.location.hash = "#/sheets/s9";
+      render(<SheetsPage api={api} id="s9" />);
+      expect(await screen.findByTestId("sheet-stage-open")).toBeTruthy();
+      expect(screen.queryByTestId("sheet-stage")).toBeNull();
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(minimised).toEqual([]);
+    } finally {
+      window.removeEventListener("keydown", shell);
+    }
+  });
+
   it("plays in setlist order on the stage, from a song picked in the title view", async () => {
     const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song" };
     const gig: Setlist = { id: "L1", name: "Gig", items: [{ sheet_id: "s9", newest: false }, { sheet_id: "s1", newest: false }], updated_at: null, created_at: null };
