@@ -190,8 +190,8 @@ export function PluginsPage({ api, events }: Props) {
           <thead>
             <tr>
               <th>{t("plugins.name")}</th>
-              <th>{t("plugins.version")}</th>
-              <th>{t("plugins.state")}</th>
+              <th className="plugin-col">{t("plugins.version")}</th>
+              <th className="plugin-col">{t("plugins.state")}</th>
               <th>
                 <span className="sr-only">{t("plugins.actions")}</span>
               </th>
@@ -218,9 +218,13 @@ export function PluginsPage({ api, events }: Props) {
                       <code className="muted small">{r.key}</code>
                     </>
                   )}
+                  {/* a narrow page folds the version and state columns into this line */}
+                  <span className="plugin-facts muted small">
+                    {r.version} · {t(STATE_KEY[stateOf(r)])}
+                  </span>
                 </td>
-                <td>{r.version}</td>
-                <td>{t(STATE_KEY[stateOf(r)])}</td>
+                <td className="plugin-col">{r.version}</td>
+                <td className="plugin-col">{t(STATE_KEY[stateOf(r)])}</td>
                 <td>
                   <div className="plugin-actions">
                     {!r.builtin && (
