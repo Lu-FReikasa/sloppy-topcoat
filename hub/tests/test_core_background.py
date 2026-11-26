@@ -128,7 +128,7 @@ def test_the_mirror_is_idempotent_follows_the_file_and_archives_what_vanished(
     assert back.status == "active" and back.id == first.id and len(all_kb_rows(clean_db)) == 1
 
 
-def test_a_mirrored_note_is_read_only_for_the_assistant_and_its_check_is_set_by_the_care_only(
+def test_a_mirrored_note_is_read_only_for_the_assistant_and_the_care(
     client: TestClient, world: dict[str, Any], clean_db: str
 ) -> None:
     docs: Docs = world["docs"]
@@ -143,18 +143,6 @@ def test_a_mirrored_note_is_read_only_for_the_assistant_and_its_check_is_set_by_
                 await store.change(item_id, reason="x", actor=actor, text_="node-amd is gone")
             with pytest.raises(ProtectedWrite):
                 await store.change(item_id, reason="x", actor=actor, status="archived")
-        for actor in ("chat", "user", "consolidation"):  # only the care run sets how to check it
-            with pytest.raises(ProtectedWrite):
-                await store.change(
-                    item_id, reason="x", actor=actor,
-                    verify_with={"capability": "system.service_status", "input": {}},
-                )  # fmt: skip
-        # the care run may, after a confirmed check — and that changes no content
-        changed = await store.change(
-            item_id, reason="care: confirmed", actor="care",
-            verify_with={"capability": "system.service_status", "input": {"unit": "llama"}},
-        )  # fmt: skip
-        assert changed is not None and changed.text == row.text
         assert [i.id for i in await store.unchecked()] == []  # the consolidation never touches it
         assert item_id not in [i.id for i in await store.active()]  # (nor does it see it)
         assert item_id in [i.id for i in await store.active(mirror=True)]
