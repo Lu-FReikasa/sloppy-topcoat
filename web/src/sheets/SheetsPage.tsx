@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
 import { describeError, toActionError } from "../errors";
@@ -12,7 +12,11 @@ import type {
   SheetSection,
   SheetSummary,
 } from "./types";
+import { chooseFit, isTabLine, maxColumns, neighbour, SORT_MODES, visibleGroups, type Fit, type SortMode } from "./fit";
+import { artistsOf, type SheetGroup } from "./group";
 import "./sheets.css";
+
+export { artistsOf, groupSheets, type SheetGroup } from "./group";
 
 interface Props {
   api: ApiClient;
@@ -21,41 +25,26 @@ interface Props {
 }
 
 const POLL_MS = 3000;
-const KINDS = ["intro", "verse", "pre_chorus", "chorus", "bridge", "solo", "riff", "interlude", "outro", "tab", "other"];
+const SORT_KEY = "topcoat.sheets.sort";
+const TABS_KEY = "topcoat.sheets.hideTabs";
 
-/** A name as it compares: "The Beatles" and "the beatles" are one artist. */
-function plain(text: string): string {
-  return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-}
-
-export interface SheetGroup {
-  key: string;
-  title: string;
-  artist: string;
-  /** The versions of the song, oldest first: v1, v2 … */
-  versions: SheetSummary[];
-}
-
-/** The sheets grouped by song (title and artist), the songs by title. */
-export function groupSheets(list: SheetSummary[]): SheetGroup[] {
-  const groups = new Map<string, SheetGroup>();
-  for (const s of list) {
-    const key = `${plain(s.title)}|${plain(s.artist)}`;
-    const g = groups.get(key) ?? { key, title: s.title, artist: s.artist, versions: [] };
-    g.versions.push(s);
-    groups.set(key, g);
+/** A remembered choice of this browser; storage may be missing or blocked. */
+function remembered(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
   }
-  const when = (s: SheetSummary) => s.created_at ?? s.updated_at ?? "";
-  for (const g of groups.values()) g.versions.sort((a, b) => when(a).localeCompare(when(b)));
-  return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title));
 }
 
-/** The artists of the list, one spelling each, by name. */
-export function artistsOf(list: SheetSummary[]): string[] {
-  const seen = new Map<string, string>();
-  for (const s of list) if (s.artist && !seen.has(plain(s.artist))) seen.set(plain(s.artist), s.artist);
-  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+function remember(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    /* not remembered; the choice still holds for this page */
+  }
 }
+const KINDS = ["intro", "verse", "pre_chorus", "chorus", "bridge", "solo", "riff", "interlude", "outro", "tab", "other"];
 
 /** The colour class of a part of the song (the same colour in the flow and in the sheet). */
 export function kindClass(kind: string): string {
@@ -83,6 +72,19 @@ export function SheetsPage({ api, id }: Props) {
   const [loads, setLoads] = useState(0);
   const reload = useCallback(() => setLoads((n) => n + 1), []);
   const fail = useCallback((e: unknown) => setError(describeError(toActionError(e), t, i18n)), [t, i18n]);
+  const [query, setQuery] = useState("");
+  const [artist, setArtist] = useState("");
+  const [sort, setSortState] = useState<SortMode>(() => {
+    const r = remembered(SORT_KEY) as SortMode | null;
+    return r && SORT_MODES.includes(r) ? r : "title";
+  });
+  const setSort = (m: SortMode) => {
+    setSortState(m);
+    remember(SORT_KEY, m);
+  };
+  const [stage, setStage] = useState(false);
+  const exitStage = useCallback(() => setStage(false), []);
+  const groups = useMemo(() => visibleGroups(list ?? [], query, artist, sort), [list, query, artist, sort]);
 
   useEffect(() => {
     api.sheets().then((r) => setList(r.sheets), fail);
@@ -102,6 +104,7 @@ export function SheetsPage({ api, id }: Props) {
     return () => window.clearInterval(timer);
   }, [api, running, reload]);
 
+  if (stage && id) return <Stage api={api} id={id} groups={groups} onExit={exitStage} />;
   return (
     <section className="sheets-shell" data-testid="sheets">
       <div className="sheets">
@@ -117,10 +120,15 @@ export function SheetsPage({ api, id }: Props) {
           {jobs.some((j) => j.status !== "done") && <Jobs jobs={jobs.filter((j) => j.status !== "done")} />}
           <PasteForm api={api} onError={fail} />
           {list !== null && list.length === 0 && <p className="muted small">{t("sheets.empty")}</p>}
-          {list && list.length > 0 && <SheetList list={list} openId={id} />}
+          {list && list.length > 0 && <SheetList
+              list={list}
+              groups={groups}
+              openId={id}
+              filter={{ query, setQuery, artist, setArtist, sort, setSort }}
+            />}
         </nav>
         {id ? (
-          <OpenSheet key={id} api={api} id={id} onChanged={reload} />
+          <OpenSheet key={id} api={api} id={id} onChanged={reload} onStage={() => setStage(true)} />
         ) : (
           <p className="sheets-pick muted">{t("sheets.pick")}</p>
         )}
@@ -129,19 +137,19 @@ export function SheetsPage({ api, id }: Props) {
   );
 }
 
-function SheetList({ list, openId }: { list: SheetSummary[]; openId?: string }) {
+interface ListFilter {
+  query: string;
+  setQuery: (q: string) => void;
+  artist: string;
+  setArtist: (a: string) => void;
+  sort: SortMode;
+  setSort: (m: SortMode) => void;
+}
+
+function SheetList({ list, groups, openId, filter }: { list: SheetSummary[]; groups: SheetGroup[]; openId?: string; filter: ListFilter }) {
   const { t } = useTranslation();
-  const [query, setQuery] = useState("");
-  const [artist, setArtist] = useState("");
+  const { query, setQuery, artist, setArtist, sort, setSort } = filter;
   const artists = useMemo(() => artistsOf(list), [list]);
-  const groups = useMemo(() => {
-    const q = plain(query);
-    return groupSheets(list).filter(
-      (g) =>
-        (!artist || plain(g.artist) === plain(artist)) &&
-        (!q || plain(`${g.title} ${g.artist}`).includes(q)),
-    );
-  }, [list, query, artist]);
   const facts = (s: SheetSummary) =>
     [s.key, s.capo ? t("sheets.capoN", { n: s.capo }) : "", t(`sheets.instrument.${s.instrument}`)].filter(Boolean).join(" · ");
   return (
@@ -158,6 +166,13 @@ function SheetList({ list, openId }: { list: SheetSummary[]; openId?: string }) 
             ))}
           </select>
         )}
+        <select value={sort} onChange={(e) => setSort(e.target.value as SortMode)} aria-label={t("sheets.sort.label")}>
+          {SORT_MODES.map((m) => (
+            <option key={m} value={m}>
+              {t(`sheets.sort.${m}`)}
+            </option>
+          ))}
+        </select>
       </div>
       {groups.length === 0 && <p className="muted small">{t("sheets.filter.none")}</p>}
       <ul className="sheets-list" data-testid="sheets-list">
@@ -318,7 +333,7 @@ function PasteForm({ api, onError }: { api: ApiClient; onError: (e: unknown) => 
   );
 }
 
-function OpenSheet({ api, id, onChanged }: { api: ApiClient; id: string; onChanged: () => void }) {
+function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string; onChanged: () => void; onStage: () => void }) {
   const { t, i18n } = useTranslation();
   const [sheet, setSheet] = useState<SheetDetail | null>(null);
   const [instrument, setInstrument] = useState<Instrument | null>(null);
@@ -367,6 +382,9 @@ function OpenSheet({ api, id, onChanged }: { api: ApiClient; id: string; onChang
           {sheet.version_note && <span className="muted">{sheet.version_note}</span>}
         </div>
         <div className="sheet-controls">
+          <button type="button" onClick={onStage} data-testid="sheet-stage-open">
+            {t("sheets.stage.open")}
+          </button>
           <div className="sheet-switch" role="group" aria-label={t("sheets.instrumentLabel")}>
             {(["guitar", "piano"] as const).map((ins) => (
               <button key={ins} type="button" aria-pressed={shownInstrument === ins} onClick={() => setInstrument(ins)}>
@@ -552,6 +570,153 @@ function Comparison({ cmp }: { cmp: SheetComparison }) {
           </table>
         </section>
       ))}
+    </div>
+  );
+}
+
+/** The text of a line as it reads, chords included (to spot tab lines). */
+function lineText(line: SheetLine): string {
+  return line.comment ?? (line.segments ?? []).map((g) => (g.chord ?? "") + g.text).join("");
+}
+
+/** The sections without tab parts and tab lines; a part left empty goes too. */
+export function withoutTabs(sections: SheetSection[]): SheetSection[] {
+  return sections
+    .filter((s) => s.kind !== "tab")
+    .map((s) => ({ ...s, lines: s.lines.filter((ln) => !isTabLine(lineText(ln))) }))
+    .filter((s) => s.lines.length > 0 || s.repeat_of !== null);
+}
+
+/** The stage mode: the sheet alone, full screen, fitted on one screen in columns. ←/→ and
+ *  PageUp/PageDown (a foot pedal sends these) page through the songs of the list as it is
+ *  filtered and sorted; Esc leaves. */
+function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups: SheetGroup[]; onExit: () => void }) {
+  const { t, i18n } = useTranslation();
+  const [sheet, setSheet] = useState<SheetDetail | null>(null);
+  const [error, setError] = useState("");
+  const [hideTabs, setHideTabsState] = useState(() => remembered(TABS_KEY) !== "0");
+  const [fit, setFit] = useState<Fit | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const setHideTabs = (on: boolean) => {
+    setHideTabsState(on);
+    remember(TABS_KEY, on ? "1" : "0");
+  };
+
+  useEffect(() => {
+    api.sheet(id, {}).then(
+      (s) => {
+        setError("");
+        setSheet(s);
+      },
+      (e) => setError(describeError(toActionError(e), t, i18n)),
+    );
+  }, [api, id, t, i18n]);
+
+  const prev = neighbour(groups, id, -1);
+  const next = neighbour(groups, id, 1);
+  const go = (to: string | null) => {
+    if (to) window.location.hash = sheetsHref(to);
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onExit();
+      else if (e.key === "ArrowRight" || e.key === "PageDown") go(next);
+      else if (e.key === "ArrowLeft" || e.key === "PageUp") go(prev);
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  // full screen where the browser allows it; leaving full screen (Esc there) leaves the stage too
+  useEffect(() => {
+    const el = document.documentElement;
+    let entered = false;
+    el.requestFullscreen?.().then(
+      () => (entered = true),
+      () => undefined,
+    );
+    const onChange = () => {
+      if (entered && !document.fullscreenElement) onExit();
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => undefined);
+    };
+  }, [onExit]);
+
+  const sections = useMemo(
+    () => (sheet ? (hideTabs ? withoutTabs(sheet.view.sections) : sheet.view.sections) : []),
+    [sheet, hideTabs],
+  );
+
+  // fit: columns and the largest font at which nothing spills into an extra column
+  useLayoutEffect(() => {
+    const b = box.current;
+    const c = body.current;
+    if (!b || !c || sections.length === 0) return;
+    const measure = () => {
+      const height = b.clientHeight;
+      c.style.height = `${height}px`;
+      const f = chooseFit(maxColumns(b.clientWidth), (columns, font) => {
+        c.style.columnCount = String(columns);
+        c.style.fontSize = `${font}px`;
+        return c.scrollWidth <= c.clientWidth + 1;
+      });
+      c.style.columnCount = String(f.columns);
+      c.style.fontSize = `${f.font}px`;
+      c.style.height = f.fits ? `${height}px` : "auto";
+      setFit((old) => (old && old.columns === f.columns && old.font === f.font && old.fits === f.fits ? old : f));
+    };
+    measure();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    ro?.observe(b);
+    return () => ro?.disconnect();
+  }, [sections]);
+
+  const v = sheet?.view;
+  return (
+    <div className="sheet-stage" data-testid="sheet-stage">
+      <header className="sheet-stage-head">
+        {v ? (
+          <>
+            <strong>{v.title}</strong>
+            {v.artist && <span className="muted">{v.artist}</span>}
+            {v.shown_key && (
+              <span>
+                {t("sheets.key")}: <strong>{v.shown_key}</strong>
+              </span>
+            )}
+            {v.capo > 0 && v.capo_view && <span>{t("sheets.capoN", { n: v.capo })}</span>}
+            {fit && !fit.fits && <span className="sheet-stage-hint">{t("sheets.stage.scroll")}</span>}
+          </>
+        ) : (
+          <span className="muted">{error || t("sheets.loading")}</span>
+        )}
+        <div className="sheet-stage-tools">
+          <button type="button" onClick={() => go(prev)} disabled={!prev} aria-label={t("sheets.stage.prev")} title={t("sheets.stage.prev")}>
+            ←
+          </button>
+          <button type="button" onClick={() => go(next)} disabled={!next} aria-label={t("sheets.stage.next")} title={t("sheets.stage.next")}>
+            →
+          </button>
+          <button type="button" aria-pressed={hideTabs} onClick={() => setHideTabs(!hideTabs)}>
+            {t("sheets.stage.hideTabs")}
+          </button>
+          <button type="button" onClick={onExit}>
+            {t("sheets.stage.exit")}
+          </button>
+        </div>
+      </header>
+      <div ref={box} className={`sheet-stage-box${fit && !fit.fits ? " is-scroll" : ""}`}>
+        <div ref={body} className="sheet-stage-body">
+          {v && <Body sections={sections} />}
+        </div>
+      </div>
     </div>
   );
 }

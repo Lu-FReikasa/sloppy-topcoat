@@ -351,3 +351,74 @@
     display: none;
   }
 }
+
+/* --- stage mode: the sheet alone, fitted on one screen (SheetsPage.tsx Stage, fit.ts) -------- */
+
+.sheet-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.4rem 1rem 0.6rem;
+  background: var(--bg, Canvas);
+  color: var(--text, CanvasText);
+}
+
+.sheet-stage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 1rem;
+  font-size: 14px;
+}
+
+.sheet-stage-hint {
+  color: #d29922;
+}
+
+.sheet-stage-tools {
+  margin-left: auto;
+  display: flex;
+  gap: 0.3rem;
+  opacity: 0.45;
+}
+
+.sheet-stage-tools:hover,
+.sheet-stage-tools:focus-within {
+  opacity: 1;
+}
+
+.sheet-stage-box {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sheet-stage-box.is-scroll {
+  overflow-y: auto;
+}
+
+.sheet-stage-body {
+  column-gap: 2em;
+  column-fill: auto;
+  column-rule: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.sheet-stage-body .sheet-body {
+  display: block;
+}
+
+.sheet-stage-body .sheet-part {
+  break-inside: avoid;
+  margin-bottom: 0.6em;
+}
+
+.sheet-stage-body .sheet-part-label {
+  font-size: 0.7em;
+}
+
+.sheet-stage-body .sheet-text {
+  white-space: pre-wrap;
+}

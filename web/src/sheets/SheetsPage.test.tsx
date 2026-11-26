@@ -202,4 +202,23 @@ describe("Sheets", () => {
       wish: "",
     });
   });
+
+  it("opens the stage mode, pages with the keys of a foot pedal and leaves with Esc", async () => {
+    const other = { ...SUMMARY, id: "s9", title: "Zebra Song" };
+    const { api } = client({
+      "GET /api/sheets": { sheets: [SUMMARY, other] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/s1": detail(true, ["G", "D"]),
+    });
+    window.location.hash = "#/sheets/s1";
+    render(<SheetsPage api={api} id="s1" />);
+    fireEvent.click(await screen.findByTestId("sheet-stage-open"));
+    const stage = await screen.findByTestId("sheet-stage");
+    await waitFor(() => expect(chordsOf(stage)).toEqual(["G", "D", "C"]));
+    expect(screen.queryByTestId("sheets-list")).toBeNull();
+    fireEvent.keyDown(window, { key: "PageDown" });
+    expect(window.location.hash).toBe("#/sheets/s9");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByTestId("sheet-stage")).toBeNull();
+  });
 });
