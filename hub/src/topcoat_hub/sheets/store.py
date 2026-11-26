@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from topcoat_hub.models import SheetRow
-from topcoat_hub.sheets import chordpro, compare, plaintext
+from topcoat_hub.sheets import chordpro, compare, plaintext, rules
 from topcoat_hub.sheets.chordpro import Sheet
 from topcoat_hub.sheets.render import INSTRUMENTS, sounding_key
 
@@ -43,6 +43,7 @@ def read(text: str, fmt: str = "chordpro", title: str = "", artist: str = "") ->
     sheet = chordpro.parse(text)
     sheet.title = title.strip() or sheet.title
     sheet.artist = artist.strip() or sheet.artist
+    rules.apply(sheet)  # chords written as text, tab blocks, a header (sheets/rules.py)
     if not sheet.chords():
         raise SheetError(422, "invalid", "the sheet has no chords")
     if sheet.key is None:
