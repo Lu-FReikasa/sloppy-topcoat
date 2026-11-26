@@ -56,6 +56,7 @@ import (
 	"topcoat/node/internal/tools"
 	"topcoat/node/internal/update"
 	"topcoat/node/internal/version"
+	"topcoat/node/internal/voice"
 	"topcoat/node/internal/workshop"
 )
 
@@ -380,7 +381,7 @@ func cmdRun(ctx context.Context, args []string, stderr io.Writer) int {
 		opts.Sleeper = power.NewSystem()
 		opts.Watcher = watcher.NewSystem()
 		opts.NewRunner = realRunner(d.Path, opts.GPU, opts.SysInfo, logger)
-		opts.NewCapabilities = realCapabilities(logger, d.Path)
+		opts.NewCapabilities = realCapabilities(logger, d.Path, opts.GPU)
 		opts.NewImageRunner = realImageRunner(d.Path, opts.GPU, logger)
 	}
 
@@ -625,7 +626,7 @@ func realImageRunner(dataDir string, gpus gpu.GPUProvider, logger *slog.Logger) 
 // Docker over the configured socket or loopback proxy, journalctl and systemctl by fixed
 // argument lists, /proc for the rest. A Docker host that is configured wrongly leaves the
 // docker.* and compose.* capabilities answering with the reason; the others still work.
-func realCapabilities(logger *slog.Logger, dataDir string) func(*protocol.ToolsConfig) *capability.Registry {
+func realCapabilities(logger *slog.Logger, dataDir string, gpus gpu.GPUProvider) func(*protocol.ToolsConfig) *capability.Registry {
 	return func(c *protocol.ToolsConfig) *capability.Registry {
 		var o tools.Options
 		// a container node with the host's /proc mounted read-only (system.memory sees the host)
@@ -678,8 +679,44 @@ func realCapabilities(logger *slog.Logger, dataDir string) func(*protocol.ToolsC
 		if c != nil && c.Workshop != nil {
 			addWorkshop(reg, c.Workshop, dataDir, logger)
 		}
+		if c != nil && c.Voice.On() {
+			addVoice(reg, c.Voice, dataDir, gpus, logger)
+		}
 		return reg
 	}
+}
+
+// addVoice registers voice.transcribe and voice.speak (D127): pinned whisper.cpp and Piper
+// builds, installed below <data dir>/runtime-voice when voice is switched on, one process per request.
+func addVoice(reg *capability.Registry, c *protocol.VoiceConfig, dataDir string, gpus gpu.GPUProvider, logger *slog.Logger) {
+	var vendors []string
+	if gpus != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		detected, _ := gpus.GPUs(ctx)
+		cancel()
+		for _, g := range detected {
+			vendors = append(vendors, g.Vendor)
+		}
+	}
+	w, p := voice.NewInstallers(dataDir)
+	o := voice.Options{DataDir: dataDir, Whisper: w, Piper: p,
+		WhisperBackend: voice.WhisperBackend(runtime.GOOS, c.Backend, vendors)}
+	for _, d := range []string{"stt", "tts"} {
+		_ = os.MkdirAll(filepath.Join(dataDir, "voice-models", d), 0o750)
+	}
+	if err := voice.Register(reg, voice.NewWhisper(o), voice.NewPiper(o)); err != nil {
+		logger.Warn("voice capabilities are off", "err", err)
+		return
+	}
+	// switching voice on installs the builds; the read-only capabilities never download
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		if err := voice.Install(ctx, o); err != nil {
+			logger.Warn("voice builds not installed", "err", err)
+		}
+	}()
+	logger.Info("voice capabilities on", "whisper_backend", o.WhisperBackend)
 }
 
 // addWorkshop registers the repo.* capabilities of a dev node (E6-01 S1, D52). A workshop that

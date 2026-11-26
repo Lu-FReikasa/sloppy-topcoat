@@ -1156,6 +1156,10 @@
       },
       "hub": {
         "update": "Roll the hub out to an image already on this host, with digest check, dump, health check and a way back."
+      },
+      "voice": {
+        "transcribe": "Turns a short recording into text with whisper.cpp on this machine; the audio is not kept.",
+        "speak": "Reads a text aloud with a Piper voice on this machine and returns the sound."
       }
     }
   },

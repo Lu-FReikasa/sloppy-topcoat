@@ -14,10 +14,13 @@ from topcoat_hub.blocks import builtin
 
 ROOT = Path(__file__).resolve().parents[2]
 I18N = ROOT / "web/src/i18n"
-# What the node declares in its source (`name: "windows.system"`, `const Name = "hub.update"`):
+# What the node declares in its source (`name: "windows.system"`, `const Name = "hub.update"`,
+# `func (speakCap) Name() string { return "voice.speak" }`):
 # the hub's lists miss what it never switches on by role (Windows, browser, restarts, files).
 NODE_DECLARATION = re.compile(
-    r'^\s*(?:name:|(?:const\s+)?Name\s*=)\s*"([a-z][a-z0-9_]*\.[a-z][a-z0-9_]*)"', re.MULTILINE
+    r"^\s*(?:name:|(?:const\s+)?Name\s*=|func \(\w+\) Name\(\) string \{ return)\s*"
+    r'"([a-z][a-z0-9_]*\.[a-z][a-z0-9_]*)"',
+    re.MULTILINE,
 )
 
 
@@ -26,7 +29,7 @@ def _node_capabilities() -> set[str]:
     for path in (ROOT / "node/internal").rglob("*.go"):
         if not path.name.endswith("_test.go"):
             found.update(NODE_DECLARATION.findall(path.read_text(encoding="utf-8")))
-    return found
+    return {n for n in found if not n.startswith("fake.")}  # fakes of tests never reach a person
 
 
 NODE_CAPABILITIES = _node_capabilities()
@@ -52,7 +55,9 @@ def test_every_shipped_program_has_a_title_in_the_catalogue(lang: str) -> None:
 
 def test_the_node_source_scan_finds_the_capabilities() -> None:
     # the scan must not pass on nothing: the node declares far more than the hub's role lists
-    assert {"windows.system", "browser.open", "docker.restart", "hub.update"} <= NODE_CAPABILITIES
+    assert {"windows.system", "browser.open", "docker.restart", "hub.update", "voice.speak"} <= (
+        NODE_CAPABILITIES
+    )
 
 
 @pytest.mark.parametrize("lang", ["en", "de"])

@@ -1,0 +1,13 @@
+{
+  "comment": "Pinned official Piper builds (https://github.com/rhasspy/piper/releases, MIT; the last standalone binary, the repository is archived), D127. GitHub has no digest for these 2023 assets: the SHA-256 values were computed from the downloads on 2026-11-25. Voices must come from a piper-voices revision written for this binary (before 2026-11-17, e.g. a60bfb135881): newer voice configs use phonemes it cannot read.",
+  "default": "2023.11.14-2",
+  "base_url": "https://github.com/rhasspy/piper/releases/download",
+  "releases": {
+    "2023.11.14-2": {
+      "builds": [
+        {"os": "linux", "backend": "cpu", "assets": [{"name": "piper_linux_x86_64.tar.gz", "sha256": "a50cb45f355b7af1f6d758c1b360717877ba0a398cc8cbe6d2a7a3a26e225992"}]},
+        {"os": "windows", "backend": "cpu", "assets": [{"name": "piper_windows_amd64.zip", "sha256": "f3c58906402b24f3a96d92145f58acba6d86c9b5db896d207f78dc80811efcea"}]}
+      ]
+    }
+  }
+}

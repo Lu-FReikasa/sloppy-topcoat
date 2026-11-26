@@ -572,6 +572,21 @@
           "maximum": 300,
           "description": "time limit of one capability call (default 20)"
         },
+        "voice": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "the capabilities voice.transcribe (whisper.cpp) and voice.speak (Piper), D127: pinned builds, one process per request, models in <data dir>/voice-models/stt (ggml-*.bin) and tts (*.onnx + *.onnx.json); absent = off",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "backend": {
+              "type": "string",
+              "enum": ["auto", "cpu"],
+              "description": "whisper.cpp: auto = CUDA on Windows with an NVIDIA GPU, otherwise the CPU (there is no Linux GPU or Vulkan build)"
+            }
+          }
+        },
         "workshop": {
           "type": "object",
           "additionalProperties": false,
