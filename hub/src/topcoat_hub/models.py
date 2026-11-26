@@ -1450,6 +1450,37 @@ class Handover(Base):
     knowledge_path: Mapped[str | None] = mapped_column(String(200))
 
 
+class Order(Base):
+    """A task the secretary handed on (D112, issue #36): which employee does it, the message that
+    carries it (an ``assistant.request`` node), its state as the secretary knows it, and whether
+    the person asked to be told when it is done. Personal (D20): only ever read or written
+    through :class:`topcoat_hub.secretary.OrderStore`, which scopes by ``user_id``."""
+
+    __tablename__ = "orders"
+    __table_args__ = (Index("orders_user_status_idx", "user_id", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="SET NULL"), index=True
+    )
+    target: Mapped[str] = mapped_column(String(20))  # the employee: research | dev | admin
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("project_nodes.id", ondelete="SET NULL")
+    )
+    topic: Mapped[str] = mapped_column(String(300))
+    # sent | queued | running | waiting | done | failed | stopped
+    status: Mapped[str] = mapped_column(String(12), default="sent")
+    report_when_done: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    reported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class ProjectChange(Base):
     """A change the Projekte chat prepared and the person has not decided yet
     (``project_changes.py``): the exact call, immutable (``content_hash``), applied or refused by
