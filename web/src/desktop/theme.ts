@@ -56,14 +56,18 @@ export const BASES: readonly NonNullable<ThemeManifest["base"]>[] = ["terminal",
 
 /** Terminal Nest (#16): the terminal in panes, like a terminal multiplexer. Its own look is a style
  *  sheet like a custom theme's, within the same limits (`cssProblems`): one thin title line per
- *  program, the taskbar as one line at the top, crisp one-pixel borders between the panes. */
+ *  program, the taskbar as one line at the top, crisp one-pixel borders between the panes. The fill
+ *  of the pane in front is its hue at 68 % lightness: dark text on it stays at 4.5:1 for every hue
+ *  (at 60 % the blues and purples, Research among them, fell to 3.2:1; contrast.test.ts). On a
+ *  narrow screen (below NARROW_PX) the title line, the taskbar and their buttons keep the 40 px of
+ *  touch.css, which the thin lines would otherwise beat. */
 const TERMINAL_NEST_CSS = `--radius: 0;
 font-family: ui-monospace, "JetBrains Mono", "SFMono-Regular", "DejaVu Sans Mono", Consolas, monospace;
 .dt-stage { background: var(--border); }
 .dt-program { border: 0; box-shadow: none; outline: 1px solid var(--border); outline-offset: -1px; }
-.dt-program.dt-focused { outline-color: hsl(var(--pg-hue) 70% 60%); z-index: 1; }
+.dt-program.dt-focused { outline-color: hsl(var(--pg-hue) 70% 68%); z-index: 1; }
 .dt-titlebar { min-height: 0; height: 1.35rem; padding: 0 0 0 0.6ch; gap: 1ch; font-size: 0.8rem; background: var(--bg); border-bottom: 1px solid var(--border); }
-.dt-focused .dt-titlebar { background: hsl(var(--pg-hue) 70% 60%); color: var(--accent-text); }
+.dt-focused .dt-titlebar { background: hsl(var(--pg-hue) 70% 68%); color: var(--accent-text); }
 .dt-focused .dt-title, .dt-focused .dt-code { color: var(--accent-text); }
 .dt-title { font-weight: 400; }
 .dt-lamp, .dt-titlebar .dt-icon { display: none; }
@@ -72,10 +76,11 @@ font-family: ui-monospace, "JetBrains Mono", "SFMono-Regular", "DejaVu Sans Mono
 .dt-taskbar { min-height: 0; height: 1.6rem; padding: 0; gap: 0; border-top: 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
 .dt-taskbar button { min-height: 0; height: 1.6rem; border: 0; border-radius: 0; padding: 0 1ch; }
 .dt-task { width: auto; max-width: 14rem; border-bottom: 0; }
-.dt-task.dt-front, .dt-task.dt-front .dt-icon { background: hsl(var(--pg-hue) 70% 60%); color: var(--accent-text); }
+.dt-task.dt-front, .dt-task.dt-front .dt-icon { background: hsl(var(--pg-hue) 70% 68%); color: var(--accent-text); }
 .dt-start { background: var(--accent); color: var(--accent-text); }
 .dt-program.dt-scaled .dt-titlebar { font-style: italic; }
-@media (prefers-reduced-motion: reduce) { .dt-program { animation: none; } }`;
+@media (prefers-reduced-motion: reduce) { .dt-program { animation: none; } }
+@media (max-width: 759px) { .dt-titlebar, .dt-taskbar, .dt-taskbar button, .dt-titlebar-buttons button { height: auto; min-height: 40px; } .dt-taskbar button, .dt-titlebar-buttons button { min-width: 40px; } }`;
 
 /** The themes that come with the web build: the first three are the style sheets above; the rest
  *  is data like any other theme's. */
