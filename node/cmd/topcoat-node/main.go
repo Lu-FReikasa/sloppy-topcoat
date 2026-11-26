@@ -580,6 +580,7 @@ func realRunner(dataDir string, gpus gpu.GPUProvider, sys sysinfo.Provider, logg
 			GPU:            gpus,
 			Logger:         logger,
 			ModelBackends:  perModel,
+			Projectors:     c.Projectors,
 			SysInfo:        sys,
 			GuardMode:      guardMode,
 			GuardReserveMB: guardReserve,

@@ -26,7 +26,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from topcoat_hub import handover_file, memory_scope, report_class
+from topcoat_hub import handover_file, memory_scope, plugin_registry, report_class
 from topcoat_hub import report as report_card
 from topcoat_hub.agent_service import AgentError, AgentService
 from topcoat_hub.auth import CurrentUser
@@ -326,7 +326,8 @@ class HandoverService:
         access = await resolve_access(db, user.uuid, user.role)
         if template is None or not access.workspace_visible(template):
             raise HandoverError(404, "unknown_application", "there is no such application")
-        scope = effective_agent(template.agent, access).get("tool_scope")
+        agent = await plugin_registry.program_agent(db, template)  # a plug-in only narrows
+        scope = effective_agent(agent, access).get("tool_scope")
         return scope, template.title
 
     # --- the person's steps ----------------------------------------------------------------

@@ -128,6 +128,13 @@
     "unload": "Entladen",
     "offlineHint": "Der Node ist offline – Aktionen sind nicht möglich.",
     "loadedModels": "Geladene Modelle",
+    "glanceGpu": "GPU",
+    "glanceGpuValue": "{{name}}: {{used}} / {{total}} GB VRAM",
+    "glanceGpuShared": "{{used}} / {{total}} GB geteilt",
+    "glanceLoaded": "Jetzt geladen",
+    "glanceLoadedValue": "{{name}} ({{vram}} GB VRAM)",
+    "glanceNone": "keins",
+    "factsMore": "Details: System, CPU, Netzwerk, Versionen",
     "contextLength": "Kontext: {{value}}",
     "contextPerSlot": "Kontext: {{value}} pro Slot × {{slots}} Slots",
     "events": "Letzte Ereignisse",
@@ -1007,7 +1014,150 @@
     "grantAllFor": "{{user}}: alle lesenden Fähigkeiten",
     "grantFor": "{{user}}: {{capability}}",
     "grantsSave": "Speichern",
-    "grantsSaved": "Gespeichert"
+    "grantsSaved": "Gespeichert",
+    "cap": {
+      "system": {
+        "info": "Hostname, Betriebssystem, Kernel, Laufzeit, Last, CPUs, RAM und Swap dieses Rechners.",
+        "memory": "Wofür der RAM verbraucht wird: Programme, Cache, Kernel, Swap, ZFS-ARC und die Prozesse, die am meisten belegen."
+      },
+      "disk": {
+        "usage": "Belegung jedes eingehängten Dateisystems mit Daten (Größe, belegt, frei, Inodes), das vollste zuerst."
+      },
+      "docker": {
+        "ps": "Container dieses Docker-Hosts mit Zustand, Health-Status, Neustarts und Startzeit.",
+        "inspect": "Zustandsdetails eines Containers: Zustand, Exit-Code, Neustarts, Health-Checks, Mounts, Netzwerke. Nie seine Umgebungsvariablen.",
+        "logs": "Die letzten Log-Zeilen eines Containers, Geheimnisse maskiert.",
+        "restart": "Einen Container neu starten, den die Konfiguration des Nodes nennt; sein Dienst ist ein paar Sekunden weg."
+      },
+      "compose": {
+        "projects": "Compose-Projekte (Stacks) auf diesem Docker-Host mit dem Zustand jedes Dienstes.",
+        "file": "Eine Datei eines Compose-Projekts (Compose- oder .env-Datei), Geheimnisse maskiert; nur in freigegebenen Ordnern.",
+        "logs": "Logs eines ganzen Compose-Projekts, alle seine Container nach Zeit gemischt.",
+        "restart": "Ein ganzes Compose-Projekt neu starten, Abhängigkeiten zuerst; seine Dienste sind solange weg."
+      },
+      "journal": {
+        "logs": "Journal-Zeilen einer systemd-Unit, Geheimnisse maskiert."
+      },
+      "service": {
+        "status": "Zustand einer systemd-Unit: Aktivzustand, letztes Ergebnis, Haupt-PID, Neustarts, Speicher, seit wann.",
+        "failed": "Die systemd-Units, die gerade fehlgeschlagen sind.",
+        "restart": "Eine systemd-Unit neu starten, die die Konfiguration des Nodes nennt; der Dienst ist solange weg."
+      },
+      "health": {
+        "check": "Der allgemeine Zustand dieses Rechners in einem Aufruf: fehlgeschlagene Units, Container mit Problemen, volle Platten, RAM, Last und letzte Fehler."
+      },
+      "logs": {
+        "search": "Einen Text in den Logs aller Container und im Journal auf einmal suchen."
+      },
+      "certs": {
+        "expiry": "TLS-Zertifikate der eingerichteten Dienste: Aussteller, Ablaufdatum, verbleibende Tage und ob die Kette gültig ist."
+      },
+      "net": {
+        "check": "Erreichbarkeit der eingerichteten Hosts von diesem Node aus: DNS, Ping und Ports."
+      },
+      "inventory": {
+        "snapshot": "Was auf diesem Rechner läuft, für das Inventar des Hubs: Host-Daten, Docker-Container und systemd-Dienste."
+      },
+      "shell": {
+        "read": "Einen nur lesenden Shell-Befehl als Benutzer ohne Rechte und ohne Netz ausführen; Geheimnisse maskiert."
+      },
+      "docs": {
+        "list": "Die Markdown- und Textdateien eines für die Wissensbasis freigegebenen Ordners auflisten.",
+        "read": "Eine Markdown- oder Textdatei der Wissensbasis seitenweise lesen, Geheimnisse maskiert."
+      },
+      "files": {
+        "list": "Einen Ordner innerhalb eines auf diesem Node zum Lesen freigegebenen Ordners auflisten.",
+        "read": "Eine Textdatei in einem zum Lesen freigegebenen Ordner lesen, seitenweise oder ihre letzten Zeilen."
+      },
+      "kuma": {
+        "monitors": "Uptime Kuma: jeder Monitor mit Status, Antwortzeit und Zertifikatsablauf."
+      },
+      "omada": {
+        "sites": "Omada-Controller: die Standorte.",
+        "devices": "Omada-Controller: die Geräte eines Standorts mit Status, Modell, IP und Firmware.",
+        "clients": "Omada-Controller: die gerade verbundenen Clients.",
+        "events": "Omada-Controller: das Ereignisprotokoll des Standorts in einem Zeitraum.",
+        "audit_logs": "Omada-Controller: wer im Controller was geändert hat, in einem Zeitraum.",
+        "alerts": "Omada-Controller: die Warnungen des Standorts in einem Zeitraum.",
+        "firmware": "Omada-Controller: die neueste bekannte Firmware für ein Gerät."
+      },
+      "keycloak": {
+        "snapshot": "Keycloak: Benutzer, Gruppen und Clients mit ihren Rollenzuordnungen, in einem Aufruf.",
+        "user": "Keycloak: die Gruppen einer Person und die Rollen, die sie tatsächlich hat."
+      },
+      "web": {
+        "search": "Das Web über die eigene Suchmaschine des Betreibers (SearXNG) durchsuchen.",
+        "fetch": "Eine öffentliche Webseite als Text lesen.",
+        "images": "Bilder über die eigene Suchmaschine des Betreibers (SearXNG) suchen.",
+        "image": "Ein öffentliches Bild holen, damit der Hub es bei einem Bericht ablegen kann."
+      },
+      "windows": {
+        "system": "Windows-Version und Build, Laufzeit, Modell, RAM, CPU, BIOS, Zeitzone und die neuesten Updates.",
+        "services": "Windows-Dienste mit Anzeigename, Zustand und Starttyp.",
+        "events": "Einträge des System- oder Anwendungsprotokolls (nie des Sicherheitsprotokolls), die neuesten zuerst.",
+        "storage": "Volumes und physische Datenträger mit Größe, freiem Platz und Zustand.",
+        "network": "Netzwerkadapter, IPv4-Adressen, DNS-Server, Routen und das Netzwerkprofil.",
+        "processes": "Die Prozesse mit der meisten CPU-Zeit oder dem meisten Speicher.",
+        "programs": "Installierte Programme mit Version und Herausgeber.",
+        "startup": "Was von selbst startet: Autostart-Befehle und geplante Aufgaben.",
+        "defender": "Status von Microsoft Defender und die registrierten Virenschutzprodukte.",
+        "devices": "Geräte mit einem Problem im Geräte-Manager und die Grafikkarten mit ihren Treibern.",
+        "power": "Energieoptionen: aktiver Energiesparplan, unterstützte Ruhezustände, letzte Weckquelle und Geräte, die den PC wecken dürfen."
+      },
+      "repo": {
+        "sync": "Das Repository in die Werkstatt klonen oder seinen Standardbranch holen.",
+        "status": "Der Zustand des Arbeitsbaums: Branch, Head-Commit und geänderte Dateien.",
+        "list": "Die Dateien des Arbeitsbaums auflisten; Dateien, die Zugangsdaten enthalten können, fehlen.",
+        "read": "Eine Textdatei des Arbeitsbaums nach Zeilenbereich lesen, Geheimnisse maskiert.",
+        "search": "Den Arbeitsbaum nach einem Text oder regulären Ausdruck durchsuchen.",
+        "outline": "Eine Karte des Arbeitsbaums: jede Quelldatei mit ihren benannten Stellen und deren Zeilen.",
+        "diff": "Die bisherige Änderung als Unified Diff oder nur die Liste der Dateien.",
+        "start": "Einen Arbeitsbranch vom aktuellen Standardbranch aus anlegen.",
+        "edit": "Ein genaues Textstück in einer Datei des Arbeitsbaums ersetzen.",
+        "write": "Eine Datei im Arbeitsbaum anlegen oder ganz ersetzen.",
+        "apply_patch": "Einen Unified Diff auf den Arbeitsbaum anwenden, ganz oder gar nicht.",
+        "reset": "Jede nicht committete Änderung im Arbeitsbaum verwerfen.",
+        "test": "Die Tests des Repositorys in einem Wegwerf-Container mit Grenzen ausführen.",
+        "test_start": "Die Tests des Repositorys im Hintergrund starten.",
+        "test_status": "Der Zustand eines Testlaufs im Hintergrund und das Ende seiner Ausgabe.",
+        "test_cancel": "Einen Testlauf im Hintergrund stoppen.",
+        "build_node": "Den Node für Linux und Windows aus dem Arbeitsbaum bauen; die Programme bleiben unsigniert.",
+        "build_list": "Die in der Werkstatt aufbewahrten Builds eines Repositorys, mit Größen und SHA-256.",
+        "push": "Die Änderung committen und auf einen Arbeitsbranch im Remote pushen; braucht einen bestätigten Vorschlag.",
+        "branches": "Die Branches eines lokalen Repositorys: letzter Commit und wie weit jeder vorn oder hinten liegt.",
+        "commit": "Die Änderung im Arbeitsbaum auf ihrem Arbeitsbranch in der Werkstatt committen; nichts verlässt die Werkstatt."
+      },
+      "workshop": {
+        "create": "Ein neues lokales Repository mit einem ersten Commit anlegen.",
+        "clone": "Ein lokales Repository als vollständige Kopie eines entfernten anlegen.",
+        "branch": "Einen Branch in einem lokalen Repository anlegen.",
+        "merge": "Einen Branch eines lokalen Repositorys in einen anderen übernehmen; ein Konflikt ändert nichts.",
+        "publish": "Einen Branch eines lokalen Repositorys zu seinem Remote pushen, nie erzwungen.",
+        "pull": "Einen Branch eines lokalen Repositorys auf den Stand seines Remotes bringen (nur Fast-Forward).",
+        "remove": "Ein lokales Repository aus dieser Werkstatt löschen; das lässt sich nicht rückgängig machen."
+      },
+      "browser": {
+        "open": "Einen Browser ohne Fenster auf der GUI des Repositorys öffnen, mit einem nachgebildeten Hub, in einem Container ohne Netz.",
+        "close": "Die Browsersitzung beenden und ihren Container entfernen.",
+        "snapshot": "Die Seite als kompakter Baum dessen, was ein Mensch sehen und bedienen kann.",
+        "act": "Die Seite bedienen: klicken, tippen, mit der Maus darüberfahren, scrollen oder eine Taste drücken.",
+        "shot": "Ein kleines Bild der Seite oder eines Bereichs.",
+        "console": "Konsolenmeldungen, Seitenfehler und fehlgeschlagene Anfragen.",
+        "audit": "Die Seite durch Messen prüfen und nur die Verstöße zurückgeben.",
+        "animations": "Die Animationen der Seite messen: Zeiten, abgetastete Werte, Bildzeiten und Layoutverschiebungen.",
+        "viewport": "Die Größe der Seite setzen und wahlweise Pixelverhältnis, Farbschema und reduzierte Bewegung."
+      },
+      "build": {
+        "fetch": "Einen Commit, Branch oder Tag in den Build-Spiegel holen und die Änderungen seit dem letzten Release nennen.",
+        "node_release": "Den Node für Linux und Windows aus einem festen Commit bauen und die Dateien zum Hub hochladen; signiert nichts.",
+        "hub_image": "Das Hub-Image aus einem festen Commit in einem frischen Klon bauen.",
+        "node_container_image": "Das Container-Image des CPU-Nodes aus einem festen Commit bauen.",
+        "smoke_test": "Das zuletzt gebaute Image mit einer Datenbank starten und prüfen, dass es migriert und antwortet."
+      },
+      "hub": {
+        "update": "Den Hub auf ein Image umstellen, das schon auf diesem Host liegt, mit Digest-Prüfung, Dump, Health-Check und Weg zurück."
+      }
+    }
   },
   "params": {
     "title": "Parameter",
@@ -1189,7 +1339,9 @@
     },
     "event": {
       "pause": "Von dir pausiert",
-      "resume": "Von dir fortgesetzt"
+      "resume": "Von dir fortgesetzt",
+      "vision_routed": "hat die Bilder angesehen (ein Modell, das sehen kann)",
+      "vision_blind": "kann keine Bilder sehen: sie wurden nicht geschickt"
     },
     "control": {
       "pause": "Pause",
@@ -1304,7 +1456,9 @@
     "error": "Die Aufgabe ist fehlgeschlagen: {{message}}",
     "checks": "Prüfungen",
     "checkProgress": "{{steps}} Schritte, {{calls}} Aufrufe",
-    "checkOpen": "öffnen"
+    "checkOpen": "öffnen",
+    "noTask": "Keine Aufgabe geöffnet",
+    "noTaskHint": "Eine Aufgabe öffnet sich aus dem Posteingang oder aus einer Prüfung in einem Chat."
   },
   "proposal": {
     "heading": "Vorgeschlagene Änderungen",
@@ -2460,13 +2614,15 @@
     "targets": {
       "research": "Recherche",
       "dev": "Entwicklung",
-      "admin": "Verwaltung"
+      "admin": "Verwaltung",
+      "project": "Dieses Projekt"
     },
     "actions": {
       "request_report": "Bericht anfordern",
       "create_branch": "Branch anlegen",
       "create_prototype": "Prototyp anlegen",
-      "read_released": "freigegebene Daten lesen"
+      "read_released": "freigegebene Daten lesen",
+      "decompose": "große Aufgaben in Teilaufgaben zerlegen"
     },
     "tree": "Baum",
     "noNodes": "Hier ist noch nichts. Lege oben ein Thema, eine Aufgabe oder einen Bericht an.",
@@ -2958,6 +3114,11 @@
     "programs": "Anwendungen",
     "program": "Anwendung",
     "action": "Aktion",
+    "nest": {
+      "zoomIn": "Hineinzoomen (zum Programm vorn)",
+      "zoomOut": "Eine Ebene herauszoomen",
+      "overview": "Übersicht über alle Programme"
+    },
     "views": "Ansichten von {{program}}",
     "minimise": "{{program}} minimieren",
     "maximise": "{{program}} maximieren",
@@ -2971,7 +3132,8 @@
     "looks": {
       "terminal": "Terminal",
       "leitstand": "Leitstand",
-      "schreibtisch": "Schreibtisch"
+      "schreibtisch": "Schreibtisch",
+      "terminal-nest": "Terminal Nest"
     },
     "signal": {
       "amber": "etwas zu lesen",
@@ -3125,6 +3287,28 @@
       "ok": "fertig",
       "failed": "fehlgeschlagen",
       "stopped": "angehalten"
+    },
+    "programs": {
+      "research_report": "Recherchebericht mit Überarbeitung",
+      "theme_design": "Desktop-Theme mit Prüfung und Überarbeitung",
+      "two_node_check": "Zwei Antworten, ein drittes Modell vergleicht",
+      "wiki_check": "Eine Wiki-Seite gegen Code, Live-Zustand und topcoat.guide prüfen",
+      "doc_section": "Einen Teil des Repositorys aus seinem Code dokumentieren",
+      "issue_check": "Die Ursache eines Issues im Code finden, den der Hub ausführt",
+      "issue_fix": "Den Fix eines Issues als genaue Änderungen schreiben",
+      "issue_steps": "Den Fix eines Issues in kleinen Schritten planen, je eine Stelle",
+      "fix_step": "Einen Schritt eines geplanten Fixes als genaue Änderungen an einer Stelle schreiben",
+      "issue_area": "Runde 0 einer Issue-Untersuchung: um welchen Teil des Codes es geht",
+      "issue_investigate": "Ein Issue in Runden mit Entwicklung und Verwaltung untersuchen, mit einem Plan enden",
+      "investigate_round": "Eine Runde einer Issue-Untersuchung: weiterfragen oder Bericht und Plan schreiben",
+      "review_plan": "Zweiter Blick auf den Plan eines Issues: die richtigen Stellen für das, was die Prüfungen verlangen?",
+      "probe_dev": "Eine Frage einer Issue-Untersuchung in Entwicklung beantworten",
+      "probe_admin": "Eine Frage einer Issue-Untersuchung in Verwaltung beantworten",
+      "probe_read": "Den Code finden, den der Test einer Untersuchung aufrufen muss",
+      "probe_test": "Einen kleinen Test schreiben, der eine Vermutung einer Untersuchung ausprobiert",
+      "issue_plan": "Den beschlossenen Plan eines Issues Schritt für Schritt ausführen",
+      "decompose": "Eine große Aufgabe in geprüfte Teilaufgaben zerlegen",
+      "checklist_check": "Die Checkliste einer Aufgabe abarbeiten, ein Punkt pro neuem Lauf"
     }
   },
   "pools": {
@@ -3251,6 +3435,55 @@
     "loads": "Ladevorgänge in den letzten sieben Tagen",
     "noLabel": "noch nicht gekennzeichnet"
   },
+  "plugins": {
+    "title": "Plug-ins",
+    "hint": "Anwendungen als Daten (Manifeste): installieren, aktualisieren, zurückrollen, abschalten oder entfernen, während der Hub läuft. Jede Version bleibt erhalten. Ein Plug-in kann die Werkzeuge seines Programms einschränken, nie erweitern. Eingebaute Programme sind hier eingetragen und lassen sich nicht entfernen.",
+    "name": "Plug-in",
+    "version": "Version",
+    "state": "Zustand",
+    "actions": "Aktionen",
+    "builtin": "Eingebaut",
+    "enabled": "An",
+    "disabled": "Aus",
+    "enable": "Einschalten",
+    "disable": "Abschalten",
+    "remove": "Entfernen",
+    "cancel": "Abbrechen",
+    "confirmRemove": "Das Plug-in {{key}} mit allen Versionen entfernen?",
+    "removed": "{{key}} entfernt.",
+    "enabledNote": "{{key}} ist an.",
+    "disabledNote": "{{key}} ist aus.",
+    "installed": "{{key}} installiert.",
+    "updated": "Neue Version von {{key}} installiert.",
+    "rolledBack": "{{key}} ist wieder auf Version {{version}}.",
+    "refused": "Der Hub hat die Änderung abgelehnt:",
+    "notJson": "Das Manifest ist kein JSON-Objekt.",
+    "noId": "Das Manifest hat keine id.",
+    "installTitle": "Installieren oder aktualisieren",
+    "installHint": "Ein Manifest einfügen oder aus einer Datei laden. Eine neue id wird installiert; die id eines installierten Plug-ins braucht eine höhere Versionsnummer und wird seine neue Version.",
+    "manifest": "Manifest (JSON)",
+    "fromFile": "Aus einer Datei",
+    "installOrUpdate": "Installieren oder aktualisieren",
+    "versionsOf": "Versionen von {{name}}",
+    "installedBy": "Installiert",
+    "byHub": "der Hub",
+    "hash": "SHA-256",
+    "inForce": "(gilt)",
+    "compare": "Vergleichen",
+    "rollBack": "Hierauf zurückrollen",
+    "diffOf": "Was sich von {{a}} zu {{b}} geändert hat",
+    "same": "Die beiden Versionen sind gleich.",
+    "changes": "Änderungen",
+    "action": {
+      "register": "eingetragen mit {{to}}",
+      "install": "installiert mit {{to}}",
+      "update": "aktualisiert von {{from}} auf {{to}}",
+      "rollback": "zurückgerollt von {{from}} auf {{to}}",
+      "enable": "eingeschaltet",
+      "disable": "abgeschaltet",
+      "remove": "entfernt bei {{from}}"
+    }
+  },
   "modelSwitches": {
     "title": "Modellwechsel auf den Maschinen",
     "hint": "Wie oft eine Maschine ein Modell laden musste, das sie nicht hatte, und wie oft sie das Modell wechselte, das sie ausgab, je Tag und Maschine. Ladevorgänge wegen des zweiten Blicks stehen gesondert. Nur Zahlen; daran wird nichts geändert.",
@@ -3316,7 +3549,8 @@
       "columns": "Spalten",
       "rows": "Zeilen",
       "focus": "Eines groß, der Rest an der Seite",
-      "cascade": "Überlappend, das vordere oben"
+      "cascade": "Überlappend, das vordere oben",
+      "nest": "Verschachtelt, mit Zoom (Ebenen von Gruppen)"
     },
     "barPosition": "Taskleiste",
     "positions": {
@@ -3860,7 +4094,8 @@
     "navigation": "Navigation",
     "applications": "Anwendungen",
     "system": "System",
-    "toWindows": "Fenster-Ansicht"
+    "toWindows": "Fenster-Ansicht",
+    "moved": "Diese Seite ist umgezogen oder existiert nicht."
   },
   "research": {
     "title": "Recherchieren",
@@ -4008,6 +4243,13 @@
     "changes": "Änderungen ({{count}})",
     "newFile": "neue Datei",
     "tests": "Tests: {{state}}",
+    "testsPassed": "{{n}} bestanden",
+    "testsFailed": "{{n}} fehlgeschlagen",
+    "testsErrored": "{{n}} abgebrochen",
+    "testsSkipped": "{{n}} übersprungen",
+    "testsNoFailure": "Kein fehlgeschlagener Test im Log: Der Lauf ist woanders gescheitert (Lint, Typprüfung, Absturz oder ein abgeschnittener Teil). Die vollständige Ausgabe zeigt, wo.",
+    "firstFailure": "Erster Fehler:",
+    "testOutput": "Vollständige Testausgabe",
     "sameFailure": "{{count}}× derselbe Fehler",
     "rollout": "Einspielen",
     "apply": "Übernehmen und testen",
@@ -4126,6 +4368,23 @@
       "artist": "Interpret",
       "allArtists": "Alle Interpreten",
       "none": "Kein Sheet passt."
+    }
+  },
+  "images": {
+    "attach": "Bilder anhängen",
+    "attachHint": "Bilder anhängen (bis zu {{max}}); du kannst sie auch hier einfügen oder hineinziehen",
+    "image": "Bild",
+    "remove": "{{name}} entfernen",
+    "open": "Bild ganz zeigen",
+    "viewer": "Bild",
+    "close": "Schließen",
+    "missing": "Bild nicht verfügbar",
+    "blind": "Das Modell dieser Antwort kann keine Bilder sehen und hat sie deshalb nicht bekommen.",
+    "problem": {
+      "type": "Nur Bilder können mit einer Nachricht mitgehen.",
+      "size": "Ein Bild darf höchstens 15 MB groß sein.",
+      "count": "Höchstens {{max}} Bilder gehen mit einer Nachricht mit.",
+      "read": "Das Bild konnte nicht gelesen werden."
     }
   }
 }

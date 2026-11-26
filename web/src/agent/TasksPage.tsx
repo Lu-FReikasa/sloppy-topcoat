@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { TaskView } from "./TaskView";
 import type { ApiClient } from "../api/client";
 
@@ -13,7 +14,15 @@ interface Props {
  *  with their buttons. There is no list of tasks any more: the inbox leads here when a task needs
  *  a look or a click, and a check in a chat links to its own task. */
 export function TasksPage({ api, taskId, tick }: Props) {
-  if (!taskId) return null;
+  const { t } = useTranslation();
+  // `#/tasks` without a task: say where tasks come from instead of a blank page
+  if (!taskId)
+    return (
+      <section className="empty">
+        <h2>{t("agent.noTask")}</h2>
+        <p>{t("agent.noTaskHint")}</p>
+      </section>
+    );
   return (
     <TaskView api={api} id={taskId} tick={tick} onChanged={() => undefined} />
   );

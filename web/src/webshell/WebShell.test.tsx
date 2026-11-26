@@ -37,8 +37,6 @@ function show() {
     refreshNodes: () => undefined,
     tick: 0,
     inboxTick: 0,
-    epoch: 0,
-    detail: null,
     dispatch: () => undefined,
   };
   render(<WebShell api={api} ctx={ctx} status="live" onSaveLanguage={() => undefined} onLogout={() => undefined} />);

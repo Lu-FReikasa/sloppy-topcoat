@@ -69,9 +69,21 @@ describe("the layout engines", () => {
 });
 
 describe("themes", () => {
-  it("come with three built-in ones that pass their own check", () => {
-    expect(BUILTIN_THEMES.map((t) => t.key)).toEqual(["terminal", "leitstand", "schreibtisch"]);
+  it("come with four built-in ones that pass their own check", () => {
+    expect(BUILTIN_THEMES.map((t) => t.key)).toEqual(["terminal", "leitstand", "schreibtisch", "terminal-nest"]);
     for (const t of BUILTIN_THEMES) expect(themeProblems(t), t.key).toEqual([]);
+  });
+
+  it("include Terminal Nest: the nest layout on the terminal, its style sheet within a theme's limits", () => {
+    const nest = resolveTheme("terminal-nest");
+    expect(nest).toMatchObject({ base: "terminal", layout: { kind: "nest" }, bar: { position: "top" } });
+    expect(cssProblems(nest.css ?? "")).toEqual([]);
+    // every rule reaches something the desktop draws, and no line swallows the next
+    expect(cssWarnings(nest.css ?? "")).toEqual({ classes: [], lines: [] });
+    // scoped to its own root like a custom theme's
+    expect(safeCss(nest)).toContain(".dt-theme-terminal-nest:is(.dt-root, #dt-theme) {");
+    // a built-in theme is not a base: a custom theme cannot start from it
+    expect(themeProblems({ ...nest, key: "mine", base: "terminal-nest" })).toEqual(["base: one of terminal, leitstand, schreibtisch"]);
   });
 
   it("resolve to a custom theme, a built-in one, or the terminal", () => {
@@ -84,6 +96,7 @@ describe("themes", () => {
       "terminal",
       "leitstand",
       "schreibtisch",
+      "terminal-nest",
       "wall",
     ]);
   });

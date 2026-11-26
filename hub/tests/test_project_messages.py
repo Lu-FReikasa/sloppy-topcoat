@@ -31,7 +31,7 @@ def store(client: TestClient) -> ProjectStore:
 class TestRegistry:
     def test_every_type_starts_with_its_sending_application(self) -> None:
         reg = messages.load()
-        assert len(reg.types) == 25
+        assert len(reg.types) == 26
         for spec in reg.types.values():
             assert spec.name.split(".")[0] in spec.senders
             assert spec.trust in messages.TRUSTS and spec.effect in messages.EFFECTS
@@ -191,6 +191,24 @@ class TestStore:
                 state="flying",
             )
         assert await store.tree(DEV_ADMIN_ID, project.id) == []  # nothing was filed
+
+    async def test_a_result_of_the_wrong_shape_is_refused_not_a_crash(
+        self, store: ProjectStore
+    ) -> None:
+        """The brief of a result is written from its payload: a payload of the wrong shape is the
+        registry's refusal, never an error of the brief writer."""
+        project = await store.create_project(DEV_ADMIN_ID, title="Shape")
+        for payload in ({**RESULT, "summary": 123}, {**RESULT, "tests": "green"}, {"findings": 7}):
+            with pytest.raises(Invalid):
+                await store.add_message(
+                    DEV_ADMIN_ID,
+                    project.id,
+                    type="research.result",
+                    sender="research",
+                    receiver="project",
+                    payload=payload,
+                )
+        assert await store.tree(DEV_ADMIN_ID, project.id) == []
 
     async def test_the_state_moves_along_its_table_and_every_move_is_a_line(
         self, store: ProjectStore
@@ -410,7 +428,7 @@ class TestStore:
 class TestRoutes:
     def test_the_registry_is_readable(self, client: TestClient) -> None:
         body = client.get("/api/project/messages/registry", headers=AUTH).json()
-        assert len(body["types"]) == 25 and "dev" in body["responsibilities"]
+        assert len(body["types"]) == 26 and "dev" in body["responsibilities"]
         request = next(t for t in body["types"] if t["type"] == "project.request")
         assert request["from"] == ["project"] and request["to"] == ["research", "dev", "admin"]
 

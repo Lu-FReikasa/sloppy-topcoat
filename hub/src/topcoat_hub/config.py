@@ -279,9 +279,13 @@ class Settings(BaseSettings):
     agent_tools_wait_seconds: float = 60.0  # after a restart the tool nodes reconnect first
     # a chat check is offered only the tool groups its question names (shorter tool definitions)
     agent_auto_tool_groups: bool = True
-    # Wake-on-LAN (E2-05 E): the LAN's broadcast address the magic packet goes to, and the port
+    # Wake-on-LAN (E2-05 E): the broadcast address(es, comma-separated: the directed broadcast of
+    # each LAN when the hub sits in another subnet) the magic packet goes to, and the port
     wol_broadcast: str = "255.255.255.255"
     wol_port: int = 9
+    # a request whose model only a sleeping node has as its house model wakes that node and waits
+    # this long for it to connect (1.7, E2); 0 = never wake on demand
+    wake_timeout_seconds: float = 240.0
     # A request that waits in a node's queue counts one place better for every this many seconds
     # (0 = off), so background work cannot starve behind a steady stream of chat requests.
     gateway_queue_aging_seconds: float = 0.0
@@ -352,7 +356,7 @@ class Settings(BaseSettings):
     # stages the model sees (never numbers): reliability >= sure: sure, >= older: older, else stale
     memory_stage_sure: float = 0.7
     memory_stage_older: float = 0.35
-    # a note below this reliability is checked by the care run
+    # unused since D124 (the care run checks no note); still shown in the GUI's care settings
     memory_check_threshold: float = 0.5
     # a note is archived only if usefulness AND reliability are below these AND it has not been
     # used for this many days (age alone never archives)
@@ -363,16 +367,8 @@ class Settings(BaseSettings):
     # been idle; the tick looks this often (0 = never on its own, the GUI can still start a run).
     memory_care_hour: int = 3
     memory_care_interval_seconds: float = 900.0
-    # budget of one run, and the tool calls of the check of one note
+    # unused since D124 (the care run checks no note); still shown in the GUI's care settings
     memory_care_max_notes: int = 10
-    memory_care_run_max_seconds: float = 3600.0
-    # one check of the care: the time of one model turn and of the whole task. A big model on a
-    # slow node (the laptop) reads a prompt for minutes and nobody waits for the answer.
-    memory_care_model_timeout_seconds: float = 900.0
-    memory_care_task_seconds: float = 1800.0
-    memory_care_task_calls: int = 4
-    # a note is not checked again sooner than this many days
-    memory_care_recheck_days: float = 3.0
     # idle care runs (besides the night) at most this often per user
     memory_care_idle_every_hours: float = 12.0
 

@@ -59,8 +59,6 @@ function mount(agentScope: ToolScope, agentStatus = 200) {
     refreshNodes: () => undefined,
     tick: 0,
     inboxTick: 0,
-    epoch: 0,
-    detail: null,
     dispatch: () => undefined,
   } as ModuleCtx;
   const boot = bootstrap([workspace("office", ["page.chat"])]);

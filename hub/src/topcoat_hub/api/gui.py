@@ -25,6 +25,7 @@ from topcoat_hub.models import Node, NodeInventory, User
 from topcoat_hub.protocol import DEFAULT_RESIDENT_PRIORITY, ProtocolError
 from topcoat_hub.service import NodeService
 from topcoat_hub.views import node_summary
+from topcoat_hub.wake import send_to, wake_addresses
 
 router = APIRouter(prefix="/api")
 
@@ -498,11 +499,7 @@ async def wake_node(
     if state.sessions.is_connected(node_id):
         raise _error(409, "already_online", "the node is connected; it does not need waking")
     inventory = await db.get(NodeInventory, node_id)
-    interfaces = ((inventory.inventory if inventory else None) or {}).get("hardware", {}).get(
-        "network"
-    ) or []
-    wired = [i for i in interfaces if i.get("kind") != "wifi"] or interfaces
-    macs = [i["mac"] for i in wired if isinstance(i.get("mac"), str)]
+    macs = wake_addresses(inventory.inventory if inventory else None)
     if not macs:
         raise _error(
             409,
@@ -513,8 +510,7 @@ async def wake_node(
     await db.close()
     settings = state.settings
     try:
-        for mac in macs:
-            await state.wake.send(mac, settings.wol_broadcast, settings.wol_port)
+        await send_to(state.wake, macs, settings.wol_broadcast, settings.wol_port)
     except OSError as exc:
         raise _error(502, "wake_failed", f"the magic packet could not be sent: {exc}") from exc
     await _service(request).record_event(

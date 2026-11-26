@@ -147,11 +147,7 @@ function BenchmarkDialog({
         onClose();
         return;
       }
-      const err = res.error ?? { code: "unknown", message: "" };
-      // The node says "busy" for its own reasons (a benchmark still running, a game) and its
-      // message names them; the catalogue text for "busy" is about the hub's places for programs.
-      const fromNode = err.code === "busy" && err.status === undefined && err.message !== "";
-      setError(fromNode ? t("errors.generic", { message: err.message }) : describeError(err, t, i18n));
+      setError(describeError(res.error ?? { code: "unknown", message: "" }, t, i18n));
     } catch (err) {
       if (!(err instanceof UnauthorizedError)) {
         setError(describeError(toActionError(err), t, i18n));

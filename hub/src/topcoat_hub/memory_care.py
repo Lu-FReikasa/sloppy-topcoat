@@ -31,8 +31,6 @@ FEEDBACK_WEIGHT = 3.0  # one click of the user counts like this many recalls / u
 USE_PRIOR = 2.0  # (used + 2) / (recalled + 4): no data = 0.5, neutral
 USE_HALFLIFE_DAYS = 120.0  # how fast the recency of the last use fades
 DISPUTE_FACTOR = 0.3  # a note in dispute is trusted a third as much
-UNVERIFIABLE_FACTOR = 0.7  # trust after a check that could not be made
-TRUST_FLOOR = 0.2
 
 # "used" = two signals agree: the model names the note and the answer shares its terms
 OVERLAP_FULL = 0.5  # this share of the note's terms in the answer is the full overlap signal
@@ -53,12 +51,10 @@ class CareConfig:
     live_weight: float = 2.0
     stage_sure: float = 0.7
     stage_older: float = 0.35
-    check_threshold: float = 0.5
     archive_usefulness: float = 0.3
     archive_reliability: float = 0.25
     archive_idle_days: float = 90.0
     volatile_ttl_hours: float = 24.0
-    recheck_days: float = 3.0
 
     @classmethod
     def of(cls, s: Any) -> "CareConfig":
@@ -75,12 +71,10 @@ class CareConfig:
             live_weight=s.memory_live_check_weight,
             stage_sure=s.memory_stage_sure,
             stage_older=s.memory_stage_older,
-            check_threshold=s.memory_check_threshold,
             archive_usefulness=s.memory_archive_usefulness,
             archive_reliability=s.memory_archive_reliability,
             archive_idle_days=s.memory_archive_idle_days,
             volatile_ttl_hours=s.memory_volatile_ttl_hours,
-            recheck_days=s.memory_care_recheck_days,
         )
 
 
@@ -162,27 +156,6 @@ def stage(item: Any, now: datetime | None = None, cfg: CareConfig = DEFAULT) -> 
     return "stale"
 
 
-def needs_check(item: Any, now: datetime | None = None, cfg: CareConfig = DEFAULT) -> bool:
-    """Is the note below the check threshold (and not checked very recently)?"""
-    now = _aware(now) or utcnow()
-    if getattr(item, "status", "active") != "active":
-        return False
-    last = _aware(getattr(item, "care_checked_at", None))
-    if last is not None and _days(now, last) < cfg.recheck_days:
-        return False
-    return reliability(item, now, cfg) < cfg.check_threshold
-
-
-def recheck_due(item: Any, now: datetime | None = None, cfg: CareConfig = DEFAULT) -> bool:
-    """Was the note not looked at for ``recheck_days`` (or never)? Used for mirrored profiles with a
-    check hint: their file is the truth, so no reliability threshold decides — the clock does."""
-    now = _aware(now) or utcnow()
-    last = _aware(getattr(item, "care_checked_at", None))
-    return getattr(item, "status", "active") == "active" and (
-        last is None or _days(now, last) >= cfg.recheck_days
-    )
-
-
 def is_expired(item: Any, now: datetime | None = None) -> bool:
     expires = _aware(getattr(item, "expires_at", None))
     return expires is not None and expires <= (_aware(now) or utcnow())
@@ -236,9 +209,10 @@ def archive_due(item: Any, now: datetime | None = None, cfg: CareConfig = DEFAUL
 
 
 def rank_factor(item: Any, now: datetime | None = None, cfg: CareConfig = DEFAULT) -> float:
-    """What the relevance of a hit is multiplied with in the recall: reliability and usefulness
-    (1.0 for a fresh note without use data, a little over 1 for a note that proved useful)."""
-    return (0.4 + 0.6 * reliability(item, now, cfg)) * (0.5 + usefulness(item, now))
+    """What the relevance of a hit is multiplied with in the recall: its reliability (1.0 for a
+    sure note, 0.4 for one nobody can vouch for). The usefulness arithmetic (recalled and used
+    counts, feedback weights) is no ranking input (D124)."""
+    return 0.4 + 0.6 * reliability(item, now, cfg)
 
 
 # --- "used" -------------------------------------------------------------------------------------
@@ -276,21 +250,6 @@ def counts_as_used(model_named: bool | None, overlap_ratio: float) -> bool:
 
 
 # --- what the model sees -------------------------------------------------------------------------
-
-
-def verify_input_ok(value: Any) -> dict[str, Any] | None:
-    """A ``verify_with`` the model proposed, as far as it can be trusted to be one:
-    ``{"capability": "name.like.this", "input": {…small…}}``; else ``None``. Whether the capability
-    exists and is read-only is decided by the care run against what the user may run."""
-    if not isinstance(value, dict):
-        return None
-    cap = value.get("capability")
-    if not isinstance(cap, str) or not re.fullmatch(r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+", cap):
-        return None
-    given = value.get("input", {})
-    if not isinstance(given, dict) or len(str(given)) > 400:
-        return None
-    return {"capability": cap, "input": given}
 
 
 def kind_of(value: Any) -> str:

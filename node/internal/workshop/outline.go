@@ -610,13 +610,14 @@ func (w *Workshop) capOutline() capability.Capability {
 			"(Python classes, functions, methods and module constants; TS/JS classes, functions, components, types, consts; " +
 			"Go functions, methods and types; JSON keys; Markdown headings; CSS rules). start/end are 1-based lines for repo.read. " +
 			"Narrow with `path` (a directory or file prefix) and `kinds`; page with `after`. A file with many names shows the outer ones " +
-			"first (symbols_left says how many are left out). Files that may hold credentials are left out.",
+			"first (symbols_left says how many are left out). Files that may hold credentials are left out. " +
+			"With `branch`, a large task's local branch topcoat/v-<nr> is mapped instead of the worktree.",
 		schema: `{"type":"object","additionalProperties":false,"required":["repo"],"properties":{` + repoProp + `,` +
 			`"path":{"type":"string","maxLength":512,"description":"a directory or file prefix"},` +
 			`"kinds":{"type":"array","maxItems":6,"uniqueItems":true,"items":{"enum":` + string(kinds) + `}},` +
 			`"limit":{"type":"integer","minimum":1,"maximum":200,"description":"files per page (default 50)"},` +
 			`"max_symbols":{"type":"integer","minimum":1,"maximum":200,"description":"names per file (default 40)"},` +
-			`"after":{"type":"string","maxLength":1024,"description":"the previous call's next_after"}}}`,
+			`"after":{"type":"string","maxLength":1024,"description":"the previous call's next_after"},` + branchProp + `}}`,
 		run: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var in struct {
 				Repo       string   `json:"repo"`
@@ -625,6 +626,7 @@ func (w *Workshop) capOutline() capability.Capability {
 				Limit      int      `json:"limit"`
 				MaxSymbols int      `json:"max_symbols"`
 				After      string   `json:"after"`
+				Branch     string   `json:"branch"`
 			}
 			if err := decode(raw, &in); err != nil {
 				return nil, err
@@ -650,21 +652,45 @@ func (w *Workshop) capOutline() capability.Capability {
 			if err != nil {
 				return nil, err
 			}
-			args := []string{"ls-files", "-z", "--cached", "--others", "--exclude-standard"}
+			prefix := ""
 			if in.Path != "" {
-				p, err := cleanRel(in.Path)
+				if prefix, err = cleanRel(in.Path); err != nil {
+					return nil, err
+				}
+			}
+			// a large task's branch: its blobs, read from git's objects (the worktree stays as it is)
+			var blobs map[string]treeBlob
+			var names []string
+			if in.Branch != "" {
+				ref, err := w.atBranch(ctx, dir, in.Branch)
 				if err != nil {
 					return nil, err
 				}
-				args = append(args, "--", p)
-			}
-			out, err := w.git(ctx, dir, nil, "", args...)
-			if err != nil {
-				return nil, err
+				all, err := w.treeBlobs(ctx, dir, ref, prefix)
+				if err != nil {
+					return nil, err
+				}
+				blobs = map[string]treeBlob{}
+				for _, b := range all {
+					if readableBlob(b) {
+						blobs[b.path] = b
+						names = append(names, b.path)
+					}
+				}
+			} else {
+				args := []string{"ls-files", "-z", "--cached", "--others", "--exclude-standard"}
+				if prefix != "" {
+					args = append(args, "--", prefix)
+				}
+				out, err := w.git(ctx, dir, nil, "", args...)
+				if err != nil {
+					return nil, err
+				}
+				names = strings.Split(out, "\x00")
 			}
 			seen := map[string]bool{}
 			var files []string
-			for _, f := range strings.Split(out, "\x00") {
+			for _, f := range names {
 				k := outlineKind(f)
 				if f == "" || seen[f] || k == "" || (len(want) > 0 && !want[k]) || secretName(f) || f <= in.After {
 					continue
@@ -673,11 +699,16 @@ func (w *Workshop) capOutline() capability.Capability {
 				files = append(files, f)
 			}
 			sort.Strings(files)
-			links, err := w.trackedLinks(ctx, dir)
-			if err != nil {
-				return nil, err
+			var links map[string]bool
+			if blobs == nil {
+				if links, err = w.trackedLinks(ctx, dir); err != nil {
+					return nil, err
+				}
 			}
 			res := map[string]any{"repo": in.Repo, "total_after": len(files)}
+			if in.Branch != "" {
+				res["branch"] = in.Branch
+			}
 			var page []outlineFile
 			size, masked := 0, 0
 			for _, f := range files {
@@ -689,7 +720,14 @@ func (w *Workshop) capOutline() capability.Capability {
 					res["next_after"] = page[len(page)-1].Path
 					break
 				}
-				entry, n, ok := outlineOne(dir, f, links, maxSyms)
+				var entry outlineFile
+				var n int
+				var ok bool
+				if b, at := blobs[f]; at {
+					entry, n, ok = outlineEntry(f, b.size, func() ([]byte, error) { return w.blobBytes(ctx, dir, b) }, maxSyms)
+				} else {
+					entry, n, ok = outlineOne(dir, f, links, maxSyms)
+				}
 				if !ok {
 					continue
 				}
@@ -738,12 +776,18 @@ func outlineOne(dir, f string, links map[string]bool, maxSyms int) (outlineFile,
 	if err != nil || !st.Mode().IsRegular() {
 		return outlineFile{}, 0, false
 	}
-	entry := outlineFile{Path: rel, Kind: outlineKind(rel), Bytes: st.Size(), Symbols: []outlineSymbol{}}
-	if st.Size() > maxFileBytes {
+	return outlineEntry(rel, st.Size(), func() ([]byte, error) { return os.ReadFile(abs) }, maxSyms)
+}
+
+// outlineEntry builds the entry of one file from its size and its content (read only when the
+// file is small enough): the worktree's file or a blob of a large task's branch.
+func outlineEntry(rel string, size int64, read func() ([]byte, error), maxSyms int) (outlineFile, int, bool) {
+	entry := outlineFile{Path: rel, Kind: outlineKind(rel), Bytes: size, Symbols: []outlineSymbol{}}
+	if size > maxFileBytes {
 		entry.Skipped = "too large"
 		return entry, 0, true
 	}
-	data, err := os.ReadFile(abs)
+	data, err := read()
 	if err != nil {
 		return outlineFile{}, 0, false
 	}

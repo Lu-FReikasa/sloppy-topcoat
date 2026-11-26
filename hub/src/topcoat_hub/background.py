@@ -128,8 +128,7 @@ TASKS: dict[str, TaskSpec] = {
             "care",
             "The care run",
             "At night and every few idle hours: expired notes are struck, useless ones archived, "
-            "the core reviewed (proposals only), the memories cross-checked, and notes about the "
-            "servers checked live.",
+            "the core reviewed (proposals only) and the memories cross-checked.",
             lambda s: {
                 "on": True,
                 "hour": s.memory_care_hour,
@@ -148,13 +147,6 @@ TASKS: dict[str, TaskSpec] = {
                     "crosscheck",
                     "Cross-check the memories",
                     "A discrepancy goes to the program responsible for its topic.",
-                ),
-                StepSpec(
-                    "checks",
-                    "Check notes live",
-                    "Notes about the servers are checked with a read-only look (limit = notes "
-                    "per run; empty model = the deep model).",
-                    lambda s: {"limit": s.memory_care_max_notes},
                 ),
             ),
         ),

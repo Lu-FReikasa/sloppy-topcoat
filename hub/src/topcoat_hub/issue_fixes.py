@@ -963,6 +963,9 @@ class FixService:
             node = await db.get(ProjectNode, fix.issue_id)
             if node is None or node.user_id != fix.user_id:
                 return
+            # A sub-task of a large task gets this item too: the coordinator would replan its
+            # branch first (D109), but nothing ticks it in the background yet, so without the
+            # item nobody would hear of the stop.
             await InboxStore(db, fix.user_id).add(
                 Candidate(
                     kind=KIND_BLOCKED,

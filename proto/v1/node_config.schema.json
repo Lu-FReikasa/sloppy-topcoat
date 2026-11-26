@@ -121,6 +121,17 @@
             "type": "boolean"
           }
         },
+        "projectors": {
+          "type": "object",
+          "description": "vision projector (mmproj) per model name, as a file name in the model's own directory, or \"none\" for no projector; wins over the node's own matching (mmproj-<model>.gguf, <model>.mmproj.gguf, <model>-mmproj*.gguf, or the only projector in the model's subfolder); {} = none (D125)",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^(none|[^/\\\\]+[.]gguf)$"
+          }
+        },
         "model_backends": {
           "type": "object",
           "description": "backend and GPU offload per model name (E2-05): e.g. a 7B on vulkan and a 30B on cpu. Absent or {} = the node's backend and llama.cpp's own fit to device memory",

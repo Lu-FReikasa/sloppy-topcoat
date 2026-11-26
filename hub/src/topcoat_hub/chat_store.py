@@ -16,7 +16,16 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from topcoat_hub.models import Conversation, HubSetting, Message, PromptSnapshot, UserSettings
+from topcoat_hub import agent_contract
+from topcoat_hub.models import (
+    HOUSEHOLD_ID,
+    Conversation,
+    HubSetting,
+    Message,
+    Persona,
+    PromptSnapshot,
+    UserSettings,
+)
 from topcoat_hub.tool_groups import clean_scope
 
 TITLE_MAX = 200
@@ -100,7 +109,8 @@ class ChatStore:
         ``tool_scope`` None: the user's last choice of servers and groups (E3-04), the start of
         new conversations; the internet switch starts as the user's default. ``persona_ref`` None:
         the persona the user has chosen as their default *now* — pinned to the conversation, so a
-        later change of the default leaves it alone (E3-06)."""
+        later change of the default leaves it alone (E3-06); without a default of the person's own,
+        the persona the application's contract names (D118: the Butler for the secretary)."""
         # Only the free chat inherits the user's last server choice. A fixed application (admin,
         # project, research, dev) starts from its own default, so an old choice never narrows
         # or widens its run (pruefauftrag T2.1).
@@ -109,6 +119,8 @@ class ChatStore:
         if persona_ref is None:
             settings = await self.get_settings()
             persona_ref = str(settings.persona_id) if settings and settings.persona_id else None
+        if persona_ref is None:
+            persona_ref = await self._contract_persona(application)
         conv = Conversation(
             user_id=self.user_id,
             title=title[:TITLE_MAX],
@@ -398,6 +410,24 @@ class ChatStore:
                 index_elements=["user_id"], set_={"tool_scope": scope, "updated_at": func.now()}
             )
         )
+
+    async def _contract_persona(self, application: str | None) -> str | None:
+        """The persona the contract of ``application`` names (D118), as the household's active
+        template of that key; ``None`` when the application has no contract or the template is
+        gone or archived. Only used when the person has chosen no default of their own; a
+        conversation a program opens without naming an application gets none."""
+        contract = agent_contract.get(application) if application else None
+        if contract is None:
+            return None
+        found = await self.db.scalar(
+            select(Persona.id).where(
+                Persona.user_id == HOUSEHOLD_ID,
+                Persona.scope == "household",
+                Persona.key == contract.persona,
+                Persona.status == "active",
+            )
+        )
+        return str(found) if found is not None else None
 
     async def get_settings(self) -> UserSettings | None:
         return await self.db.scalar(

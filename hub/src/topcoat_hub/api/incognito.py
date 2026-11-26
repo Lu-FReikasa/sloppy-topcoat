@@ -1,11 +1,14 @@
 """The incognito folder (docs/PLATFORM.md, section 3.9). Nothing here touches the database: the
 tabs live in the memory of the hub and are the caller's own (D20)."""
 
-from typing import Any
+import asyncio
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi.responses import Response
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from topcoat_hub import chat_images
 from topcoat_hub.auth import CurrentUser, api_user
 from topcoat_hub.incognito import MAX_MESSAGE_CHARS, IncognitoError, IncognitoService, Tab
 
@@ -45,7 +48,17 @@ class TabUpdate(BaseModel):
 class Message(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    content: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
+    content: str = Field("", max_length=MAX_MESSAGE_CHARS)
+    # D125: re-encoded like the chat's, kept in the tab in memory only
+    images: list[Annotated[str, Field(max_length=chat_images.MAX_UPLOAD_CHARS)]] = Field(
+        default_factory=list, max_length=chat_images.MAX_PER_MESSAGE
+    )
+
+    @model_validator(mode="after")
+    def _says_something(self) -> "Message":
+        if not self.content and not self.images:
+            raise ValueError("a message needs text or an image")
+        return self
 
 
 @router.get("")
@@ -86,10 +99,29 @@ async def send(
     """Ask in a tab; the answer comes back whole (nothing of it is streamed to a store)."""
     tab = _tab(request, user, tab_id)
     try:
-        answer = await _service(request).reply(user, tab, body.content)
+        images = [
+            await asyncio.to_thread(chat_images.reencode, chat_images.decode_upload(i))
+            for i in body.images
+        ]
+        answer = await _service(request).reply(user, tab, body.content, images)
+    except chat_images.ImageError as exc:
+        raise HTTPException(422, detail={"code": exc.code, "message": exc.message}) from exc
     except IncognitoError as exc:
         raise _fail(exc) from exc
-    return {"message": answer, "tab": tab.view()}
+    return {"message": answer, "asked": tab.messages[-2], "tab": tab.view()}
+
+
+@router.get("/{tab_id}/images/{image_id}")
+async def get_image(
+    tab_id: str, image_id: str, request: Request, user: CurrentUser = Depends(api_user)
+) -> Response:
+    """An image of one of the person's tabs, from memory."""
+    image = _tab(request, user, tab_id).images.get(image_id)
+    if image is None:
+        raise HTTPException(404, detail={"code": "not_found", "message": "unknown image"})
+    return Response(
+        content=image.data, media_type=image.content_type, headers=chat_images.IMAGE_HEADERS
+    )
 
 
 @router.delete("/{tab_id}", status_code=204)
