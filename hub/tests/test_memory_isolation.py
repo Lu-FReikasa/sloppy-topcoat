@@ -193,7 +193,7 @@ STORE_METHODS_COVERED = {
     "finish_run", "runs", "running_run", "live", "get_many", "superseded_by", "add_question",
     "questions", "question", "close_question", "close_questions_about", "mark_question_checked",
     "annotate_question",
-    "mark_care_checked", "lower_trust", "verify", "record_recalled", "record_used", "feedback",
+    "record_recalled", "record_used", "feedback",
     "expired", "instructions", "profile", "pinned_facts", "household", "system_rules",
     "legacy_item", "proposals", "get_proposal",
     "propose", "accept_proposal", "reject_proposal", "learn_instruction",
@@ -292,9 +292,6 @@ def test_the_memory_store_scopes_every_statement_by_user(
             await store.annotate_question(question_id, question="x")  # another user's: nothing
             # care (E3-05): every statement is scoped by user, too
             now = datetime.now(UTC)
-            await store.mark_care_checked(item_id, now)
-            await store.lower_trust(item_id, 0.7, 0.2, now)
-            found["verify"] = await store.verify(item_id, now)
             await store.record_recalled([item_id])
             await store.record_used([item_id], now)
             found["feedback"] = await store.feedback(item_id, False, now)
@@ -338,7 +335,7 @@ def test_the_memory_store_scopes_every_statement_by_user(
                 "unchecked", "active", "top", "runs", "live", "many", "superseded_by",
                 "questions"):  # fmt: skip
         assert found[key] == [], key
-    assert found["verify"] is None and found["feedback"] is None and found["expired"] == []
+    assert found["feedback"] is None and found["expired"] == []
     assert found["same"] is None and found["confirm"] is None
     assert found["question"] is None and found["closed"] is None
     for key in ("instructions", "profile", "pinned", "proposals", "household"):

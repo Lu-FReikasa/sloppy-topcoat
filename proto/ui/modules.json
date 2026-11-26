@@ -144,6 +144,11 @@
       "admin": true
     },
     {
+      "id": "page.plugins",
+      "kind": "page",
+      "admin": true
+    },
+    {
       "id": "page.task_kinds",
       "kind": "page",
       "admin": true

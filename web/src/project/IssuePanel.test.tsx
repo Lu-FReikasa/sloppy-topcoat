@@ -143,6 +143,36 @@ describe("an issue's way to the fix", () => {
     expect(screen.getByText("Tests: passed")).toBeTruthy();
   });
 
+  it("a test run opens with its counts and first failure, the whole log one click away", async () => {
+    const output = [
+      "E       assert 3 == 2",
+      "FAILED hub/tests/test_x.py::test_x - assert 3 == 2",
+      "===== 1 failed, 1204 passed, 2 skipped in 61.20s =====",
+    ].join("\n");
+    setup([fix("failed", { id: "f-1", tests: { state: "failed", output } })]);
+    const run = await screen.findByTestId("test-run");
+    expect(run.textContent).toContain("Tests: failed · 1.204 bestanden, 1 fehlgeschlagen, 2 übersprungen");
+    expect(run.textContent).toContain("Erster Fehler: hub/tests/test_x.py::test_x – assert 3 == 2");
+    expect(run.textContent).not.toContain("Kein fehlgeschlagener Test");
+    const log = run.querySelector("details") as HTMLDetailsElement;
+    expect(log.open).toBe(false);
+    expect(log.querySelector("summary")?.textContent).toBe("Vollständige Testausgabe");
+    expect(log.querySelector("pre")?.textContent).toBe(output);
+  });
+
+  it("a red run without a failing test in its log says the failure is elsewhere", async () => {
+    // the hub's tests passed, the web part failed at lint: no test line says what broke
+    const output = [
+      "===== 3545 passed in 121.30s =====",
+      "=== web: lint, typecheck, tests",
+      "Cannot find module 'mermaid'",
+    ].join("\n");
+    setup([fix("failed", { id: "f-1", tests: { state: "failed", output } })]);
+    const run = await screen.findByTestId("test-run");
+    expect(run.textContent).toContain("3.545 bestanden, 0 fehlgeschlagen");
+    expect(run.textContent).toContain("Kein fehlgeschlagener Test im Log");
+  });
+
   it("fixes that failed the same way in a row say how often", async () => {
     const same = { failure_print: "AssertionError | test_x.py::test_x | assert # == #" };
     setup([

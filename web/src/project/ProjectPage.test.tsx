@@ -82,6 +82,56 @@ describe("ProjectPage", () => {
     );
   });
 
+  it("shows the grant to split large tasks and saves it as project.decompose", async () => {
+    const api = fakeApi({ project: project({ scope: {} }), nodes: [] });
+    await openProject(api);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Grants for the agent" }),
+    );
+    const select = screen.getByLabelText("project decompose");
+    const row = select.closest("tr") as HTMLElement;
+    expect(within(row).getByText("This project")).toBeTruthy();
+    expect(
+      within(row).getByText("split large tasks into sub-tasks"),
+    ).toBeTruthy();
+    fireEvent.change(select, { target: { value: "free" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save grants" }));
+    await waitFor(() =>
+      expect(api.setProjectScope).toHaveBeenCalledWith("p1", {
+        revision: 1,
+        scope: { project: { decompose: "free" } },
+      }),
+    );
+  });
+
+  it("clears the grant to split large tasks", async () => {
+    const api = fakeApi({
+      project: project({
+        scope: {
+          project: { decompose: "confirm" },
+          research: { request_report: "free" },
+        },
+      }),
+      nodes: [],
+    });
+    await openProject(api);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Grants for the agent" }),
+    );
+    const select = screen.getByLabelText(
+      "project decompose",
+    ) as HTMLSelectElement;
+    expect(select.value).toBe("confirm");
+    fireEvent.change(select, { target: { value: "none" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save grants" }));
+    await waitFor(() =>
+      expect(api.setProjectScope).toHaveBeenCalledWith("p1", {
+        revision: 1,
+        scope: { research: { request_report: "free" } },
+      }),
+    );
+  });
+
   it("lets the person confirm a request that awaits confirmation", async () => {
     const request = node({
       id: "r1",

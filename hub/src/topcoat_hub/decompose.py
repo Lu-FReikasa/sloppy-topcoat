@@ -223,12 +223,23 @@ def _layer_problems(sub: Subtask) -> list[str]:
     return problems
 
 
-async def check(text: str, read: Read) -> tuple[Decomposition | None, list[str]]:
-    """The decomposition an answer of ``decompose`` holds, or every problem that makes it none."""
+async def check(
+    text: str,
+    read: Read,
+    *,
+    outside: set[str] | frozenset[str] = frozenset(),
+    taken: set[str] | frozenset[str] = frozenset(),
+) -> tuple[Decomposition | None, list[str]]:
+    """The decomposition an answer of ``decompose`` holds, or every problem that makes it none.
+    A replan of one branch may depend on the sub-tasks that stay (``outside``) and must not reuse
+    an id the large task has had (``taken``)."""
     doc, subs, problems = parse(text)
     if doc is None:
         return None, problems
-    ids = {s.id for s in subs}
+    for s in subs:
+        if s.id in taken:
+            problems.append(f"sub-task {s.id}: the id is used already; give a new one")
+    ids = {s.id for s in subs} | set(outside)
     for sub in subs:
         problems += _layer_problems(sub)
         for a in sub.accept:
@@ -299,6 +310,8 @@ async def decompose(
     *,
     hint: str = "",
     tries: int = TRIES,
+    outside: set[str] | frozenset[str] = frozenset(),
+    taken: set[str] | frozenset[str] = frozenset(),
 ) -> Outcome:
     """Up to ``tries`` runs of ``decompose``: each answer checked, the next one told every problem
     of the one before. ``hint`` goes in front of the feedback (a replan says its branch there)."""
@@ -316,7 +329,7 @@ async def decompose(
         )
         out.answers.append(answer)
         out.model = model or out.model
-        found, problems = await check(answer, read)
+        found, problems = await check(answer, read, outside=outside, taken=taken)
         if found is not None:
             out.decomposition, out.problems = found, []
             return out

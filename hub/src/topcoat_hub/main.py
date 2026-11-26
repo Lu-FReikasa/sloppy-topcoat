@@ -17,6 +17,7 @@ from topcoat_hub import (
     hub_log,
     node_rename,
     output_schemas,
+    plugin_registry,
     project_events,
     tls,
     web_access,
@@ -42,6 +43,7 @@ from topcoat_hub.api import metrics as metrics_api
 from topcoat_hub.api import model_transfers as model_transfers_api
 from topcoat_hub.api import params as params_api
 from topcoat_hub.api import personas as personas_api
+from topcoat_hub.api import plugins as plugins_api
 from topcoat_hub.api import project as project_api
 from topcoat_hub.api import project_export as project_export_api
 from topcoat_hub.api import releases as releases_api
@@ -54,6 +56,7 @@ from topcoat_hub.api import theme_workshop as theme_workshop_api
 from topcoat_hub.api import tools as tools_api
 from topcoat_hub.api import ui as ui_api
 from topcoat_hub.api import updates as updates_api
+from topcoat_hub.api import vorhaben as vorhaben_api
 from topcoat_hub.api import wiki as wiki_api
 from topcoat_hub.bench.service import BenchService
 from topcoat_hub.blocks.service import BlockService
@@ -361,7 +364,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.memory_care = MemoryCare(
             app.state.sessionmaker,
             app.state.gateway,
-            app.state.agents,
             app.state.memory,
             settings,
             digester=app.state.digester,
@@ -443,6 +445,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         written = await ensure_ui_builtin(app.state.sessionmaker)
         if written:
             log.info("ui: %d built-in workspace(s) or profile(s) written", written)
+        # the built-in programs as plug-ins of the registry (D105), after their rows are written
+        if registered := await plugin_registry.ensure_builtin(app.state.sessionmaker):
+            log.info("plug-ins: %d built-in program(s) registered or refreshed", registered)
         # earlier names of renamed nodes still reach them (node_rename.py)
         if aliases := await node_rename.load_aliases(app.state.sessionmaker):
             log.info("nodes: %d earlier name(s) lead to renamed nodes", aliases)
@@ -523,10 +528,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(project_api.router)
     app.include_router(messages_api.router)
     app.include_router(mandates_api.router)
+    app.include_router(vorhaben_api.router)
     app.include_router(project_export_api.router)
     app.include_router(incognito_api.router)
     app.include_router(handovers_api.router)
     app.include_router(ui_api.router)
+    app.include_router(plugins_api.router)
     app.include_router(theme_workshop_api.router)
     app.include_router(keys.router)
     app.include_router(dev_repos.router)

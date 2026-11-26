@@ -143,7 +143,13 @@ function AuthedApp({ token, onLogout, onUnauthorized }: AuthedProps) {
           setAgentTick((n) => n + 1);
         if (ev.event === "inbox" || ev.event === "agent_task" || ev.event === "chat_message")
           setInboxTick((n) => n + 1);
-        if (ev.event === "ui_access" || ev.event === "ui_prefs" || ev.event === "ui_themes")
+        // a plug-in installed, changed or removed (D105) may change what a person is offered
+        if (
+          ev.event === "ui_access" ||
+          ev.event === "ui_prefs" ||
+          ev.event === "ui_themes" ||
+          ev.event === "ui_plugins"
+        )
           setUiTick((n) => n + 1);
         if (ev.event === "chat_message") {
           const hubMessage = parseHubMessage(ev.data);

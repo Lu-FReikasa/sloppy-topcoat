@@ -10,6 +10,7 @@ The states of a message move only along :data:`TRANSITIONS`, and a chain that wa
 new message. Everything is scoped by the person and the application, like the rest of the store.
 """
 
+import contextlib
 import uuid
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -17,7 +18,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from topcoat_hub import messages
+from topcoat_hub import messages, result_forms
 from topcoat_hub.models import ProjectChain, ProjectNode
 from topcoat_hub.project_base import (
     Invalid,
@@ -215,7 +216,11 @@ class MessageMixin(StoreBase):
         title: str = "",
     ) -> ProjectNode:
         """File one message in the project, after the registry checked its type, its edge and its
-        payload. The node is a report with the next number of its parent."""
+        payload. The node is a report with the next number of its parent. The result of an
+        employee is filed with its ``brief`` for the secretary (D112, result_forms.py)."""
+        # a payload of the wrong shape keeps no brief: the registry below names what is wrong
+        with contextlib.suppress(AttributeError, TypeError, KeyError, ValueError):
+            payload = result_forms.with_brief(type, payload)
         try:
             spec = messages.validate(type, sender, receiver, payload)
         except messages.MessageError as exc:

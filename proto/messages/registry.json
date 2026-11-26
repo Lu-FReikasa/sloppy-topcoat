@@ -2,6 +2,9 @@
   "description": "The messages the applications send each other (brief PPH-05-messages-chains-mandates, section 3). The hub reads this file; the web build keeps a copy of the types and edges (web/src/project/messages.ts) and web/src/project/messages.shared.test.ts checks that they agree. A type, an edge or a payload that is not listed here is refused; nothing runs on free text.",
   "v": 1,
   "applications": {
+    "assistant": {
+      "contract": "../agents/assistant.json"
+    },
     "project": {
       "contract": "../agents/project.json"
     },
@@ -467,7 +470,8 @@
         "research"
       ],
       "to": [
-        "project"
+        "project",
+        "assistant"
       ],
       "trust": "foreign",
       "needs_review": true,
@@ -484,6 +488,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 6000
+          },
+          "brief": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
           },
           "findings": {
             "type": "array",
@@ -572,7 +581,8 @@
         "dev"
       ],
       "to": [
-        "project"
+        "project",
+        "assistant"
       ],
       "trust": "system",
       "needs_review": true,
@@ -589,6 +599,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 6000
+          },
+          "brief": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
           },
           "branch": {
             "type": "string",
@@ -715,7 +730,8 @@
         "admin"
       ],
       "to": [
-        "project"
+        "project",
+        "assistant"
       ],
       "trust": "system",
       "needs_review": false,
@@ -732,6 +748,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 6000
+          },
+          "brief": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
           },
           "findings": {
             "type": "array",
@@ -784,7 +805,8 @@
         "research"
       ],
       "to": [
-        "project"
+        "project",
+        "assistant"
       ],
       "trust": "foreign",
       "needs_review": false,
@@ -827,7 +849,8 @@
         "research"
       ],
       "to": [
-        "project"
+        "project",
+        "assistant"
       ],
       "trust": "foreign",
       "needs_review": false,
@@ -964,7 +987,8 @@
         "dev"
       ],
       "to": [
-        "project"
+        "project",
+        "assistant"
       ],
       "trust": "system",
       "needs_review": false,
@@ -1007,7 +1031,8 @@
         "dev"
       ],
       "to": [
-        "project"
+        "project",
+        "assistant"
       ],
       "trust": "system",
       "needs_review": false,
@@ -1144,7 +1169,8 @@
         "admin"
       ],
       "to": [
-        "project"
+        "project",
+        "assistant"
       ],
       "trust": "system",
       "needs_review": false,
@@ -1187,7 +1213,8 @@
         "admin"
       ],
       "to": [
-        "project"
+        "project",
+        "assistant"
       ],
       "trust": "system",
       "needs_review": false,
@@ -1540,6 +1567,125 @@
           "in_reply_to": {
             "type": "string",
             "maxLength": 40
+          }
+        },
+        "required": [
+          "topic"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "assistant.request",
+      "from": [
+        "assistant"
+      ],
+      "to": [
+        "research",
+        "dev",
+        "admin"
+      ],
+      "trust": "own",
+      "needs_review": false,
+      "effect": "queue_task",
+      "schema_version": 1,
+      "label": {
+        "en": "Hand-on",
+        "de": "Weitergabe"
+      },
+      "payload": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "depth": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "min_sources": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "min_hosts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "source_kinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "must_cover": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "expected": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 50
+          },
+          "format": {
+            "enum": [
+              "brief",
+              "guide",
+              "comparison"
+            ]
+          },
+          "budget": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "steps": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "round": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "in_reply_to": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "report_when_done": {
+            "type": "boolean"
           }
         },
         "required": [
