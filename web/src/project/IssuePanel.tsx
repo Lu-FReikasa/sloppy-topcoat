@@ -7,6 +7,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
+import { formatInt } from "../format";
+import { summarizeTestOutput } from "../summaries";
 import type { IssueFix, IssuePlan, ProjectMandate, ProjectNode } from "./types";
 
 const BUSY = new Set(["applying", "testing", "queued"]);
@@ -256,12 +258,7 @@ export function IssuePanel({
                   </ul>
                 )}
               </details>
-              {f.tests?.output && (
-                <details>
-                  <summary>{t("issues.tests", { state: f.tests.state ?? "?" })}</summary>
-                  <pre className="project-diff">{f.tests.output}</pre>
-                </details>
-              )}
+              {f.tests?.output && <TestRun state={f.tests.state} output={f.tests.output} />}
               {f.rollout?.message && (
                 <p className="small">
                   {t("issues.rollout")}: {f.rollout.message}
@@ -350,6 +347,44 @@ export function CheckOpenIssues({
         {t("issues.checkOpen")}
       </button>
       {note && <span role="status">{note}</span>}
+    </div>
+  );
+}
+
+/** A fix's test run: the counts and the first failing test first, the whole log one click away. */
+function TestRun({ state, output }: { state: string | undefined; output: string }) {
+  const { t, i18n } = useTranslation();
+  const { counts, firstFailure } = summarizeTestOutput(output);
+  const n = (count: number) => formatInt(count, i18n.language);
+  const parts = counts
+    ? [
+        t("issues.testsPassed", { n: n(counts.passed) }),
+        t("issues.testsFailed", { n: n(counts.failed) }),
+        ...(counts.errors > 0 ? [t("issues.testsErrored", { n: n(counts.errors) })] : []),
+        ...(counts.skipped > 0 ? [t("issues.testsSkipped", { n: n(counts.skipped) })] : []),
+      ]
+    : [];
+  return (
+    <div className="test-run" data-testid="test-run">
+      <p className="small">
+        <strong>{t("issues.tests", { state: state ?? "?" })}</strong>
+        {parts.length > 0 && ` · ${parts.join(", ")}`}
+      </p>
+      {firstFailure && (
+        <p className="small test-first-failure">
+          {t("issues.firstFailure")} <code>{firstFailure.test}</code>
+          {firstFailure.error && (
+            <>
+              {" – "}
+              <span className="error">{firstFailure.error}</span>
+            </>
+          )}
+        </p>
+      )}
+      <details>
+        <summary>{t("issues.testOutput")}</summary>
+        <pre className="project-diff">{output}</pre>
+      </details>
     </div>
   );
 }

@@ -377,7 +377,8 @@ input {
 
 .facts {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  /* a long label ("Network cards (Wake-on-LAN)") takes at most 45 % on a phone and wraps */
+  grid-template-columns: fit-content(45%) minmax(0, 1fr);
   gap: 0.3rem 1rem;
   margin: 1rem 0;
 }
@@ -388,6 +389,8 @@ input {
 
 .facts dd {
   margin: 0;
+  /* MAC addresses and versions have no break of their own */
+  overflow-wrap: anywhere;
 }
 
 .gpu-list {
@@ -2587,6 +2590,30 @@ details.fold > summary > h2 {
 }
 .node-kind {
   margin: 0.75rem 0;
+}
+
+/* Summaries first, the raw data folded behind them (issue #22): a node's inventory, a long
+   capability description, the log of a fix's test run. */
+details.facts-more {
+  margin: 0.25rem 0 0.75rem;
+}
+details.facts-more > summary,
+details.one-line > summary,
+.test-run details > summary {
+  cursor: pointer;
+}
+/* the table keeps its cells on one line; the opened description wraps */
+details.one-line > p {
+  margin: 0.25rem 0 0;
+  white-space: normal;
+  min-width: 16rem;
+  max-width: 40rem;
+}
+.test-run > p {
+  margin: 0.25rem 0;
+}
+.test-first-failure {
+  overflow-wrap: anywhere;
 }
 
 /* Sparklines of the nodes overview */
