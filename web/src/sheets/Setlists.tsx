@@ -71,7 +71,25 @@ export function Setlists({ api, list, openId, onPlay, onError }: Props) {
   const sending = useRef<Promise<void>>(Promise.resolve());
   const change = (s: Setlist, patch: { name?: string; items?: SetlistItem[] }) => {
     replace({ ...s, ...patch });
-    sending.current = sending.current.then(() => api.setlistUpdate(s.id, patch).then(() => undefined, failed));
+    const before = sending.current;
+    const send = async (): Promise<void> => {
+      await before;
+      try {
+        await api.setlistUpdate(s.id, patch);
+      } catch (e) {
+        onError(e);
+        void reloadWhenSent();
+      }
+    };
+    sending.current = send();
+  };
+  // after a refused change, reload once the changes queued behind it have landed, or the hub's
+  // answer would show an order that a later change is still about to replace
+  const reloadWhenSent = async (): Promise<void> => {
+    const last = sending.current;
+    await last;
+    if (last === sending.current) reload();
+    else await reloadWhenSent();
   };
 
   const remove = async (s: Setlist) => {
