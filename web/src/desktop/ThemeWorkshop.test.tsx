@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "../api/client";
 import { usePreviewTheme } from "./preview";
-import type { ThemeManifest } from "./theme";
+import { LAYOUT_KINDS, type ThemeManifest } from "./theme";
 import { ThemeWorkshop } from "./ThemeWorkshop";
 
 const START: ThemeManifest = {
@@ -18,7 +18,11 @@ const START: ThemeManifest = {
 
 function Shown() {
   const draft = usePreviewTheme();
-  return <output data-testid="shown">{draft?.css ?? "none"}</output>;
+  return (
+    <output data-testid="shown" data-layout={draft?.layout.kind ?? ""}>
+      {draft?.css ?? "none"}
+    </output>
+  );
 }
 
 function setup(extra: Partial<Record<string, unknown>> = {}) {
@@ -87,6 +91,14 @@ describe("the theme workshop", () => {
     fireEvent.change(bg, { target: { value: "#102030" } });
     await waitFor(() => expect(screen.getByTestId("shown").textContent).toBe("--bg: #102030;"));
     expect(api.workshopTurn).not.toHaveBeenCalled();
+  });
+
+  it("offers every layout the desktop knows, nest too, and draws the one picked", async () => {
+    setup();
+    const layout = (await screen.findByLabelText("Anordnung")) as HTMLSelectElement;
+    expect([...layout.options].map((o) => o.value).sort()).toEqual([...LAYOUT_KINDS].sort());
+    fireEvent.change(layout, { target: { value: "nest" } });
+    await waitFor(() => expect(screen.getByTestId("shown").dataset.layout).toBe("nest"));
   });
 
   it("saves as an iteration of the task, with the steps, on the version it began from", async () => {
