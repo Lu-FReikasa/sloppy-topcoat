@@ -48,8 +48,13 @@ func (w *Workshop) treeBlobs(ctx context.Context, dir, ref, prefix string) ([]tr
 	if err != nil {
 		return nil, err
 	}
+	// Every entry ends with a NUL. git's output is capped (gitOutputLimit), so the last piece may be
+	// a path cut short: it is dropped, or a cut name could pass the name checks (x.md.env -> x.md)
+	// while the entry still carries the blob of the full name.
+	lines := strings.Split(out, "\x00")
+	lines = lines[:len(lines)-1]
 	var blobs []treeBlob
-	for _, line := range strings.Split(out, "\x00") {
+	for _, line := range lines {
 		head, p, ok := strings.Cut(line, "\t")
 		if !ok {
 			continue

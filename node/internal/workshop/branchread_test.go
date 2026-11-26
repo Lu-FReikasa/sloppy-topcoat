@@ -1,6 +1,7 @@
 package workshop
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -218,5 +219,47 @@ func TestReadsOnALargeTasksBranch(t *testing.T) {
 	}
 	if st := f.must(t, "repo.status", repoIn{"repo": "demo"}); st["clean"] != true || st["branch"] != "main" {
 		t.Fatalf("the worktree changed: %v", st)
+	}
+}
+
+// git's output is capped; an entry cut at the cap must not be read under its cut name. The listing
+// is padded so the cap falls inside the name of a secret file, right after "zz.md" of "zz.md.env".
+func TestBranchListingCutAtTheCapIsDropped(t *testing.T) {
+	f := newFixture(t, nil)
+	f.must(t, "repo.sync", repoIn{"repo": "demo"})
+	clone := filepath.Join(f.w.dir, "demo")
+	hash := func(content string) string {
+		cmd := execGit(clone, "hash-object", "-w", "--stdin")
+		cmd.Stdin = strings.NewReader(content)
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	pad, secret := hash("x"), hash("# db password hunter2\n")
+	// a line of `ls-tree -r -z --long` is 62 bytes plus the path (sizes below 10^7); the cap must
+	// fall after "zz.md" in the secret's line, before its NUL
+	const width = 200
+	before := gitOutputLimit - (61 + len("zz.md"))
+	n := before/(62+width) - 1
+	var tree strings.Builder
+	for i := range n {
+		fmt.Fprintf(&tree, "100644 blob %s\tp%0*d\n", pad, width-1, i)
+	}
+	fmt.Fprintf(&tree, "100644 blob %s\tq%s\n", pad, strings.Repeat("a", before-n*(62+width)-63))
+	fmt.Fprintf(&tree, "100644 blob %s\tzz.md.env\n", secret)
+	cmd := execGit(clone, "mktree")
+	cmd.Stdin = strings.NewReader(tree.String())
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit := gitOutEnv(t, clone, nil, "commit-tree", strings.TrimSpace(string(out)), "-m", "padded")
+	run(t, clone, "update-ref", "refs/heads/topcoat/v-1", commit)
+
+	got := f.must(t, "repo.outline", repoIn{"repo": "demo", "branch": "topcoat/v-1", "kinds": []string{"md"}})
+	if files, _ := got["files"].([]any); len(files) != 0 {
+		t.Fatalf("a cut entry was outlined: %v", got)
 	}
 }
