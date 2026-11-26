@@ -620,19 +620,25 @@
   cursor: default;
 }
 
-/* search and view of one setlist: the search takes the line, the view select wraps below it in
-   the narrow side column */
+/* search and view of one setlist: side by side in a wide panel; in the narrow side column
+   (300 px) the select wraps below the search, so neither cuts its text */
 .setlist-view > input[type="search"] {
-  flex: 1 1 10rem;
+  flex: 1 1 12rem;
   min-width: 0;
   font-size: 16px;
+}
+
+.setlist-view > select {
+  flex: 1 1 12rem;
 }
 
 .setlist-item.is-dragged {
   opacity: 0.5;
 }
 
+/* the position number sits on the title's line, also when the row has an artist or version line */
 .setlist-n {
+  align-self: baseline;
   min-width: 1.4em;
   text-align: right;
   color: var(--muted);
