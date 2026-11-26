@@ -32,9 +32,11 @@ var (
 	nameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 )
 
-// WhisperPins and PiperPins are the manifests compiled into this binary.
+// WhisperPins is the whisper.cpp manifest compiled into this binary.
 func WhisperPins() llamacpp.Manifest { return mustParse(whisperJSON, whisperTag) }
-func PiperPins() llamacpp.Manifest   { return mustParse(piperJSON, piperTag) }
+
+// PiperPins is the Piper manifest compiled into this binary.
+func PiperPins() llamacpp.Manifest { return mustParse(piperJSON, piperTag) }
 
 func mustParse(b []byte, tag *regexp.Regexp) llamacpp.Manifest {
 	m, err := llamacpp.ParseManifestFor(b, tag)

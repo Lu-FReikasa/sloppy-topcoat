@@ -355,7 +355,8 @@ auto|<iso>}` → `{text, language}` and `voice.speak {text (at most 600 characte
 `{audio_base64, format: "wav"}`. They run the pinned official builds of whisper.cpp (`b5454`; Linux CPU,
 Windows CPU or CUDA 12; no Vulkan build) and Piper (`2023.11.14-2`, the last standalone binary) as **one
 short process per request**: no server, no port; audio is written to a temporary directory and removed
-after the request. Models: `<data dir>/voice-models/stt/*.bin` (whisper ggml) and `tts/*.onnx` with
+after the request. The builds (up to about 685 MB) are installed in the background when `voice` is switched on;
+the capabilities themselves never download and answer "not installed yet" until the build is there. Models: `<data dir>/voice-models/stt/*.bin` (whisper ggml) and `tts/*.onnx` with
 their `*.onnx.json`. Piper voices must come from a `rhasspy/piper-voices` revision written for that
 binary (before 2026-11-17, e.g. `a60bfb135881`): newer voice configs use phonemes it cannot read.
 

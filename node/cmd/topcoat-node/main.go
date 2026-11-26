@@ -687,7 +687,7 @@ func realCapabilities(logger *slog.Logger, dataDir string, gpus gpu.GPUProvider)
 }
 
 // addVoice registers voice.transcribe and voice.speak (D127): pinned whisper.cpp and Piper
-// builds, installed below <data dir>/runtime-voice on their first use, one process per request.
+// builds, installed below <data dir>/runtime-voice when voice is switched on, one process per request.
 func addVoice(reg *capability.Registry, c *protocol.VoiceConfig, dataDir string, gpus gpu.GPUProvider, logger *slog.Logger) {
 	var vendors []string
 	if gpus != nil {
@@ -708,6 +708,14 @@ func addVoice(reg *capability.Registry, c *protocol.VoiceConfig, dataDir string,
 		logger.Warn("voice capabilities are off", "err", err)
 		return
 	}
+	// switching voice on installs the builds; the read-only capabilities never download
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		if err := voice.Install(ctx, o); err != nil {
+			logger.Warn("voice builds not installed", "err", err)
+		}
+	}()
 	logger.Info("voice capabilities on", "whisper_backend", o.WhisperBackend)
 }
 

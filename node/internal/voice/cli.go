@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -60,6 +61,23 @@ func (o *Options) defaults() {
 	}
 }
 
+// ErrNotInstalled is the answer of a voice capability whose build is not installed yet: the
+// builds are installed when voice is switched on (Install), never by a read-only call.
+var ErrNotInstalled = errors.New("not installed yet (it installs when voice is switched on in the node's config)")
+
+// Install installs the pinned whisper.cpp and Piper builds (up to about 685 MB). The node calls
+// it when config.tools.voice is switched on, so the read-only capabilities only run what is there.
+func Install(ctx context.Context, o Options) error {
+	o.defaults()
+	if _, err := o.Whisper.Ensure(ctx, o.Whisper.Manifest.Default, o.WhisperBackend, nil); err != nil {
+		return fmt.Errorf("install whisper.cpp: %w", err)
+	}
+	if _, err := o.Piper.Ensure(ctx, o.Piper.Manifest.Default, llamacpp.BackendCPU, nil); err != nil {
+		return fmt.Errorf("install piper: %w", err)
+	}
+	return nil
+}
+
 // NewInstallers returns the installers of the pinned builds below <data dir>/runtime-voice.
 func NewInstallers(dataDir string) (whisper, piper *llamacpp.Installer) {
 	root := filepath.Join(dataDir, "runtime-voice")
@@ -99,7 +117,7 @@ func libEnv(dir string) []string {
 // Whisper is the speech-to-text engine: whisper-cli per request.
 type Whisper struct{ o Options }
 
-// NewWhisper returns the engine; the build is installed on its first use.
+// NewWhisper returns the engine; it runs the installed build only (see Install).
 func NewWhisper(o Options) *Whisper { o.defaults(); return &Whisper{o: o} }
 
 func (w *Whisper) dir() string { return filepath.Join(w.o.DataDir, "voice-models", "stt") }
@@ -114,9 +132,9 @@ func (w *Whisper) Transcribe(ctx context.Context, wav []byte, model, language st
 	if err != nil {
 		return Transcript{}, err
 	}
-	inst, err := w.o.Whisper.Ensure(ctx, w.o.Whisper.Manifest.Default, w.o.WhisperBackend, nil)
-	if err != nil {
-		return Transcript{}, fmt.Errorf("install whisper.cpp: %w", err)
+	inst, ok := w.o.Whisper.Installed(w.o.Whisper.Manifest.Default, w.o.WhisperBackend)
+	if !ok {
+		return Transcript{}, fmt.Errorf("%w: whisper.cpp", ErrNotInstalled)
 	}
 	tmp, err := os.MkdirTemp("", "topcoat-stt-")
 	if err != nil {
@@ -171,7 +189,7 @@ func parseWhisperJSON(raw []byte) (Transcript, error) {
 // Piper is the text-to-speech engine: piper per request, the text on stdin.
 type Piper struct{ o Options }
 
-// NewPiper returns the engine; the build is installed on its first use.
+// NewPiper returns the engine; it runs the installed build only (see Install).
 func NewPiper(o Options) *Piper { o.defaults(); return &Piper{o: o} }
 
 func (p *Piper) dir() string { return filepath.Join(p.o.DataDir, "voice-models", "tts") }
@@ -186,9 +204,9 @@ func (p *Piper) Speak(ctx context.Context, text, voice string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	inst, err := p.o.Piper.Ensure(ctx, p.o.Piper.Manifest.Default, llamacpp.BackendCPU, nil)
-	if err != nil {
-		return nil, fmt.Errorf("install piper: %w", err)
+	inst, ok := p.o.Piper.Installed(p.o.Piper.Manifest.Default, llamacpp.BackendCPU)
+	if !ok {
+		return nil, fmt.Errorf("%w: piper", ErrNotInstalled)
 	}
 	tmp, err := os.MkdirTemp("", "topcoat-tts-")
 	if err != nil {

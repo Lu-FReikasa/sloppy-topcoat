@@ -3,6 +3,7 @@ package voice
 import (
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -136,20 +137,24 @@ func strictDecode(input json.RawMessage, v any) error {
 // FakeTranscriber answers with a fixed text (fake nodes and tests).
 type FakeTranscriber struct{ Text, Language string }
 
+// Models implements Transcriber.
 func (FakeTranscriber) Models() []string { return []string{"fake-whisper"} }
 
+// Transcribe implements Transcriber.
 func (f FakeTranscriber) Transcribe(_ context.Context, wav []byte, model, _ string) (Transcript, error) {
 	if model != "" && model != "fake-whisper" {
 		return Transcript{}, fmt.Errorf("%w: %q", ErrUnknownModel, model)
 	}
-	return Transcript{Text: f.Text, Language: f.Language}, nil
+	return Transcript(f), nil
 }
 
 // FakeSpeaker returns a short silent WAV (fake nodes and tests).
 type FakeSpeaker struct{}
 
+// Voices implements Speaker.
 func (FakeSpeaker) Voices() []string { return []string{"fake-voice"} }
 
+// Speak implements Speaker.
 func (FakeSpeaker) Speak(_ context.Context, text, voice string) ([]byte, error) {
 	if voice != "" && voice != "fake-voice" {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownModel, voice)
@@ -157,12 +162,13 @@ func (FakeSpeaker) Speak(_ context.Context, text, voice string) ([]byte, error) 
 	return SilentWAV(len(text) * 100), nil
 }
 
-// SilentWAV is a 16 kHz mono 16-bit WAV of n silent samples.
+// SilentWAV is a 16 kHz mono 16-bit WAV of n silent samples (n is clamped to 0..maxSilent).
 func SilentWAV(n int) []byte {
+	n = min(max(n, 0), maxSilent)
 	data := n * 2
 	b := make([]byte, 44+data)
 	copy(b[0:], "RIFF")
-	le32(b[4:], uint32(36+data))
+	le32(b[4:], uint32(36+data)) //nolint:gosec // data is at most 2*maxSilent
 	copy(b[8:], "WAVEfmt ")
 	le32(b[16:], 16)
 	b[20], b[22] = 1, 1 // PCM, mono
@@ -170,8 +176,11 @@ func SilentWAV(n int) []byte {
 	le32(b[28:], 32000)
 	b[32], b[34] = 2, 16
 	copy(b[36:], "data")
-	le32(b[40:], uint32(data))
+	le32(b[40:], uint32(data)) //nolint:gosec // data is at most 2*maxSilent
 	return b
 }
 
-func le32(b []byte, v uint32) { b[0], b[1], b[2], b[3] = byte(v), byte(v>>8), byte(v>>16), byte(v>>24) }
+// maxSilent bounds SilentWAV: ten minutes at 16 kHz.
+const maxSilent = 16000 * 600
+
+func le32(b []byte, v uint32) { binary.LittleEndian.PutUint32(b, v) }

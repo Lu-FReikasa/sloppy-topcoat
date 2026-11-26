@@ -1156,6 +1156,10 @@
       },
       "hub": {
         "update": "Den Hub auf ein Image umstellen, das schon auf diesem Host liegt, mit Digest-Prüfung, Dump, Health-Check und Weg zurück."
+      },
+      "voice": {
+        "transcribe": "Macht aus einer kurzen Aufnahme Text, mit whisper.cpp auf diesem Rechner; die Aufnahme wird nicht behalten.",
+        "speak": "Liest einen Text mit einer Piper-Stimme auf diesem Rechner vor und gibt den Klang zurück."
       }
     }
   },

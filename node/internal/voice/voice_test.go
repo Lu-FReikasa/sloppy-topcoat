@@ -202,3 +202,31 @@ func TestTheCapabilitiesCheckTheirInput(t *testing.T) {
 		t.Fatalf("unknown voice: %v", err)
 	}
 }
+
+func TestTheCapabilitiesRunOnlyWhatIsInstalledAndNeverDownload(t *testing.T) {
+	data := t.TempDir()
+	w, p := NewInstallers(data) // nothing installed, and no download would work here
+	ran := false
+	o := Options{DataDir: data, Whisper: w, Piper: p, Exec: func(context.Context, string, []string, string, []string, []byte) ([]byte, error) {
+		ran = true
+		return nil, nil
+	}}
+	write(t, filepath.Join(data, "voice-models", "stt", "ggml-base.bin"), []byte("x"))
+	write(t, filepath.Join(data, "voice-models", "tts", "de.onnx"), []byte("x"))
+	write(t, filepath.Join(data, "voice-models", "tts", "de.onnx.json"), []byte("{}"))
+	if _, err := NewWhisper(o).Transcribe(context.Background(), SilentWAV(100), "", ""); !errors.Is(err, ErrNotInstalled) {
+		t.Fatalf("transcribe: %v", err)
+	}
+	if _, err := NewPiper(o).Speak(context.Background(), "Hallo", ""); !errors.Is(err, ErrNotInstalled) {
+		t.Fatalf("speak: %v", err)
+	}
+	if ran {
+		t.Fatal("nothing runs without an installed build")
+	}
+	entries, _ := os.ReadDir(filepath.Join(data, "runtime-voice", "whisper"))
+	for _, e := range entries {
+		if e.IsDir() {
+			t.Fatalf("a read-only call installed something: %s", e.Name())
+		}
+	}
+}
