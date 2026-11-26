@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ApiClient } from "../api/client";
 import { parseRoute } from "../route";
@@ -218,6 +218,10 @@ describe("Sheets", () => {
     expect(screen.queryByTestId("sheets-list")).toBeNull();
     fireEvent.keyDown(window, { key: "PageDown" });
     expect(window.location.hash).toBe("#/sheets/s9");
+    // a fresh mount at the new address (as the shell does) stays on stage
+    cleanup();
+    render(<SheetsPage api={api} id="s1" />);
+    expect(await screen.findByTestId("sheet-stage")).toBeTruthy();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByTestId("sheet-stage")).toBeNull();
   });

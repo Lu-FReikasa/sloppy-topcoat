@@ -27,6 +27,7 @@ interface Props {
 const POLL_MS = 3000;
 const SORT_KEY = "topcoat.sheets.sort";
 const TABS_KEY = "topcoat.sheets.hideTabs";
+const STAGE_KEY = "topcoat.sheets.stage";
 
 /** A remembered choice of this browser; storage may be missing or blocked. */
 function remembered(key: string): string | null {
@@ -82,8 +83,24 @@ export function SheetsPage({ api, id }: Props) {
     setSortState(m);
     remember(SORT_KEY, m);
   };
-  const [stage, setStage] = useState(false);
-  const exitStage = useCallback(() => setStage(false), []);
+  // the stage mode survives paging: a new address may mount this page afresh
+  const [stage, setStageState] = useState(() => {
+    try {
+      return window.sessionStorage.getItem(STAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setStage = useCallback((on: boolean) => {
+    setStageState(on);
+    try {
+      if (on) window.sessionStorage.setItem(STAGE_KEY, "1");
+      else window.sessionStorage.removeItem(STAGE_KEY);
+    } catch {
+      /* the stage mode then ends with this page */
+    }
+  }, []);
+  const exitStage = useCallback(() => setStage(false), [setStage]);
   const groups = useMemo(() => visibleGroups(list ?? [], query, artist, sort), [list, query, artist, sort]);
 
   useEffect(() => {
