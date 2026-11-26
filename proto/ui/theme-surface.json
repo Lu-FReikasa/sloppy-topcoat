@@ -3,7 +3,7 @@
   "classes": [
     "dt-root", "dt-solo", "dt-overlay", "dt-arriving", "dt-leaving", "dt-meter", "dt-moving", "dt-snap-preview", "dt-tile", "dt-settings", "dt-overlay-hint", "dt-screen", "dt-pin", "dt-grip",
     "dt-grip-n", "dt-grip-s", "dt-grip-e", "dt-grip-w", "dt-grip-ne", "dt-grip-nw", "dt-grip-se", "dt-grip-sw", "dt-stage", "dt-view", "dt-banner", "dt-empty", "dt-note",
-    "dt-program", "dt-focused", "dt-maxi", "dt-closing", "dt-titlebar", "dt-lamp", "dt-code", "dt-title", "dt-icon",
+    "dt-program", "dt-focused", "dt-maxi", "dt-closing", "dt-scaled", "dt-unframed", "dt-titlebar", "dt-lamp", "dt-code", "dt-title", "dt-icon",
     "dt-titlebar-buttons", "dt-minimise", "dt-maximise", "dt-close", "dt-program-body", "dt-nav",
     "dt-taskbar", "dt-start", "dt-tasks", "dt-task", "dt-open", "dt-min", "dt-front", "dt-label",
     "dt-signal", "dt-signal-red", "dt-signal-amber", "dt-signal-green",
@@ -16,7 +16,9 @@
     "dt-front": ["dt-task", "dt-start"],
     "dt-focused": ["dt-program"],
     "dt-maxi": ["dt-program"],
-    "dt-closing": ["dt-program"]
+    "dt-closing": ["dt-program"],
+    "dt-scaled": ["dt-program"],
+    "dt-unframed": ["dt-program"]
   },
   "root_prefixes":["dt-theme-", "dt-look-", "dt-bar-"],
   "variables": {

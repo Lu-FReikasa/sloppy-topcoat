@@ -219,6 +219,32 @@ export function overview(): ZoomPath {
   return [];
 }
 
+/** The frame that shows `key`: the zoom as it is when the program is framed, else zoomed out just
+ *  far enough (a program brought forward from the taskbar must not stay outside the view). */
+export function reveal(tree: NestTree, zoom: readonly number[], key: string): ZoomPath {
+  const z = validZoom(tree, zoom);
+  const p = pathOf(tree, key);
+  if (!p) return z;
+  const common = z.findIndex((v, i) => p[i] !== v);
+  return common < 0 ? z : z.slice(0, common);
+}
+
+/** The shallowest zoom towards `key` at which the program is drawn at its full size (scale 1), or
+ *  the program alone when even that is too small. */
+export function zoomToFit(
+  tree: NestTree,
+  key: string,
+  area: Box,
+  min: { w: number; h: number } = MIN_TILE,
+): ZoomPath {
+  const p = pathOf(tree, key);
+  if (!p) return [];
+  const fits = p
+    .map((_, i) => p.slice(0, i))
+    .find((z) => (rects(tree, area, z, min).find((r) => r.key === key)?.scale ?? 0) >= 1);
+  return fits ?? p;
+}
+
 /** The group a program stands in (its innermost split), or [] for a lone program. */
 export function groupOf(tree: NestTree, key: string): ZoomPath {
   const p = pathOf(tree, key);

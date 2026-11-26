@@ -38,9 +38,21 @@ it. The admin may still copy and change programs.
 | `Ctrl+K` | the **command palette**, in the middle: programs, views, settings and actions by name; Enter opens |
 | `Ctrl+Enter` | the conversation of the focused program (its chat, in its context) |
 | `Alt+1` … `Alt+9` | the n-th program of the taskbar: open, or bring forward |
-| `Escape` | close the palette; otherwise minimise the focused program |
+| `Escape` | close the palette; in a `nest` theme zoomed in: out one level; otherwise minimise the focused program |
+| `Alt+↓` / `Alt+↑` / `Alt+0` | `nest` themes only: zoom in one level towards the focused program / out one level / the overview of all |
 
 A key does nothing while the person types in a field, except `Ctrl+K` and `Escape`.
+
+**The `nest` layout** (a theme's `layout.kind`, `nest.ts`): programs sit in splits that nest to any
+depth; each split is a level, and the view frames one of them (the overview frames the whole tree).
+Programs outside the frame lie off the stage and keep running (mounted, inert); a zoom moves every
+window from its old place to the new one as a transform, for the theme's `motion.ms` (none with
+reduced motion). A program smaller than its minimum size (`MIN_TILE`) is laid out at that size and
+drawn scaled down; its content takes no input then, and a click on it zooms to the first level where
+it has its full size and brings it forward. Bringing a program forward from outside the frame (taskbar,
+`Alt+n`) zooms out just far enough to show it. In the overlay `Escape` stays the client's key (it
+hides the overlay), so `Alt+↑` steps out there, and nest windows are not moved or sized by hand; a
+solo window shows its one program whole. The zoom commands are also in the palette.
 
 ## 3. State
 

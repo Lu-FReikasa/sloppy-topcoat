@@ -3103,6 +3103,11 @@
     "programs": "Applications",
     "program": "application",
     "action": "action",
+    "nest": {
+      "zoomIn": "Zoom in (towards the program in front)",
+      "zoomOut": "Zoom out one level",
+      "overview": "Overview of all programs"
+    },
     "views": "Views of {{program}}",
     "minimise": "Minimise {{program}}",
     "maximise": "Maximise {{program}}",
@@ -3483,7 +3488,8 @@
       "columns": "Columns",
       "rows": "Rows",
       "focus": "One large, the rest at the side",
-      "cascade": "Overlapping, the front one on top"
+      "cascade": "Overlapping, the front one on top",
+      "nest": "Nested, with zoom (levels of groups)"
     },
     "barPosition": "Taskbar",
     "positions": {

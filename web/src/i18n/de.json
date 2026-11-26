@@ -3103,6 +3103,11 @@
     "programs": "Anwendungen",
     "program": "Anwendung",
     "action": "Aktion",
+    "nest": {
+      "zoomIn": "Hineinzoomen (zum Programm vorn)",
+      "zoomOut": "Eine Ebene herauszoomen",
+      "overview": "Übersicht über alle Programme"
+    },
     "views": "Ansichten von {{program}}",
     "minimise": "{{program}} minimieren",
     "maximise": "{{program}} maximieren",
@@ -3483,7 +3488,8 @@
       "columns": "Spalten",
       "rows": "Zeilen",
       "focus": "Eines groß, der Rest an der Seite",
-      "cascade": "Überlappend, das vordere oben"
+      "cascade": "Überlappend, das vordere oben",
+      "nest": "Verschachtelt, mit Zoom (Ebenen von Gruppen)"
     },
     "barPosition": "Taskleiste",
     "positions": {
