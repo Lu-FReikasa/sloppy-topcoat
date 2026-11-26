@@ -66,13 +66,12 @@ export function Setlists({ api, list, openId, onPlay, onError }: Props) {
     reload();
   };
 
-  const change = async (s: Setlist, patch: { name?: string; items?: SetlistItem[] }) => {
+  // changes go to the hub one after the other: each one sends the whole order, so two quick moves
+  // must not overtake each other on the way
+  const sending = useRef<Promise<void>>(Promise.resolve());
+  const change = (s: Setlist, patch: { name?: string; items?: SetlistItem[] }) => {
     replace({ ...s, ...patch });
-    try {
-      await api.setlistUpdate(s.id, patch);
-    } catch (e) {
-      failed(e);
-    }
+    sending.current = sending.current.then(() => api.setlistUpdate(s.id, patch).then(() => undefined, failed));
   };
 
   const remove = async (s: Setlist) => {
@@ -127,7 +126,7 @@ export function Setlists({ api, list, openId, onPlay, onError }: Props) {
           setlist={current}
           list={list}
           openId={openId}
-          onChange={(patch) => void change(current, patch)}
+          onChange={(patch) => change(current, patch)}
           onDelete={() => void remove(current)}
           onPlay={(from) => onPlay(current, from)}
         />
