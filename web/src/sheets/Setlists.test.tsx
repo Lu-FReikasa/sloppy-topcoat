@@ -39,7 +39,7 @@ describe("Setlists", () => {
       }),
     } as unknown as ApiClient;
     window.localStorage.setItem("topcoat.sheets.setlist", "L1");
-    render(<Setlists api={api} list={list} onPlay={() => undefined} onError={() => undefined} />);
+    render(<Setlists api={api} list={list} onOpen={() => undefined} onPlay={() => undefined} onError={() => undefined} />);
     const items = await screen.findByTestId("setlist-items");
     const down = () => within(items).getAllByRole("button", { name: /^(Move down|Nach unten)$/ });
     fireEvent.click(down()[0]!); // a b c -> b a c
@@ -76,7 +76,7 @@ describe("Setlists", () => {
       ),
     } as unknown as ApiClient;
     window.localStorage.setItem("topcoat.sheets.setlist", "L1");
-    render(<Setlists api={api} list={list} onPlay={() => undefined} onError={onError} />);
+    render(<Setlists api={api} list={list} onOpen={() => undefined} onPlay={() => undefined} onError={onError} />);
     const items = await screen.findByTestId("setlist-items");
     const down = () => within(items).getAllByRole("button", { name: /^(Move down|Nach unten)$/ });
     fireEvent.click(down()[0]!);
