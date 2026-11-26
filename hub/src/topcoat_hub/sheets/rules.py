@@ -42,7 +42,24 @@ def apply(sheet: Sheet) -> Applied:
     _chord_lines(sheet, done)
     _tab_blocks(sheet, done)
     _header(sheet, done)
+    _accents(sheet)
     return done
+
+
+def _accents(sheet: Sheet) -> None:
+    """Accent stars ("*  A   A", a lone "**") on lines without words go: a reader plays from the
+    chords; a line left with nothing goes too."""
+    for sec in sheet.sections:
+        keep: list[Line] = []
+        for ln in sec.lines:
+            if ln.comment is None and re.fullmatch(r"[\s*]*", ln.lyrics) and "*" in ln.lyrics:
+                for g in ln.segments:
+                    g.text = g.text.replace("*", " ")
+                if not ln.chords and not any(g.raw for g in ln.segments):
+                    continue
+            keep.append(ln)
+        sec.lines = keep
+    _replace(sheet, list(sheet.sections))
 
 
 # --- chord lines -----------------------------------------------------------------------------

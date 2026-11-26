@@ -260,3 +260,12 @@ def test_a_lyric_with_the_word_riff_stays() -> None:
            "\n{start_of_verse}\n[A]paper boat\n{end_of_verse}\n")  # fmt: skip
     rules.apply(s)
     assert lyric_lines(s)[0] == "play me that riff again"
+
+
+def test_accent_stars_on_chord_lines_go_and_a_star_in_lyrics_stays() -> None:
+    s = cp("{start_of_verse}\n *    A   D\n**\npaper *boats* are sailing\n{end_of_verse}\n")
+    rules.apply(s)
+    lines = s.sections[0].lines
+    assert len(lines) == 2  # the lone "**" line went
+    assert "*" not in lines[0].lyrics and [c.name() for c in lines[0].chords] == ["A", "D"]
+    assert lines[1].lyrics == "paper *boats* are sailing"
