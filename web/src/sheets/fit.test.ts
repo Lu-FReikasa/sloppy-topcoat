@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balanceColumns, chooseFit, packColumns, isTabLine, maxColumns, MAX_FONT, MIN_FONT, neighbour, positionOf, sortGroups, visibleGroups } from "./fit";
+import { balanceColumns, chooseFit, packColumns, maxColumns, MAX_FONT, MIN_FONT, neighbour, positionOf, sortGroups, visibleGroups } from "./fit";
 import { groupSheets } from "./group";
 import type { SheetSummary } from "./types";
 
@@ -80,14 +80,6 @@ describe("sorting and paging", () => {
   });
 });
 
-describe("isTabLine", () => {
-  it("spots tablature, not lyrics or chords", () => {
-    expect(isTabLine("e|-----3---5---|")).toBe(true);
-    expect(isTabLine("--0--2--3--2--0--")).toBe(true);
-    expect(isTabLine("Walking down the road - again")).toBe(false);
-    expect(isTabLine("C   G   Am   F")).toBe(false);
-  });
-});
 
 describe("packColumns", () => {
   it("fills each column before the next and never breaks a part", () => {

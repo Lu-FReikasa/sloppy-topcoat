@@ -84,12 +84,6 @@ export function neighbour(groups: SheetGroup[], id: string, step: number, at?: n
   return g?.versions[g.versions.length - 1]?.id ?? null;
 }
 
-/** A line that is guitar tablature or a riff drawn in dashes ("e|--3--|", "--0--2--"). */
-export function isTabLine(text: string): boolean {
-  const t = text.trim();
-  return /^[a-gA-G]?\s*[|:]?[-0-9hpbr/\\|x~.]{6,}/.test(t) && (t.match(/-/g)?.length ?? 0) >= 4;
-}
-
 /** The parts (by their heights, in order) placed into at most `columns` columns of height
  *  `capacity`, each column filled before the next; a part never breaks. The indexes per column,
  *  or null when they do not fit. Browsers differ in how CSS columns overflow, so the stage places

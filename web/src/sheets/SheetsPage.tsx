@@ -18,7 +18,6 @@ import {
   balanceColumns,
   chooseFit,
   packColumns,
-  isTabLine,
   maxColumns,
   neighbour,
   positionOf,
@@ -43,7 +42,6 @@ interface Props {
 
 const POLL_MS = 3000;
 const SORT_KEY = "topcoat.sheets.sort";
-const TABS_KEY = "topcoat.sheets.hideTabs";
 const COLLAPSE_KEY = "topcoat.sheets.stageCollapse";
 const STAGE_KEY = "topcoat.sheets.stage";
 const SIDE_KEY = "topcoat.sheets.side";
@@ -844,19 +842,6 @@ function Comparison({ cmp }: { cmp: SheetComparison }) {
   );
 }
 
-/** The text of a line as it reads, chords included (to spot tab lines). */
-function lineText(line: SheetLine): string {
-  return line.comment ?? (line.segments ?? []).map((g) => (g.chord ?? "") + g.text).join("");
-}
-
-/** The sections without tab parts and tab lines; a part left empty goes too. */
-export function withoutTabs(sections: SheetSection[]): SheetSection[] {
-  return sections
-    .filter((s) => s.kind !== "tab")
-    .map((s) => ({ ...s, lines: s.lines.filter((ln) => !isTabLine(lineText(ln))) }))
-    .filter((s) => s.lines.length > 0 || s.repeat_of !== null);
-}
-
 /** The stage mode: the sheet alone, full screen, fitted on one screen in columns. ←/→ and
  *  PageUp/PageDown (a foot pedal sends these) page through the songs of the list as it is
  *  filtered and sorted, or through a setlist (`setlistName`; `at` is where `id` is in it, since a
@@ -886,16 +871,11 @@ function Stage({
   const opened = from ?? startId;
   const [sheet, setSheet] = useState<SheetDetail | null>(null);
   const [error, setError] = useState("");
-  const [hideTabs, setHideTabsState] = useState(() => remembered(TABS_KEY) !== "0");
   // default on: a repeat written out once saves lines when a song has to fit one screen
   const [collapse, setCollapseState] = useState(() => remembered(COLLAPSE_KEY) !== "0");
   const [fit, setFit] = useState<Fit | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
-  const setHideTabs = (on: boolean) => {
-    setHideTabsState(on);
-    remember(TABS_KEY, on ? "1" : "0");
-  };
   const setCollapse = (on: boolean) => {
     setCollapseState(on);
     remember(COLLAPSE_KEY, on ? "1" : "0");
@@ -943,9 +923,9 @@ function Stage({
   }, []);
 
   const items = useMemo(() => {
-    const sections = sheet ? (hideTabs ? withoutTabs(sheet.view.sections) : sheet.view.sections) : [];
+    const sections = sheet ? sheet.view.sections : [];
     return collapse ? collapseRepeats(sections) : asWritten(sections);
-  }, [sheet, hideTabs, collapse]);
+  }, [sheet, collapse]);
 
   // fit: columns and the largest font at which every part has its place. The parts are measured in
   // a hidden copy one column wide and placed into the columns here (packColumns): browsers differ in
@@ -1001,6 +981,8 @@ function Stage({
     <>
       <div className="sheet-stage" data-testid="sheet-stage">
       <header className="sheet-stage-head">
+        {/* one line: a long title or artist is cut short, the buttons keep their place */}
+        <div className="sheet-stage-info">
         {setlistName && here >= 0 && (
           <span className="sheet-stage-set" data-testid="sheet-stage-set">
             {t("sheets.setlists.position", { name: setlistName, n: here + 1, total: groups.length })}
@@ -1021,15 +1003,13 @@ function Stage({
         ) : (
           <span className="muted">{error || t("sheets.loading")}</span>
         )}
+        </div>
         <div className="sheet-stage-tools">
-          <button type="button" onClick={() => go(prev, -1)} disabled={!prev} aria-label={t("sheets.stage.prev")} title={t("sheets.stage.prev")}>
+          <button type="button" className="sheet-stage-arrow" onClick={() => go(prev, -1)} disabled={!prev} aria-label={t("sheets.stage.prev")} title={t("sheets.stage.prev")}>
             ←
           </button>
-          <button type="button" onClick={() => go(next, 1)} disabled={!next} aria-label={t("sheets.stage.next")} title={t("sheets.stage.next")}>
+          <button type="button" className="sheet-stage-arrow" onClick={() => go(next, 1)} disabled={!next} aria-label={t("sheets.stage.next")} title={t("sheets.stage.next")}>
             →
-          </button>
-          <button type="button" aria-pressed={hideTabs} onClick={() => setHideTabs(!hideTabs)}>
-            {t("sheets.stage.hideTabs")}
           </button>
           <button type="button" aria-pressed={collapse} onClick={() => setCollapse(!collapse)}>
             {t("sheets.collapse")}
