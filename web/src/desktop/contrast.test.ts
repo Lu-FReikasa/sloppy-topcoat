@@ -329,3 +329,26 @@ describe("the desk's paper", () => {
     expect(worst(pairs)).toEqual([]);
   });
 });
+
+/** The system's palette outside the looks: the light `:root` and its dark twin under the media query. */
+const DARK_SCHEME = "@media (prefers-color-scheme: dark)";
+
+describe("the system palette outside the looks", () => {
+  const light = decls("styles.css", ":root");
+  const darkRules = SHEETS["styles.css"]!.filter((r) => r.selector === ":root" && r.within === DARK_SCHEME);
+  const dark: Vars = { ...light, ...Object.assign({}, ...darkRules.map((r) => r.decls)) };
+
+  it("writes error text readable on the dark ground and surface (#69)", () => {
+    const pairs = ["--bg", "--surface"].map((ground) => ({
+      what: `--bad on ${ground}`,
+      fg: colour("var(--bad)", dark),
+      bg: colour(`var(${ground})`, dark),
+    }));
+    expect(darkRules.length).toBeGreaterThan(0);
+    expect(worst(pairs)).toEqual([]);
+  });
+
+  it("keeps the light theme's error red", () => {
+    expect(light["--bad"]).toBe("#c53030");
+  });
+});
