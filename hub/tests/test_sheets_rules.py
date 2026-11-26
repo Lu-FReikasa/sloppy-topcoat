@@ -245,3 +245,18 @@ def test_a_minor_major_ninth_is_a_chord_but_a_hum_is_not() -> None:
 
     assert parse_chord("Ammaj9") is not None
     assert parse_chord("Hmmm", german=True) is None
+
+
+def test_the_names_of_riffs_without_their_tab_go_from_the_header() -> None:
+    s = cp("{start_of_part: Other}\n *  Riff 1:        ** Riff 2:\n{end_of_part}\n"
+           "\n{start_of_verse}\n[A]paper boat\n{end_of_verse}\n")  # fmt: skip
+    done = rules.apply(s)
+    assert len(done.removed) == 1
+    assert [x.kind for x in s.sections] == ["verse"]
+
+
+def test_a_lyric_with_the_word_riff_stays() -> None:
+    s = cp("{start_of_part: Other}\nplay me that riff again\n{end_of_part}\n"
+           "\n{start_of_verse}\n[A]paper boat\n{end_of_verse}\n")  # fmt: skip
+    rules.apply(s)
+    assert lyric_lines(s)[0] == "play me that riff again"

@@ -210,6 +210,10 @@ _FACT_NAMES = {
     "performed by": "artist", "tuning": "tuning", "stimmung": "tuning", "key": "key",
     "tonart": "key", "tempo": "tempo", "bpm": "tempo",
 }  # fmt: skip
+# the names of riffs over tab that is gone ("*Riff 1:   **Riff 2:", "Main riff")
+_RIFF_NAMES = re.compile(
+    r"^(?:[\s*#()\[\]:.,-]*(?:main\s+)?(?:riff|lick|tab)\s*\d*[\s*()\[\]:.,-]*)+$", re.I
+)
 # "Standard tuning", "Drop D tuning", "Eb tuning (half step down)"
 _HERTZ = re.compile(r"\b(4[0-9]{2}(?:[.,][0-9]+)?)\s*hz\b", re.I)
 _TUNING = re.compile(r"^(\S+(?:\s+\S+){0,3})\s+tuning\s*((?:[:(\-].*)?)$", re.I)
@@ -268,7 +272,13 @@ def _header_line(text: str, sheet: Sheet) -> bool:
     if m:
         sheet.meta.setdefault("x_tuning", (m.group(1) + m.group(2)).strip())
         return True
-    return bool(_SOURCE.search(t) or _CREDIT.search(t) or _by_name(t) or _names_song(t, sheet))
+    return bool(
+        _SOURCE.search(t)
+        or _CREDIT.search(t)
+        or _RIFF_NAMES.match(t)
+        or _by_name(t)
+        or _names_song(t, sheet)
+    )
 
 
 def _by_name(text: str) -> bool:
