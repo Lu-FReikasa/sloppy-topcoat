@@ -699,18 +699,20 @@ function Flow({ sheet }: { sheet: SheetDetail }) {
   );
 }
 
-function Body({ items }: { items: BodyItem[] }) {
+/** `anchors` off for the stage's hidden measuring copy, so ids stay unique on the page. */
+function Body({ items, anchors: withAnchors = true }: { items: BodyItem[]; anchors?: boolean }) {
   const { t } = useTranslation();
   const name = (s: SheetSection) => s.label || t(`sheets.kind.${KINDS.includes(s.kind) ? s.kind : "other"}`);
   return (
     <div className="sheet-body">
       {items.map(({ section: s, again, times, indices }) => {
         // the flow links to every part; parts merged into this block keep their anchor here
-        const anchors = indices.slice(1).map((i) => <span key={i} id={`sheet-part-${i}`} />);
+        const id = (i: number) => (withAnchors ? `sheet-part-${i}` : undefined);
+        const anchors = withAnchors && indices.slice(1).map((i) => <span key={i} id={id(i)} />);
         const count = times > 1 && <span className="sheet-times"> ×{times}</span>;
         if (again)
           return (
-            <section key={s.index} id={`sheet-part-${s.index}`} className={`sheet-part sheet-again ${kindClass(s.kind)}`} data-testid="sheet-again">
+            <section key={s.index} id={id(s.index)} className={`sheet-part sheet-again ${kindClass(s.kind)}`} data-testid="sheet-again">
               {anchors}
               <h3 className="sheet-part-label">
                 {name(s)}
@@ -720,7 +722,7 @@ function Body({ items }: { items: BodyItem[] }) {
             </section>
           );
         return (
-          <section key={s.index} id={`sheet-part-${s.index}`} className={`sheet-part ${kindClass(s.kind)}`}>
+          <section key={s.index} id={id(s.index)} className={`sheet-part ${kindClass(s.kind)}`}>
             {anchors}
             <h3 className="sheet-part-label">
               {name(s)}
@@ -1036,7 +1038,7 @@ function Stage({
       </div>
       {/* the measuring copy: out of sight, one column wide, at the font being tried */}
       <div ref={body} className="sheet-stage-body sheet-stage-measure" aria-hidden="true">
-        {v && <Body items={items} />}
+        {v && <Body items={items} anchors={false} />}
       </div>
     </>
   );

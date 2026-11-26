@@ -93,4 +93,10 @@ describe("packColumns", () => {
     expect(balanceColumns([4, 4, 4, 4, 4, 4], 3)).toEqual([[0, 1], [2, 3], [4, 5]]);
     expect(balanceColumns([10, 1, 1], 2)).toHaveLength(2);
   });
+
+  it("handles no parts and a part taller than the screen", () => {
+    expect(balanceColumns([], 3)).toEqual([[]]);
+    expect(packColumns([], 2, 5)).toEqual([[]]);
+    expect(balanceColumns([20, 2, 2], 2)).toEqual([[0], [1, 2]]);
+  });
 });

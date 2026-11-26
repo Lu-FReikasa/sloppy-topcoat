@@ -601,10 +601,18 @@
   align-items: start;
 }
 
+/* the rule sits in the middle of the gap: a column keeps the full width it was measured at */
 .sheet-stage-col + .sheet-stage-col {
+  position: relative;
+}
+
+.sheet-stage-col + .sheet-stage-col::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1em;
   border-left: 1px solid color-mix(in srgb, currentColor 12%, transparent);
-  padding-left: 1em;
-  margin-left: -1em;
 }
 
 /* the hidden copy the parts are measured in */

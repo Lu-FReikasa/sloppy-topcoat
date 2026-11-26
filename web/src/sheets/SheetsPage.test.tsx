@@ -323,6 +323,9 @@ describe("Sheets", () => {
     // repeats collapse by default on stage: the chorus and its {chorus} reference are one block
     const labels = () => [...stage.querySelectorAll(".sheet-part-label")].map((h) => h.textContent);
     expect(labels()).toEqual(["Verse 1", "Chorus ×2"]);
+    // the hidden measuring copy carries no anchors: every id on the page stays unique
+    const ids = [...document.querySelectorAll("[id^='sheet-part-']")].map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
     fireEvent.click(within(stage).getByRole("button", { name: /Collapse repeats|Wiederholungen kürzen/ }));
     expect(labels()).toEqual(["Verse 1", "Chorus", expect.stringMatching(/^Chorus · /)]);
     fireEvent.keyDown(window, { key: "PageDown" });
