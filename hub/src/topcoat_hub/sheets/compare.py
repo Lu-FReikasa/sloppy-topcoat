@@ -304,6 +304,10 @@ def pair_sections(a: Sheet, b: Sheet) -> list[tuple[int, int]]:
     return sorted(pairs)
 
 
+def _sung(sheet: Sheet) -> list[Section]:
+    return [s for s in sheet.sections if s.kind != "tab"]  # a tab block's lines are no lyrics
+
+
 def _flow_text(sheet: Sheet) -> str:
     return " · ".join(label or kind for kind, label in sheet.flow())
 
@@ -345,8 +349,8 @@ def compare(a: Sheet, b: Sheet) -> Comparison:
             continue  # both repeat a part compared already
         _compare_sections(sa.label or sa.kind, _lines(a, sa), _lines(bn, sb), ka, diffs)
 
-    words_a = _norm_words(" ".join(ln.lyrics for s in a.sections for ln in _lines(a, s)))
-    words_b = _norm_words(" ".join(ln.lyrics for s in b.sections for ln in _lines(b, s)))
+    words_a = _norm_words(" ".join(ln.lyrics for s in _sung(a) for ln in _lines(a, s)))
+    words_b = _norm_words(" ".join(ln.lyrics for s in _sung(b) for ln in _lines(b, s)))
     lyr = (
         SequenceMatcher(None, words_a, words_b, autojunk=False).ratio()
         if words_a or words_b

@@ -496,7 +496,10 @@ class FakeNode:
             self.send(msg("proxy_chunk", chunk))
             end(status)
             return
-        text = f"Antwort von {self.node_id[:8]}: " + req["messages"][-1]["content"]
+        last = req["messages"][-1]["content"]
+        if isinstance(last, list):  # content parts (an image, D125): the text of the turn
+            last = "".join(p.get("text", "") for p in last if p.get("type") == "text")
+        text = f"Antwort von {self.node_id[:8]}: " + last
         text += self.answer_padding
         if self.stream_text_fn is not None and req.get("stream"):
             got = self.stream_text_fn(req)
@@ -523,7 +526,7 @@ class FakeNode:
         completion_tokens = len(words) + (
             len((self.stream_reasoning or "").split()) if self.usage_counts_reasoning else 0
         )
-        prompt_tokens = sum(len(m["content"].split()) for m in req["messages"])
+        prompt_tokens = sum(len(str(m["content"]).split()) for m in req["messages"])
         finish = json.dumps({"choices": [{"delta": {}, "finish_reason": self.finish_reason}]})
         usage = json.dumps(
             {
@@ -611,9 +614,17 @@ def online_node(
     name: str,
     loaded: list[str] | None = None,
     context_length: int | None = None,
+    projectors: dict[str, str] | None = None,
 ) -> FakeNode:
+    """``projectors``: model -> the vision projector the node loads with it (D125)."""
     node_id, key = pair(client, name)
     node = connect(node_id, key)
+    if projectors:
+        seeing = [
+            {"name": m, "size_bytes": 1000, "format": "gguf", "projector": p}
+            for m, p in projectors.items()
+        ]
+        node.inventory = {**INVENTORY, "models": [*INVENTORY["models"], *seeing]}
     node.handshake()
     node.loaded = [
         {

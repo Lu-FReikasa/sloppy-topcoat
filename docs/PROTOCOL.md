@@ -325,6 +325,41 @@ the prerequisite of the OpenAI-compatible `tools` / `tool_calls`; b11223 has it 
 node passes it explicitly). llama-server's own agent tools (`--tools`, `--agent`, `--mcp-…`: shell
 and files) are never enabled. Both keys are additive in v1.
 
+### Vision models and their projector (D125)
+A model that can see is two GGUF files: the language model and its projector (architecture
+`clip`, by convention `mmproj` in the name). The node never lists a projector as a model; it
+loads a model together with its projector (`llama-server --mmproj <file>`) and reports the file
+name as `models[].projector` in the inventory. The projector is looked for in the model's own
+directory only: `config.runner.projectors[<model>]` (a file name, or `"none"`) wins; else by name
+(`mmproj-<model>.gguf`, `<model>.mmproj.gguf`, `<model>-mmproj*.gguf`); else the only projector of
+a subfolder below a models directory (a downloaded repository; with several, F16 before BF16
+before Q8_0, then by name), never a lone projector in the top of a models directory. The hub's
+model facts count a model with a projector as `vision`. Both keys are additive in v1.
+
+### Image runner (D126)
+`config.images {enabled, backend?: auto|vulkan|cuda|cpu, model_dirs?}` switches on the node's second
+runner: stable-diffusion.cpp's `sd-server`, a pinned official release (`node/internal/sdcpp/releases.json`,
+SHA-256 = GitHub's asset digests) installed below `<data dir>/runtime-sd` when the first image
+model loads. Image models are `.gguf` and `.safetensors` files in `<data dir>/image-models` and
+`model_dirs` (pickle-based `.ckpt`/`.pt` are not offered: loading one can run code). One image model
+runs at a time, started with `--listen-ip 127.0.0.1` on a free port. `sd-server` has **no API key**
+(none in the pinned release nor in master of 2026-11-25), so it is protected only by loopback and the
+random port. There is no official Linux CUDA build: Linux NVIDIA uses Vulkan; the Linux builds need
+glibc 2.43 (Ubuntu 26.04). The inventory reports `images {release, backend, installed, models[],
+loaded[]}`. The actions `image.generate` / `image.edit` follow with milestone P6. Additive in v1.
+
+### Voice capabilities (D127)
+`config.tools.voice {enabled, backend?: auto|cpu}` adds two read-only capabilities (invoked like every
+capability, assigned per node): `voice.transcribe {audio_base64 (WAV, at most 2.5 MB), model?, language?:
+auto|<iso>}` → `{text, language}` and `voice.speak {text (at most 600 characters), voice?}` →
+`{audio_base64, format: "wav"}`. They run the pinned official builds of whisper.cpp (`b5454`; Linux CPU,
+Windows CPU or CUDA 12; no Vulkan build) and Piper (`2023.11.14-2`, the last standalone binary) as **one
+short process per request**: no server, no port; audio is written to a temporary directory and removed
+after the request. The builds (up to about 685 MB) are installed in the background when `voice` is switched on;
+the capabilities themselves never download and answer "not installed yet" until the build is there. Models: `<data dir>/voice-models/stt/*.bin` (whisper ggml) and `tts/*.onnx` with
+their `*.onnx.json`. Piper voices must come from a `rhasspy/piper-voices` revision written for that
+binary (before 2026-11-17, e.g. `a60bfb135881`): newer voice configs use phonemes it cannot read.
+
 **Tool mode of the agent (hub).** How the agent talks to a model is set per model — hub setting
 `agent_tool_modes`, `GET/PUT /api/agent/settings` (PUT admin) — to `native` (one function per
 capability plus `finish`, `tool_choice: required`, results as `tool` messages), `json` (the
@@ -376,6 +411,12 @@ the model through `POST /api/nodes/{id}/actions` and sets it again when the user
 (event `config_changed {source: "manual_unload" | "manual_load", models, auto_reload}`), and
 pushes the new config right after the action result. Removing the entry ends "keep ready".
 Residents with `auto_reload` are exempt from the idle TTL.
+
+A node's **house model** (D117) is always one of its residents: the hub makes it an entry with
+`auto_reload: true` when the house models change (`PUT /api/scheduling/house`; the replaced house
+model's entry is removed) and again each time the node connects, before it sends the config
+(event `config_changed {source: "house" | "house_reconnect", model, previous}`). A manual unload of
+the house model therefore lasts until the next reconnect.
 
 `config.pressure` (absent = off; missing fields = defaults):
 
@@ -550,10 +591,19 @@ A node that is only needed now and then should cost little while it waits.
   Windows `SetSuspendState(hibernate=false)`), event `sleeping {reason: "action"}`. It refuses
   (`busy`) while a game runs, a model loads, a benchmark or download runs or an answer is being
   generated. `config.power.sleep_after_idle_seconds` [0 = never] lets the node do the same by
-  itself after that long without any of that, without a resident to keep, and with nobody at the
-  machine (input younger than that time); event `sleeping {reason: "idle"}`. Both need
+  itself after that long without any of that, without a loaded model being used (a loaded
+  resident such as the house model does not keep it awake; models are unloaded before the sleep
+  and residents load again after the wake), and with nobody at the machine (input younger than
+  that time); event `sleeping {reason: "idle"}`. Both need
   Wake-on-LAN to come back, which is a BIOS/UEFI and network card setting (docs/INSTALL-NODE.md
-  "Energy"). UNVERIFIED on real hardware: `systemctl suspend` / `SetSuspendState` from the
+  "Energy").
+- **Waking on demand (plan step 1.7).** When a request finds no connected node for its model and
+  the model is the **house model** of an offline node (pinned or allowed by its row), the hub
+  sends the magic packet to that node's wired addresses (event `wake_sent {reason: "demand",
+  model, addresses}`), lists the wait as activity `waking` and retries every second until the node
+  serves or `TOPCOAT_WAKE_TIMEOUT_SECONDS` (default 240, 0 = off) ends it with `503 wake_timeout`.
+  `TOPCOAT_WOL_BROADCAST` may name several addresses (comma-separated), e.g. the directed broadcast
+  of the node's LAN when the hub sits in another subnet. UNVERIFIED on real hardware: `systemctl suspend` / `SetSuspendState` from the
   service account, and the magic packet reaching a sleeping machine.
 
 ### Dev nodes (E6-01 S1, ARCHITECTURE D52)
@@ -595,6 +645,17 @@ registered repositories and offers only named, schema-checked operations (no she
   answer is `{repo, pushed, branch, commit, compare_url?}`. `capability.execute` also carries the
   `repo` object of `capability.invoke` (URL, branch, token), and nothing else is added to its keys.
   `repo.diff` (without `stat`) reports `sha256`, `bytes` and `branch` of the whole change.
+- **Large tasks (D109, D110).** The sub-tasks of a large task write one after another on its local
+  branch `topcoat/v-<nr>`. `repo.start` takes `continue: true` for such a topic only (`v-<nr>`; for any
+  other topic it is an input error): when the local branch exists it is checked out as it is, not reset,
+  and the answer is `{repo, branch, based_on: branch, continued: true}`; when it does not exist yet the
+  branch starts from the default branch as usual and the answer carries `continued: false`. Without the
+  flag nothing changes. `repo.read` and `repo.outline` take an optional `branch` (only `topcoat/v-<nr>`,
+  and it must exist in the workshop): they then read that branch from git's objects (`ls-tree`,
+  `cat-file`) and check nothing out, with the checks of a worktree read (a clean relative path, no
+  `.git`, no file that may hold credentials, the size limit, plain files only: no links, no
+  submodules) and the same masking; the answer names the `branch`. Older nodes refuse both fields
+  (`additionalProperties: false`).
 - **Local repositories (D76).** The origin of a repository can live in the workshop itself, a bare
   repository at `<dir>/.origin/<name>.git` computed from the name (never a path from the hub). The
   call's `repo` object is then `{local: true, branch, template?, url: "", token: ""}`: `repo.sync`
@@ -1121,6 +1182,9 @@ Additive changes in v1 (no version bump):
   `hardware.disk_total_mb` / `disk_free_mb`, error codes `insufficient_memory` /
   `insufficient_disk`, event `benchmark_error`, `benchmark_finished.failed_runs`.
 - E3-01c: `config.runner.jinja`, `config.runner.model_jinja`; hub `GET/PUT /api/agent/settings`.
+- D125 (#50): inventory `models[].projector`, `config.runner.projectors`.
+- D126 (#44): `config.images`, inventory `images`.
+- D127 (#53): `config.tools.voice`, capabilities `voice.transcribe`, `voice.speak`.
 - E3-05 (hub only): memory notes `kind`, `stage`, `expires_at`, `verify_with`, usage and feedback
   counters, status `archived`; `POST /api/memory/{id}/feedback`, `/archive`, `/api/memory/care`;
   runs of kind `care`; agent task origin `care`.

@@ -34,6 +34,8 @@ export const PROJECT_GRANTS: Record<string, readonly string[]> = {
   research: ["request_report"],
   dev: ["request_report", "create_branch", "create_prototype"],
   admin: ["read_released"],
+  // the project itself: create and change the sub-tasks of a large task (D109); never delete
+  project: ["decompose"],
 };
 
 /** A change the Projekte chat prepared (it waits for the person's click). */

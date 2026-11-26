@@ -1381,6 +1381,63 @@ class UiTemplate(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class Plugin(Base):
+    """D105 step 2: one installed data plug-in (a manifest, ``proto/plugin/manifest.schema.json``).
+    Owned by the installation, not by a person. ``version`` names the :class:`PluginVersion` that
+    is in force; a rollback points it at an earlier one. Built-in programs are registered by the
+    hub at start (``builtin``) and cannot be removed."""
+
+    __tablename__ = "plugins"
+
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    version: Mapped[str] = mapped_column(String(20))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    builtin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PluginVersion(Base):
+    """One version of a plug-in: the manifest as it was installed and its hash. An admin's version
+    is never edited (a change is a new version); only the version ``1.0.0`` of a built-in program
+    belongs to the code and is re-written at start when the code changed the program."""
+
+    __tablename__ = "plugin_versions"
+    __table_args__ = (UniqueConstraint("plugin_key", "version", name="uq_plugin_versions"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    plugin_key: Mapped[str] = mapped_column(
+        String(40), ForeignKey("plugins.key", ondelete="CASCADE"), index=True
+    )
+    version: Mapped[str] = mapped_column(String(20))
+    manifest: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    sha256: Mapped[str] = mapped_column(String(64))
+    installed_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    installed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class PluginChange(Base):
+    """The audit of the registry: every install, update, rollback, disable, enable and removal,
+    who did it and when. Rows are never edited and outlive the plug-in they name."""
+
+    __tablename__ = "plugin_changes"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    plugin_key: Mapped[str] = mapped_column(String(40), index=True)
+    action: Mapped[str] = mapped_column(String(20))
+    from_version: Mapped[str | None] = mapped_column(String(20))
+    to_version: Mapped[str | None] = mapped_column(String(20))
+    sha256: Mapped[str | None] = mapped_column(String(64))
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class InboxItem(Base):
     """PLATFORM.md 3.7: something that happened and wants to be read. Personal (D20): only ever
     read or written through :class:`topcoat_hub.inbox.InboxStore`. ``urgent`` items stay in the
@@ -2194,6 +2251,31 @@ class ReportImage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class ChatImage(Base):
+    """An image a person gave the chat (D125): re-encoded by the hub (no metadata such as a
+    location survives), kept within size limits and shown only to its person (D20). It belongs to
+    the user message it was sent with; deleting the message or the conversation deletes it."""
+
+    __tablename__ = "chat_images"
+    __table_args__ = (Index("ix_chat_images_message_id", "message_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE")
+    )
+    message_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("messages.id", ondelete="CASCADE")
+    )
+    content_type: Mapped[str] = mapped_column(String(20))
+    width: Mapped[int] = mapped_column(Integer)
+    height: Mapped[int] = mapped_column(Integer)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class WikiPage(Base):
     """A page of Topcoat's own wiki: a report of the application ``wiki`` (its versions, status and
     release live there, D102) with a place in the tree. Personal (D20): only read or written
@@ -2309,3 +2391,42 @@ class SheetRow(Base):
         CheckConstraint("instrument IN ('guitar', 'piano')", name="ck_sheets_instrument"),
         CheckConstraint("capo >= 0 AND capo <= 12", name="ck_sheets_capo"),
     )
+
+
+class SetlistRow(Base):
+    """A setlist of the program Sheets: the order of songs for one evening (rehearsal or gig).
+    Personal (D20): only read or written through :class:`topcoat_hub.sheets.setlists.SetlistStore`.
+    Its songs are :class:`SetlistItemRow` rows, in ``position`` order."""
+
+    __tablename__ = "setlists"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SetlistItemRow(Base):
+    """One song of a setlist: a sheet of the same person, either that version (``newest`` false)
+    or whatever version of the song is newest when the setlist is played (``newest`` true; the
+    sheet names the song). Deleting the sheet or the setlist deletes the item."""
+
+    __tablename__ = "setlist_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    setlist_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("setlists.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    sheet_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sheets.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int] = mapped_column(Integer)
+    newest: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+
+    __table_args__ = (UniqueConstraint("setlist_id", "position", name="uq_setlist_items_position"),)

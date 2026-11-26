@@ -51,6 +51,9 @@ type Options struct {
 	// NewCapabilities builds the capability registry of a tool node from config.tools (E2-04);
 	// nil = this node offers none.
 	NewCapabilities func(*protocol.ToolsConfig) *capability.Registry
+	// NewImageRunner builds the image runner for config.images when it is switched on (D126);
+	// nil = this node build has none.
+	NewImageRunner func(*protocol.ImagesConfig) runner.ImageRunner
 
 	// AgentVersion is reported in hello.
 	AgentVersion string
@@ -113,9 +116,12 @@ type Agent struct {
 	// caps is the capability registry for toolsCfg (E2-04); capSem limits concurrent calls.
 	caps     *capability.Registry
 	toolsCfg *protocol.ToolsConfig
-	capSem   chan struct{}
-	gaming   map[string]watcher.Event // Event.Key -> start event
-	gameStop context.CancelFunc
+	// images is the image runner for imagesCfg (D126); nil = off.
+	images    runner.ImageRunner
+	imagesCfg *protocol.ImagesConfig
+	capSem    chan struct{}
+	gaming    map[string]watcher.Event // Event.Key -> start event
+	gameStop  context.CancelFunc
 	// cooling is true during the cooldown after the last game ended.
 	cooling  bool
 	coolStop context.CancelFunc
@@ -342,6 +348,13 @@ func (a *Agent) applyConfig(cfg protocol.NodeConfig, hash string) {
 	if a.opts.NewCapabilities != nil && (a.caps == nil || !a.toolsCfg.Equal(cfg.Tools)) {
 		a.caps, a.toolsCfg = a.opts.NewCapabilities(cfg.Tools), cfg.Tools
 	}
+	var oldImages runner.ImageRunner
+	if a.opts.NewImageRunner != nil && !a.imagesCfg.Equal(cfg.Images) {
+		oldImages, a.images, a.imagesCfg = a.images, nil, cfg.Images
+		if cfg.Images.On() {
+			a.images = a.opts.NewImageRunner(cfg.Images)
+		}
+	}
 	a.dedicatedGPU = dedicated
 	a.cfg = &cfg
 	a.cfgHash = hash
@@ -357,6 +370,10 @@ func (a *Agent) applyConfig(cfg protocol.NodeConfig, hash string) {
 		a.log.Info("runner selected", "type", a.run.Type())
 	}
 	a.mu.Unlock()
+	if oldImages != nil {
+		a.bg.Add(1)
+		go func() { defer a.bg.Done(); oldImages.Close(context.Background()) }()
+	}
 	if c, ok := old.(runner.Closer); ok && old != nil {
 		// The previous runner's processes (other backend / release) are stopped.
 		a.bg.Add(1)
@@ -625,7 +642,7 @@ func (a *Agent) inventory(ctx context.Context) (protocol.Envelope, error) {
 		if models, err := r.ListModels(ctx); err == nil {
 			for _, m := range models {
 				own := m.Own
-				inv.Models = append(inv.Models, protocol.Model{Name: m.Name, SizeBytes: nonNeg(m.SizeBytes), Format: m.Format, Own: &own, GGUF: protoGGUF(m.GGUF)})
+				inv.Models = append(inv.Models, protocol.Model{Name: m.Name, SizeBytes: nonNeg(m.SizeBytes), Format: m.Format, Own: &own, GGUF: protoGGUF(m.GGUF), Projector: m.Projector})
 			}
 		}
 		if dr, ok := r.(runner.DiskReporter); ok {
@@ -644,6 +661,7 @@ func (a *Agent) inventory(ctx context.Context) (protocol.Envelope, error) {
 	}
 	inv.Capabilities = a.capabilityInfos()
 	inv.Update = a.updateInfo()
+	inv.Images = a.imagesInfo(ctx)
 	return protocol.New(protocol.TypeInventory, inv, a.opts.Now())
 }
 
@@ -706,6 +724,12 @@ func (a *Agent) closeRunner() {
 	if c, ok := r.(runner.Closer); ok {
 		c.Close(context.Background())
 	}
+	a.mu.Lock()
+	ir := a.images
+	a.mu.Unlock()
+	if ir != nil {
+		ir.Close(context.Background()) // an sd-server never outlives its node
+	}
 }
 
 func nonNeg(v int64) int64 {
@@ -741,4 +765,28 @@ func protoGGUF(m *gguf.Meta) *protocol.ModelGGUF {
 		PoolingType:     m.PoolingType,
 		ChatTemplate:    m.ChatTemplate,
 	}
+}
+
+// imagesInfo is the inventory's view of the image runner (D126); nil when it is off.
+func (a *Agent) imagesInfo(ctx context.Context) *protocol.ImagesInfo {
+	a.mu.Lock()
+	ir := a.images
+	a.mu.Unlock()
+	if ir == nil {
+		return nil
+	}
+	ri := ir.Info()
+	out := &protocol.ImagesInfo{Release: ri.Release, Backend: protoBackend(ri.Backend), Installed: ri.Installed,
+		Models: []protocol.ImageModel{}, Loaded: []string{}}
+	if models, err := ir.ListImageModels(ctx); err == nil {
+		for _, m := range models {
+			out.Models = append(out.Models, protocol.ImageModel{Name: m.Name, SizeBytes: nonNeg(m.SizeBytes), Format: m.Format})
+		}
+	}
+	if loaded, err := ir.LoadedImages(ctx); err == nil {
+		for _, l := range loaded {
+			out.Loaded = append(out.Loaded, l.Name)
+		}
+	}
+	return out
 }

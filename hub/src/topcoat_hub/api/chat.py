@@ -19,7 +19,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,6 +31,7 @@ from topcoat_hub import (
     application_brief,
     applications,
     chat,
+    chat_images,
     chat_loop,
     chat_policy,
     chat_review,
@@ -211,10 +212,20 @@ class MessageFeedback(BaseModel):
 class MessageCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    content: str = Field(min_length=1, max_length=100_000)
+    content: str = Field("", max_length=100_000)
     # E3-01d: a check of the user's servers before the answer. auto = when the question is about
     # them, on = always ("check the servers"), off = never.
     tools: Literal["auto", "on", "off"] = "auto"
+    # D125: images (base64, a data URL is fine), re-encoded by the hub before anything keeps them
+    images: list[Annotated[str, Field(max_length=chat_images.MAX_UPLOAD_CHARS)]] = Field(
+        default_factory=list, max_length=chat_images.MAX_PER_MESSAGE
+    )
+
+    @model_validator(mode="after")
+    def _says_something(self) -> "MessageCreate":
+        if not self.content and not self.images:
+            raise ValueError("a message needs text or an image")
+        return self
 
 
 class ChatSettingsUpdate(BaseModel):
@@ -256,7 +267,8 @@ def _iso(value: Any) -> str | None:
     return str(value.astimezone(UTC).isoformat())
 
 
-def message_view(m: Message) -> dict[str, Any]:
+def message_view(m: Message, images: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """A stored message for the browser; ``images`` are the pictures sent with it (D125)."""
     return {
         "id": m.id,
         "role": m.role,
@@ -281,6 +293,11 @@ def message_view(m: Message) -> dict[str, Any]:
         "activity": m.activity or [],
         "feedback": {1: "helped", -1: "unfit"}.get(m.feedback or 0),
         "created_at": _iso(m.created_at),
+        **(
+            {"images": [{k: i[k] for k in ("id", "width", "height")} for i in images]}
+            if images
+            else {}
+        ),
     }
 
 
@@ -419,6 +436,9 @@ async def get_conversation(
         if conv is None:
             raise _http(404, "not_found", "unknown conversation")
         messages = await store.messages(conversation_id)
+        pictures = await chat_images.ChatImageStore(db, user.uuid).of_messages(
+            [m.id for m in messages if m.role == "user"]
+        )
         history = prompt_history(messages)
         persona = None
         if conv.persona_ref:
@@ -440,8 +460,23 @@ async def get_conversation(
             "persona": persona,
             "prompt_hash": history[0]["prompt_hash"] if history else None,
             "prompt_changes": history[1:],
-            "messages": [message_view(m) for m in messages],
+            "messages": [message_view(m, pictures.get(m.id)) for m in messages],
         }
+
+
+@router.get("/chat/images/{image_id}")
+async def get_chat_image(
+    image_id: uuid.UUID, request: Request, user: CurrentUser = Depends(api_user)
+) -> Response:
+    """An image sent with a message (D125), only for its person (D20): another person's image is
+    a 404, whatever its id."""
+    async with request.app.state.sessionmaker() as db:
+        image = await chat_images.ChatImageStore(db, user.uuid).get(image_id)
+    if image is None:
+        raise _http(404, "not_found", "unknown image")
+    return Response(
+        content=image.data, media_type=image.content_type, headers=chat_images.IMAGE_HEADERS
+    )
 
 
 @router.patch("/conversations/{conversation_id}")
@@ -921,12 +956,15 @@ def strip_fake_card(text: str) -> str:
     return _FAKE_CARD.sub("", text).rstrip() or text
 
 
-def history_pairs(messages: list[Message], keep_last: bool = False) -> list[tuple[str, str]]:
+def history_pairs(
+    messages: list[Message], keep_last: bool = False, extra: dict[int, str] | None = None
+) -> list[tuple[str, str]]:
     """The stored conversation as ``(role, text)`` for the prompt (E3-07 D3): a progress line is
     not part of it, a report card is (the model must be able to answer a follow-up from it), and
     the hub's confirmation line is left out, and the card and the closing bubble
     become one turn (a chat template wants the roles to alternate). ``keep_last``: the last
-    message is a cut-off answer that is being continued and stays a turn of its own."""
+    message is a cut-off answer that is being continued and stays a turn of its own. ``extra``:
+    text that follows a message (by id), where its images stand (D125)."""
     out: list[tuple[str, str]] = []
     body = messages[:-1] if keep_last and messages else messages
     for m in body:
@@ -935,6 +973,8 @@ def history_pairs(messages: list[Message], keep_last: bool = False) -> list[tupl
         if m.role == "assistant" and m.content in CONFIRMATIONS.values():
             continue  # the hub's own "looking now" line: the model must not learn to open with it
         text = f"{REPORT_LEAD}\n{m.content}" if m.kind == "report" else m.content
+        if extra and m.id in extra:
+            text = (text + extra[m.id]).strip()
         if out and out[-1][0] == m.role == "assistant":
             out[-1] = (m.role, f"{out[-1][1]}\n\n{text}")
         else:
@@ -1056,6 +1096,12 @@ class Turn:
     context: dict[str, Any] | None = None
     # the conversation as a check's task reads it (task_pairs): answers without report cards
     task_history: list[tuple[str, str]] = field(default_factory=list)
+    # D125: the history with the images where they stand (only when a model that sees answers),
+    # the bytes of the images that go to it by id, and what happened to them (``meta.vision``)
+    vision_history: list[tuple[str, str]] | None = None
+    image_data: dict[str, tuple[str, bytes]] = field(default_factory=dict)
+    vision: dict[str, Any] | None = None
+    vision_chunk: str = ""  # the activity note on it, sent right after ``meta``
 
     @property
     def last_user_text(self) -> str:
@@ -1072,6 +1118,7 @@ async def _prepare(
     *,
     continue_last: bool = False,
     hidden: str | None = None,
+    images: list[chat_images.Encoded] | None = None,
 ) -> Turn:
     """Store the user's message (or drop the last answer to regenerate it, or pick up the
     truncated one to continue it) and collect what the model needs. ``hidden``: the hub speaks up
@@ -1098,8 +1145,15 @@ async def _prepare(
             if not messages and not conv.title:
                 await store.update_conversation(conversation_id, title=title_from(content))
             msg = await store.add_message(conversation_id, "user", content)
+            added = (
+                await chat_images.ChatImageStore(db, user.uuid).add(conversation_id, msg.id, images)
+                if images
+                else []
+            )
             messages.append(msg)
-            new_user_message = message_view(msg)
+            new_user_message = message_view(
+                msg, [chat_images.image_view(r.id, r.width, r.height) for r in added]
+            )
         elif hidden is not None:
             if not messages:
                 raise _http(409, "nothing_to_answer", "the conversation is empty")
@@ -1109,6 +1163,9 @@ async def _prepare(
                 messages.pop()
             if not messages or messages[-1].role != "user":
                 raise _http(409, "nothing_to_answer", "the conversation has no message to answer")
+        pictures = await chat_images.ChatImageStore(db, user.uuid).of_messages(
+            [m.id for m in messages if m.role == "user"]
+        )
         chain_ids = await _chain_ids(store, conv)
         d = await _defaults(db, request, store)
         account = await db.get(User, user.uuid)
@@ -1147,7 +1204,40 @@ async def _prepare(
         )
         segment_block = plan.block  # the running summary of the chat: never waited for
         messages = plan.messages  # only the current segment is replayed verbatim
-    history = history_pairs(messages, keep_last=continue_last)
+    # D125: the images of the replayed messages; a model that cannot see reads that one was there
+    shown = {m.id: pictures[m.id] for m in messages if m.role == "user" and m.id in pictures}
+    history = history_pairs(
+        messages,
+        keep_last=continue_last,
+        extra={k: chat_images.hidden(len(v)) for k, v in shown.items()},
+    )
+    vision_history: list[tuple[str, str]] | None = None
+    image_data: dict[str, tuple[str, bytes]] = {}
+    vision: dict[str, Any] | None = None
+    if shown and not continue_last:
+        sight = await chat_images.sight(
+            request.app.state.gateway, requested, picked=bool(conv.model or conv.node)
+        )
+        if sight.sees:
+            model, requested = sight.model, sight.requested
+            newest_first = [
+                (i["id"], i["bytes"]) for k in sorted(shown, reverse=True) for i in shown[k]
+            ]
+            async with request.app.state.sessionmaker() as db:
+                image_data = await chat_images.ChatImageStore(db, user.uuid).data(
+                    chat_images.pick_for_prompt(newest_first)
+                )
+            vision_history = history_pairs(
+                messages,
+                extra={k: chat_images.marked([i["id"] for i in v]) for k, v in shown.items()},
+            )
+        vision = {
+            "sees": sight.sees,
+            "model": sight.model,
+            "images": len(image_data),
+            **({"routed_from": sight.routed_from} if sight.routed_from else {}),
+            **({"node": sight.node} if sight.node else {}),
+        }
     for_task = task_pairs(messages)
     if hidden is not None:
         history.append(("user", hidden))
@@ -1169,7 +1259,7 @@ async def _prepare(
     verify_model = None
     if second_look:
         verify_model = model
-    return Turn(
+    turn = Turn(
         conversation_id=conversation_id,
         requested=requested,
         model=model,
@@ -1199,7 +1289,18 @@ async def _prepare(
         in_program=conv.application is not None,
         context=conv.context,
         task_history=for_task,
+        vision_history=vision_history,
+        image_data=image_data,
+        vision=vision,
     )
+    if vision is not None and (not vision["sees"] or vision.get("routed_from")):
+        # the chat says what happened to the images: another model looked, or none could
+        event = "vision_routed" if vision["sees"] else "vision_blind"
+        where = f"{vision['model']} @ {vision['node']}" if vision.get("node") else vision["model"]
+        _, turn.vision_chunk = turn.activity.add(
+            "note", where, status="info", data={"event": event}
+        )
+    return turn
 
 
 def _capabilities(_request: Request, memory_enabled: bool) -> chat.Capabilities:
@@ -1274,32 +1375,36 @@ def _meta_event(
     """The ``meta`` event that opens an answer: who answers, from where, with what. ``checking``
     (``forced`` | ``detected``) says that a server check runs before the answer;
     ``check_max_calls`` that it is held to that many tool calls (a slow stand-in machine)."""
-    return chat.sse(
-        "meta",
-        {
-            "conversation_id": str(turn.conversation_id),
-            "user_message": turn.new_user_message,
-            "continues": turn.continues.id if turn.continues else None,
-            "memory": [n.view() for n in recalled],
-            "message_id": turn.message_id,
-            "model": turn.model,
-            "node": node,
-            "fallback_from": fallback_from,
-            "fallback_state": fallback_state,
-            "context": {
-                "length": context_length,
-                "estimated_prompt_tokens": estimated,
-                "trimmed": trimmed,
+    return (
+        chat.sse(
+            "meta",
+            {
+                "conversation_id": str(turn.conversation_id),
+                "user_message": turn.new_user_message,
+                "continues": turn.continues.id if turn.continues else None,
+                "memory": [n.view() for n in recalled],
+                "message_id": turn.message_id,
+                "model": turn.model,
+                "node": node,
+                "fallback_from": fallback_from,
+                "fallback_state": fallback_state,
+                "context": {
+                    "length": context_length,
+                    "estimated_prompt_tokens": estimated,
+                    "trimmed": trimmed,
+                },
+                **({"checking": checking} if checking else {}),
+                **({"check_max_calls": check_max_calls} if check_max_calls else {}),
+                **({"check_offer": True} if turn.check_offer else {}),
+                **({"tool_scope": turn.scope} if tool_groups.restricts_servers(turn.scope) else {}),
+                "internet": turn.internet,
+                **({"internet_node": turn.internet_node} if turn.internet_node else {}),
+                "quality": turn.quality,
+                **({"verify_model": turn.verify_model} if turn.verify_model else {}),
+                **({"vision": turn.vision} if turn.vision else {}),
             },
-            **({"checking": checking} if checking else {}),
-            **({"check_max_calls": check_max_calls} if check_max_calls else {}),
-            **({"check_offer": True} if turn.check_offer else {}),
-            **({"tool_scope": turn.scope} if tool_groups.restricts_servers(turn.scope) else {}),
-            "internet": turn.internet,
-            **({"internet_node": turn.internet_node} if turn.internet_node else {}),
-            "quality": turn.quality,
-            **({"verify_model": turn.verify_model} if turn.verify_model else {}),
-        },
+        )
+        + turn.vision_chunk
     )
 
 
@@ -1896,8 +2001,11 @@ async def _stream_turn(
     *,
     continue_last: bool = False,
     tools: str = "auto",
+    images: list[chat_images.Encoded] | None = None,
 ) -> Any:
-    turn = await _prepare(request, user, conversation_id, content, continue_last=continue_last)
+    turn = await _prepare(
+        request, user, conversation_id, content, continue_last=continue_last, images=images
+    )
     # The answer is made by a task of the hub from here on, the preparation included (E3-07): a
     # reader that goes away — or presses stop while the model still reads the prompt — changes
     # nothing about it. Before the first byte a failure is still an HTTP error, as it always was.
@@ -2725,8 +2833,17 @@ async def _pipeline_events(
                 core=core_text,
                 where=await _where(request, user, turn, route, context_length),
             )
+            sent: list[dict[str, Any]] | None = None
             if turn.continues is None:
                 prompt = chat.build_prompt(system, turn.history, budget, notes)
+                if turn.vision_history is not None:
+                    # D125: the same prompt with the images where they stand, for a model that sees
+                    seen = chat.build_prompt(system, turn.vision_history, budget, notes)
+                    sent, _ = chat_images.expand(seen.messages, turn.image_data)
+                    sent[0] = {
+                        **sent[0],
+                        "content": f"{sent[0]['content']}\n\n{chat_images.DATA_RULE}",
+                    }
             else:
                 continued = chat.build_continue_prompt(system, turn.history, budget, notes)
                 if continued is None:
@@ -2743,7 +2860,7 @@ async def _pipeline_events(
                 prompt = continued
             payload: dict[str, Any] = {
                 "model": turn.requested,
-                "messages": prompt.messages,
+                "messages": sent if sent is not None else prompt.messages,
                 "stream": True,
                 "stream_options": {"include_usage": True},
                 # llama-server keeps the KV cache of the last prompt of a slot and only processes
@@ -2843,7 +2960,9 @@ async def _pipeline_events(
             )
 
     after_done = None
-    held = _held_for(turn, prompt, on_tool, request.app.state.settings)
+    # a revision is asked with what the model was shown, the images included
+    shown_prompt = replace(prompt, messages=sent) if sent is not None else prompt
+    held = _held_for(turn, shown_prompt, on_tool, request.app.state.settings)
     if held is None and turn.second_look and turn.verify_model:
         # "thorough": a second look at every answer; without a check there is no evidence, the
         # reviewer marks what looks wrong or cannot be known without looking (quality.py)
@@ -4148,7 +4267,8 @@ async def _revise(
     }
     try:
         data = await state.gateway.call(
-            turn.model,
+            # with images (D125) only where the model sees them
+            turn.requested if getattr(turn, "vision_history", None) is not None else turn.model,
             "/v1/chat/completions",
             payload,
             min_context=state.settings.agent_min_context,
@@ -4269,8 +4389,18 @@ async def send_message(
     request: Request,
     user: CurrentUser = Depends(api_user),
 ) -> Any:
-    """Add the user's message and stream the answer (``text/event-stream``)."""
-    return await _stream_turn(request, user, conversation_id, body.content, tools=body.tools)
+    """Add the user's message and stream the answer (``text/event-stream``). Its images are
+    re-encoded first (D125): one that is not a picture refuses the message, nothing is stored."""
+    try:
+        images = [
+            await asyncio.to_thread(chat_images.reencode, chat_images.decode_upload(i))
+            for i in body.images
+        ]
+    except chat_images.ImageError as exc:
+        return _error(422, exc.code, exc.message)
+    return await _stream_turn(
+        request, user, conversation_id, body.content, tools=body.tools, images=images
+    )
 
 
 @router.post("/conversations/{conversation_id}/regenerate")

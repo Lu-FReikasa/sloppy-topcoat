@@ -58,6 +58,9 @@ type RunnerConfig struct {
 	// the engine cannot read).
 	Jinja      *bool           `json:"jinja,omitempty"`
 	ModelJinja map[string]bool `json:"model_jinja,omitempty"`
+	// Projectors names the vision projector (mmproj) of a model: a file name in the model's own
+	// directory, or "none" for no projector. It wins over the runner's own matching (D125).
+	Projectors map[string]string `json:"projectors,omitempty"`
 	// ModelBackends sets backend and GPU offload per model (E2-05, D27): a 7B on Vulkan and a
 	// 30B on the CPU side by side. Absent = the node's backend and llama.cpp's own fit.
 	ModelBackends map[string]ModelBackend `json:"model_backends,omitempty"`
@@ -294,6 +297,8 @@ type NodeConfig struct {
 	Update *UpdateConfig `json:"update,omitempty"`
 	// Transfer configures the direct model transfer between nodes (E2-07, D51); nil = defaults.
 	Transfer *TransferConfig `json:"transfer,omitempty"`
+	// Images switches the image runner on (stable-diffusion.cpp, D126); nil = off.
+	Images *ImagesConfig `json:"images,omitempty"`
 }
 
 // Direct model transfer defaults (E2-07).
@@ -425,6 +430,8 @@ type ToolsConfig struct {
 	// Workshop configures the repo.* capabilities of a dev node (E6-01 S1, D52); nil = they are
 	// not offered.
 	Workshop *WorkshopConfig `json:"workshop,omitempty"`
+	// Voice offers voice.transcribe (whisper.cpp) and voice.speak (Piper), D127; nil = off.
+	Voice *VoiceConfig `json:"voice,omitempty"`
 }
 
 // WorkshopConfig is config.tools.workshop: where the clones live, which hosts may be cloned from
@@ -516,6 +523,41 @@ func sameNetTargets(a, b []NetTarget) bool {
 	return true
 }
 
+// VoiceConfig is config.tools.voice (D127): the speech capabilities of a node.
+type VoiceConfig struct {
+	Enabled bool `json:"enabled"`
+	// Backend of whisper.cpp: auto (default: CUDA on Windows with an NVIDIA GPU, else the CPU) or cpu.
+	Backend string `json:"backend,omitempty"`
+}
+
+// On reports whether the voice capabilities are switched on.
+func (c *VoiceConfig) On() bool { return c != nil && c.Enabled }
+
+// ImagesConfig is config.images (D126): the image runner of a node.
+type ImagesConfig struct {
+	// Enabled starts the image runner (nothing is downloaded or started before a model loads).
+	Enabled bool `json:"enabled"`
+	// Backend of the sd.cpp build: auto (default), vulkan, cuda (Windows only) or cpu.
+	Backend string `json:"backend,omitempty"`
+	// ModelDirs are extra read-only directories scanned for image models.
+	ModelDirs []string `json:"model_dirs,omitempty"`
+}
+
+// On reports whether the image runner is switched on.
+func (c *ImagesConfig) On() bool { return c != nil && c.Enabled }
+
+// Equal reports whether two image configs are the same (nil = off).
+func (c *ImagesConfig) Equal(o *ImagesConfig) bool {
+	var a, b ImagesConfig
+	if c != nil {
+		a = *c
+	}
+	if o != nil {
+		b = *o
+	}
+	return a.Enabled == b.Enabled && a.Backend == b.Backend && sameStrings(a.ModelDirs, b.ModelDirs)
+}
+
 // Equal reports whether two tools configs are the same (nil = empty).
 func (t *ToolsConfig) Equal(o *ToolsConfig) bool {
 	var a, b ToolsConfig
@@ -531,7 +573,7 @@ func (t *ToolsConfig) Equal(o *ToolsConfig) bool {
 		!sameStrings(a.ComposeRoots, b.ComposeRoots) || !sameStrings(a.DocsRoots, b.DocsRoots) ||
 		!sameStrings(a.DocsExclude, b.DocsExclude) || !sameStrings(a.ReadRoots, b.ReadRoots) || !sameStrings(a.DNSNames, b.DNSNames) ||
 		!sameStrings(a.CertTargets, b.CertTargets) || !sameNetTargets(a.NetTargets, b.NetTargets) ||
-		!reflect.DeepEqual(a.Workshop, b.Workshop) {
+		!reflect.DeepEqual(a.Workshop, b.Workshop) || !reflect.DeepEqual(a.Voice, b.Voice) {
 		return false
 	}
 	at, bt := DefaultToolTimeoutSeconds, DefaultToolTimeoutSeconds
@@ -856,6 +898,20 @@ func ParseNodeConfig(raw []byte) (NodeConfig, error) {
 
 // Validate checks the fields the node relies on.
 func (c *NodeConfig) Validate() error {
+	if c.Tools != nil && c.Tools.Voice != nil {
+		switch c.Tools.Voice.Backend {
+		case "", BackendAuto, BackendCPU:
+		default:
+			return fmt.Errorf("config: tools.voice.backend must be auto or cpu")
+		}
+	}
+	if c.Images != nil {
+		switch c.Images.Backend {
+		case "", BackendAuto, BackendCUDA, BackendVulkan, BackendCPU:
+		default:
+			return fmt.Errorf("config: unknown images.backend %q", c.Images.Backend)
+		}
+	}
 	switch c.Runner.Type {
 	case RunnerLlamaServer, RunnerFake, RunnerNone:
 	default:
@@ -942,6 +998,11 @@ func (c *NodeConfig) Validate() error {
 	for m := range c.Runner.ModelJinja {
 		if strings.TrimSpace(m) == "" {
 			return fmt.Errorf("config: runner.model_jinja needs model names")
+		}
+	}
+	for m, f := range c.Runner.Projectors {
+		if strings.TrimSpace(m) == "" || !ValidProjector(f) {
+			return fmt.Errorf("config: runner.projectors[%q] must be a .gguf file name or \"none\"", m)
 		}
 	}
 	if n := c.Runner.NParallel; n < 0 || n > MaxParallel {
@@ -1214,3 +1275,12 @@ var (
 	workshopImageRe   = regexp.MustCompile(`^[a-z0-9][a-z0-9._/:@-]{0,255}$`)
 	workshopNetworkRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`)
 )
+
+// ValidProjector reports whether f may name a projector in runner.projectors: "none" or a plain
+// .gguf file name (no directory, so it can only point into the model's own directory).
+func ValidProjector(f string) bool {
+	if f == "none" {
+		return true
+	}
+	return f != "" && !strings.ContainsAny(f, "/\\") && f != ".gguf" && strings.EqualFold(path.Ext(f), ".gguf")
+}

@@ -7,9 +7,8 @@ hash changed, and is archived when the file is gone. The assistant writes no fil
 like is a *proposal* with Markdown to copy.
 
 A ``prüfen:`` line (on its own line or at the end of a paragraph) is kept as a hint
-(``source_ref.check_hint``), never turned into a ``verify_with``. The care run uses it as the
-task of a live check when the profile's ``host`` has a tool node that is connected right now;
-without such a node the note is simply left alone.
+(``source_ref.check_hint``) as plain text, never turned into a ``verify_with``. Nothing checks a
+profile against a live system (D124): the file wins.
 """
 
 import hashlib

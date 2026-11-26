@@ -277,3 +277,167 @@
     clip-path: none;
   }
 }
+
+/* --- images in the chat (D125) ------------------------------------------------------------------ */
+
+/* the composer's buttons keep their size; the message box gives way on a narrow screen */
+.talk-composer > button {
+  flex: 0 0 auto;
+}
+
+/* the composer's image button: a round icon button beside the message box */
+.talk-composer .image-attach {
+  flex: 0 0 auto;
+  width: 2.4rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.talk-composer .image-attach:hover:not(:disabled) {
+  color: var(--text);
+}
+
+/* the images that go with the next message, above the composer */
+.image-draft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.25rem 0.5rem;
+}
+
+.image-draft-item {
+  position: relative;
+  margin: 0;
+  width: 4.5rem;
+  height: 4.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  background: var(--surface);
+}
+
+/* no overflow: hidden on the item: it would clip the remove button's 40 px touch area */
+.image-draft-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: inherit;
+}
+
+.image-draft-item .image-draft-remove {
+  position: absolute;
+  z-index: 1; /* its touch area reaches over the next thumbnail */
+  top: 0.15rem;
+  right: 0.15rem;
+  width: 1.6rem;
+  height: 1.6rem;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* the drawn circle stays small on the thumbnail; the area that takes a tap is 40 px (touch.css) */
+.image-draft-item .image-draft-remove::after {
+  content: "";
+  position: absolute;
+  inset: calc((1.6rem - 40px) / 2);
+}
+
+.image-problem {
+  margin: 0;
+  flex-basis: 100%;
+  color: var(--bad);
+}
+
+/* thumbnails in a message: at most 10rem wide, in the picture's own proportions */
+.chat-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.chat-images:last-child {
+  margin-bottom: 0;
+}
+
+.chat-image {
+  display: block;
+  width: 10rem;
+  max-width: 100%;
+  flex: 0 1 auto;
+  min-height: 3rem;
+  max-height: 12rem;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: calc(var(--radius, 8px) - 2px);
+  overflow: hidden;
+  background: rgb(0 0 0 / 12%);
+  cursor: zoom-in;
+}
+
+/* a phone: two thumbnails side by side, so four images take two rows, not the whole screen */
+@media (max-width: 759px) {
+  .chat-image {
+    width: min(8rem, calc(50% - 0.2rem));
+    max-height: 9rem;
+  }
+}
+
+.chat-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.chat-image:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.chat-image-missing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  padding: 0.5rem;
+}
+
+/* one image whole, above everything; a click beside it or Escape closes it */
+.image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 10000; /* above the desktop's own layers (desktop.css goes to 9000) */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgb(0 0 0 / 82%);
+}
+
+.image-viewer img {
+  max-width: 100%;
+  max-height: calc(100% - 3.5rem);
+  object-fit: contain;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.image-viewer-close {
+  min-height: 2.4rem;
+  padding: 0 1.25rem;
+  border-radius: 999px;
+}

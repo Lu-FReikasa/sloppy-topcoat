@@ -18,13 +18,16 @@ What the other sources of the song say settles most of it:
             chorus written once) get the chords of that part, line by line, on the same place of
             the line
 
-The work is on the sheet in place; :class:`Tidied` says what was done, for the report.
+The rules that need no other source (chords written as text, tab blocks, header lines) run first
+(``rules.py``). The work is on the sheet in place; :class:`Tidied` says what was done, for the
+report.
 """
 
 import re
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 
+from topcoat_hub.sheets import rules
 from topcoat_hub.sheets.chordpro import Line, Section, Segment, Sheet
 from topcoat_hub.sheets.chords import Chord
 
@@ -68,6 +71,8 @@ def _chorded(ln: Line) -> bool:
 
 
 def _part_words(sec: Section) -> list[str]:
+    if sec.kind == "tab":
+        return []  # a tab block's lines are frets, no words
     return [w for ln in sec.lines if _lyric(ln) for w in _words(ln.lyrics)]
 
 
@@ -154,6 +159,7 @@ def tidy(
     and the reference lyrics hold. ``riff_patterns`` are the riffs the sources name (all of them,
     this sheet's own included: read them before any sheet is tidied)."""
     done = Tidied()
+    done.removed.extend(rules.apply(sheet).removed)  # a no-op on a sheet read by research
     vocabulary = {w for o in others for s in o.sections for w in _part_words(s)}
     vocabulary |= set(_words(reference))
     _remove(sheet, vocabulary, artist, done)
@@ -218,7 +224,7 @@ def _remove(sheet: Sheet, vocabulary: set[str], artist: str | list[str], done: T
             if not words and keep:
                 keep[-1].lines.extend(sec.lines)  # a note inside the song stays with its part
                 continue
-        if known:
+        if known and sec.kind != "tab":
             lines = []
             for ln in sec.lines:
                 words = _words(ln.lyrics) if ln.comment is None else []

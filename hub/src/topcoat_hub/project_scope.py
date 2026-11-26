@@ -21,6 +21,9 @@ TARGETS: dict[str, tuple[str, ...]] = {
     "research": ("request_report",),
     "dev": ("request_report", "create_branch", "create_prototype"),
     "admin": ("read_released",),  # data from Administration, released per request
+    # the project itself: create and change the sub-tasks of a large task (D109). It never deletes
+    # a node: a dropped sub-task is closed ("delete" stays in NEVER)
+    "project": ("decompose",),
 }
 
 # never grantable: the agent cannot be allowed to do these inside a project

@@ -4,17 +4,16 @@ Pure logic without I/O:
 
 * **Values and statements** — what a note claims (:func:`entities`), what the user's own message
   states (:func:`statements`, :func:`supports`; questions state nothing).
-* **Slots** — notes about the same thing (where the user lives, what they are called): candidates
-  for a contradiction that similarity between vectors would miss ("Musterstadt" is nothing
-  like "Hamburg" for a hashing embedder). Only *single-valued* slots contradict by themselves.
-* **Cues** — words of a message that correct ("tatsächlich", "nicht mehr") or withdraw ("war nur
-  ein Test") what was said before.
+* **Disputes** — notes the extraction or the consolidation found to contradict each other are
+  linked (``disputed_with``); :func:`conflict_groups` returns those groups. There are no slots
+  and no cue words any more (D124): what contradicts is said by the model that read the notes,
+  never guessed from single words of the person's text.
 * **Evidence and judgement** — evidence with a time is collected per note by pluggable
   :class:`EvidenceSource` objects (today: the conversations the notes came from; later
   knowledge, web and tools, E2-03/E2-04, can name the winning note as *decisive*), and
-  :func:`judge` decides only when the matter is clear: a decisive check, or a newer explicit
-  statement that corrects, or the user saying it again after the conflict. Anything else stays
-  in doubt and becomes a question to the user.
+  :func:`judge` decides only when the matter is clear: a decisive check, or the user saying it
+  again after the conflict; :func:`auto_verdict` settles the rest by the stronger evidence, then
+  the latest word of the person. Anything else stays in doubt and becomes a question.
 """
 
 import re
@@ -97,114 +96,7 @@ def entities(text: str, others: Sequence[str] = ()) -> set[str]:
     return found
 
 
-# --- cues --------------------------------------------------------------------------------
-
-# A message that corrects what was said before (and so replaces it without asking).
-CORRECTION_CUES = re.compile(
-    r"tatsächlich|tatsaechlich|eigentlich|in wahrheit|inzwischen|mittlerweile|\bjetzt\b|"
-    r"nicht mehr|nicht länger|nicht laenger|umgezogen|ziehe? um|statt\b|stattdessen|ab sofort|"
-    r"neuerdings|korrektur|richtigstellung|ich meinte|actually|\bnow\b|no longer|anymore|"
-    r"moved to|instead|correction|i meant|in fact",
-    re.IGNORECASE,
-)
-# A message that says an earlier statement was a test or a joke.
-TEST_CUES = re.compile(
-    r"zum test|nur (ein )?test|(war|waren|ist|sind) (nur |bloß |bloss )?(ein |eine )?"
-    r"(test|tests|scherz|spaß|spass|quatsch|witz)|just (a )?test|(was|were) (just )?(a )?"
-    r"(test|tests|joke|jokes)|for testing",
-    re.IGNORECASE,
-)
-# ... or that it is simply not true: the earlier statements are withdrawn.
-RETRACTION_CUES = re.compile(
-    TEST_CUES.pattern
-    + r"|stimmt so nicht|stimmt nicht|stimmte nicht|(ist|sind|war|waren) (so )?falsch|"
-    r"not true|(is|are|was|were) (wrong|false)|vergiss",
-    re.IGNORECASE,
-)
-
-
-def has_correction(user_text: str) -> bool:
-    return bool(CORRECTION_CUES.search(statements(user_text)))
-
-
-def has_retraction(user_text: str) -> bool:
-    return bool(RETRACTION_CUES.search(statements(user_text)))
-
-
-def test_sentences(user_text: str) -> list[str]:
-    """The sentences that call something a test or a joke ("Berlin war nur ein Test")."""
-    return [
-        sentence
-        for sentence in re.findall(r"[^.!?\n]+[.!?]?", statements(user_text))
-        if TEST_CUES.search(sentence)
-    ]
-
-
-def cue_sentence(user_text: str) -> str:
-    """The first statement of the message that corrects or withdraws something, as a quote."""
-    for sentence in re.findall(r"[^.!?\n]+[.!?]?", statements(user_text)):
-        if CORRECTION_CUES.search(sentence) or RETRACTION_CUES.search(sentence):
-            return " ".join(sentence.split())[:200]
-    return ""
-
-
-# --- slots -------------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class Slot:
-    name: str
-    single_valued: bool  # two different values cannot both be true
-    pattern: re.Pattern[str]
-
-
-_RELATIVES = (
-    r"hund|katze|kater|pferd|haustier|kind|sohn|tochter|frau|mann|freund|freundin|bruder|"
-    r"schwester|mutter|vater|chef|kollege|dog|cat|pet|son|daughter|wife|husband|friend|"
-    r"brother|sister|mother|father|boss"
-)
-SLOTS: tuple[Slot, ...] = (
-    Slot(
-        "residence",
-        True,
-        re.compile(
-            r"\b(lebt|leben|wohnt|wohnen|wohne|lives?|living|resides?|zuhause|umgezogen|"
-            r"ansassig|wohnort|moved)\b"
-        ),
-    ),
-    Slot("birthday", True, re.compile(r"\b(geboren|geburtstag|born|birthday)\b")),
-    Slot("age", True, re.compile(r"\b(\d{1,3} jahre alt|jahre alt|years old)\b")),
-    Slot("name", True, re.compile(r"\b(heisst|heissen|is called|named)\b")),
-    Slot(
-        "work",
-        False,
-        re.compile(
-            r"\b(arbeit\w*|beruf|job|tatig|works?|working|employed|firma|angestellt|"
-            r"selbststandig)\b"
-        ),
-    ),
-    Slot("pet", False, re.compile(r"\b(hund|katze|kater|haustier|dog|cat|pet)\b")),
-    Slot(
-        "family",
-        False,
-        re.compile(
-            r"\b(kinder|sohn|tochter|frau|ehefrau|ehemann|wife|husband|children|verheiratet|"
-            r"married)\b"
-        ),
-    ),
-)
-
-
-def slot_of(text: str) -> Slot | None:
-    """The kind of thing a note says something about (where the user lives, what they do),
-    or None. A name only counts as *the user's* name when no relative or pet is named."""
-    folded = _fold(text)
-    for slot in SLOTS:
-        if slot.name == "name" and re.search(rf"\b({_RELATIVES})\b", folded):
-            continue
-        if slot.pattern.search(folded):
-            return slot
-    return None
+# --- disputes ---------------------------------------------------------------------------
 
 
 def values_differ(a: str, b: str) -> bool:
@@ -214,20 +106,9 @@ def values_differ(a: str, b: str) -> bool:
     return not (ea <= eb or eb <= ea)
 
 
-def clash(a: str, b: str) -> bool:
-    """Do the two notes contradict each other by their kind alone: same single-valued slot,
-    different values."""
-    slot_a, slot_b = slot_of(a), slot_of(b)
-    return slot_a is not None and slot_a == slot_b and slot_a.single_valued and values_differ(a, b)
-
-
-def same_topic(a: str, b: str) -> bool:
-    slot_a = slot_of(a)
-    return slot_a is not None and slot_a == slot_of(b)
-
-
 def conflict_groups(notes: Sequence[Any]) -> list[list[Any]]:
-    """Groups of live notes that contradict each other (connected by :func:`clash`)."""
+    """Groups of live notes in a dispute: connected by their ``disputed_with`` links (set where the
+    extraction or the consolidation found a contradiction), oldest first."""
     parent: dict[uuid.UUID, uuid.UUID] = {}
 
     def find(x: uuid.UUID) -> uuid.UUID:
@@ -238,10 +119,10 @@ def conflict_groups(notes: Sequence[Any]) -> list[list[Any]]:
         return x
 
     by_id = {n.id: n for n in notes}
-    for i, a in enumerate(notes):
-        for b in notes[i + 1 :]:
-            if clash(a.text, b.text):
-                parent[find(a.id)] = find(b.id)
+    for n in notes:
+        other = getattr(n, "disputed_with", None)
+        if other is not None and other in by_id and other != n.id:
+            parent[find(n.id)] = find(other)
     groups: dict[uuid.UUID, list[Any]] = {}
     for x in list(parent):
         groups.setdefault(find(x), []).append(by_id[x])
@@ -272,9 +153,9 @@ class EvidenceSource(Protocol):
 
 
 class ConversationEvidence:
-    """What the user said, and when: the statement a note came from — read from the message
-    itself where it can be loaded, and a *correction* if that message corrected or withdrew
-    something — and every time they said it again."""
+    """What the user said, and when: the statement a note came from (read from the message itself
+    where it can be loaded) and every time they said it again. Whether a message *corrects* is
+    no longer read from cue words (D124)."""
 
     name = "conversation"
 
@@ -286,20 +167,9 @@ class ConversationEvidence:
     async def gather(self, notes: Sequence[Any]) -> list[Evidence]:
         out: list[Evidence] = []
         for n in notes:
-            ref = n.source_ref or {}
             if n.source_type == "chat" and n.evidence != "assumption":
                 text = await self.message_of(n)
-                quote = cue_sentence(text) if text else ""
-                corrected = bool(ref.get("correction")) or bool(quote)
-                out.append(
-                    Evidence(
-                        n.id,
-                        "correction" if corrected else "statement",
-                        n.created_at,
-                        quote or ref.get("cue", ""),
-                        message=text,
-                    )
-                )
+                out.append(Evidence(n.id, "statement", n.created_at, "", message=text))
             if n.last_confirmed_at is not None:
                 out.append(Evidence(n.id, "confirmation", n.last_confirmed_at))
         return out
@@ -339,9 +209,8 @@ def last_word(notes: Sequence[Any], evidence: Sequence[Evidence]) -> Any | None:
 
 def judge(notes: Sequence[Any], evidence: Sequence[Evidence]) -> Verdict | None:
     """Decide which of the conflicting notes is true — only if that is clear. None: not
-    clear, the user is asked. Clear is: a check that names the winner; or the newest note's
-    statement corrected an earlier one and nothing else was said since; or the user said one
-    note again after every other's latest evidence."""
+    clear, the user is asked. Clear is: a check that names the winner; or the user said one note
+    again after every other's latest evidence."""
     by_id = {n.id: n for n in notes}
     decisive = {e.decisive_for for e in evidence if e.decisive_for in by_id}
     if len(decisive) == 1:

@@ -2,7 +2,7 @@
 
 A theme is data and a style sheet, never code. The shape is ``proto/ui/theme.schema.json``; the
 rules for the style sheet are here (and, for defence, once more in the web build -- both are tested
-against ``proto/ui/theme-css-cases.json``). The three built-in themes live in the web build, their
+against ``proto/ui/theme-css-cases.json``). The built-in themes live in the web build, their
 keys are reserved."""
 
 import difflib
@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from topcoat_hub.config import REPO_ROOT
 from topcoat_hub.models import UiTheme
 
-BUILTIN = ("terminal", "leitstand", "schreibtisch")
+BUILTIN = ("terminal", "leitstand", "schreibtisch", "terminal-nest")
 MAX_CSS = 40_000
 MAX_THEMES = 50
 _DATA_IMAGE = re.compile(r"^data:image/(png|jpeg|gif|webp|svg\+xml)[;,]", re.I)

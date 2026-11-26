@@ -8,6 +8,8 @@ import {
 import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
 import { Markdown } from "../chat/Markdown";
+import { ImageAttachButton, ImageDraftStrip, MessageImages } from "../chat/ChatImages";
+import { imageFiles, pastedImages, useImageDraft } from "../chat/images";
 import { requestOpen } from "../layout/intent";
 import type { IncognitoMessage, IncognitoTab } from "../types";
 import { reducedMotion } from "../motion";
@@ -33,6 +35,12 @@ export function IncognitoPage({ api }: Props) {
   const bottom = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   useGrowingTextarea(box, draft);
+  // D125: images of the next question; the hub keeps them in the tab, in memory only
+  const pictures = useImageDraft();
+  const loadImage = useCallback(
+    (imageId: string) => api.incognitoImage(current ?? "", imageId),
+    [api, current],
+  );
 
   function choose(id: string | null) {
     setMessages([]);
@@ -82,19 +90,26 @@ export function IncognitoPage({ api }: Props) {
   async function send(e: FormEvent) {
     e.preventDefault();
     const content = draft.trim();
-    if (!content || !current || busy) return;
+    const images = pictures.images;
+    if ((!content && images.length === 0) || !current || busy) return;
     setDraft("");
+    pictures.clear();
     setBusy(true);
     setError(null);
-    setMessages((m) => [...m, { role: "user", content }]);
+    const shown = images.map((i) => ({ id: i.key, width: 0, height: 0, src: i.preview }));
+    setMessages((m) => [
+      ...m,
+      { role: "user", content, ...(shown.length ? { images: shown } : {}) },
+    ]);
     try {
-      const r = await api.sendIncognito(current, content);
+      const r = await api.sendIncognito(current, content, images.map((i) => i.data));
       setMessages((m) => [...m, r.message]);
       reload();
     } catch {
       setError(t("incognito.answerFailed"));
       setMessages((m) => m.slice(0, -1));
       setDraft(content);
+      pictures.setImages(images);
     } finally {
       setBusy(false);
     }
@@ -204,7 +219,17 @@ export function IncognitoPage({ api }: Props) {
                   {m.role === "assistant" ? (
                     <Markdown text={m.content} />
                   ) : (
-                    m.content
+                    <>
+                      {m.images && m.images.length > 0 && (
+                        <MessageImages images={m.images} load={loadImage} />
+                      )}
+                      {m.content}
+                    </>
+                  )}
+                  {m.vision && !m.vision.sees && (
+                    <p className="talk-calm small" role="status">
+                      {t("images.blind")}
+                    </p>
                   )}
                 </div>
               ))}
@@ -214,7 +239,25 @@ export function IncognitoPage({ api }: Props) {
               <div ref={bottom} />
             </div>
           )}
-          <form className="talk-composer" onSubmit={(e) => void send(e)}>
+          <ImageDraftStrip
+            images={pictures.images}
+            problem={pictures.problem}
+            onRemove={pictures.remove}
+          />
+          <form
+            className="talk-composer"
+            onSubmit={(e) => void send(e)}
+            onDragOver={(e) => {
+              if (Array.from(e.dataTransfer.types).includes("Files")) e.preventDefault();
+            }}
+            onDrop={(e) => {
+              const files = imageFiles(e.dataTransfer);
+              if (files.length === 0) return;
+              e.preventDefault();
+              void pictures.add(files);
+            }}
+          >
+            <ImageAttachButton onFiles={(files) => void pictures.add(files)} />
             <textarea
               ref={box}
               rows={MIN_LINES}
@@ -222,6 +265,12 @@ export function IncognitoPage({ api }: Props) {
               aria-label={t("incognito.placeholder")}
               placeholder={t("incognito.placeholder")}
               onChange={(e) => setDraft(e.target.value)}
+              onPaste={(e) => {
+                const files = pastedImages(e.clipboardData);
+                if (files.length === 0) return;
+                e.preventDefault();
+                void pictures.add(files);
+              }}
               onKeyDown={(e) => {
                 if (
                   e.key === "Enter" &&
@@ -236,7 +285,7 @@ export function IncognitoPage({ api }: Props) {
             <button
               type="submit"
               className="primary"
-              disabled={busy || !draft.trim()}
+              disabled={busy || (!draft.trim() && pictures.images.length === 0)}
             >
               {t("talk.send")}
             </button>

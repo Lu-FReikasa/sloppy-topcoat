@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiClient, UnauthorizedError } from "./api/client";
 import { connectStream, LOST_AFTER_MS, type StreamStatus } from "./api/sse";
+import { hubEvents } from "./data/hubEvents";
 import { clearToken, loadToken, saveToken } from "./auth";
 import { announceHubMessage, parseHubMessage } from "./chat/hubMessage";
 import { announceProjectChanged, projectOfEvent } from "./project/liveProject";
@@ -71,7 +72,6 @@ function AuthedApp({ token, onLogout, onUnauthorized }: AuthedProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [me, setMe] = useState<Me | null>(null);
   const [status, setStatus] = useState<StreamStatus>("connecting");
-  const [epoch, setEpoch] = useState(0);
   const [agentTick, setAgentTick] = useState(0);
   const [inboxTick, setInboxTick] = useState(0);
   // the hub says the interface data (programs, grants, choices) changed (docs/DESKTOP.md)
@@ -128,10 +128,12 @@ function AuthedApp({ token, onLogout, onUnauthorized }: AuthedProps) {
         // Catch up on anything missed while disconnected, the programs too: a hub that was
         // updated while away may offer other ones.
         refreshNodes();
-        setEpoch((e) => e + 1);
         setUiTick((n) => n + 1);
+        // the data layer (web/src/data) reloads its live resources
+        hubEvents.connected();
       },
       onEvent: (ev) => {
+        hubEvents.publish(ev);
         // the agent's progress (E3-01a): the task pages refetch
         if (
           ev.event === "agent_task" ||
@@ -141,7 +143,13 @@ function AuthedApp({ token, onLogout, onUnauthorized }: AuthedProps) {
           setAgentTick((n) => n + 1);
         if (ev.event === "inbox" || ev.event === "agent_task" || ev.event === "chat_message")
           setInboxTick((n) => n + 1);
-        if (ev.event === "ui_access" || ev.event === "ui_prefs" || ev.event === "ui_themes")
+        // a plug-in installed, changed or removed (D105) may change what a person is offered
+        if (
+          ev.event === "ui_access" ||
+          ev.event === "ui_prefs" ||
+          ev.event === "ui_themes" ||
+          ev.event === "ui_plugins"
+        )
           setUiTick((n) => n + 1);
         if (ev.event === "chat_message") {
           const hubMessage = parseHubMessage(ev.data);
@@ -184,8 +192,6 @@ function AuthedApp({ token, onLogout, onUnauthorized }: AuthedProps) {
       refreshNodes,
       tick: agentTick,
       inboxTick,
-      epoch,
-      detail: state.detail,
       dispatch,
     }),
     [
@@ -198,8 +204,6 @@ function AuthedApp({ token, onLogout, onUnauthorized }: AuthedProps) {
       refreshNodes,
       agentTick,
       inboxTick,
-      epoch,
-      state.detail,
     ],
   );
 

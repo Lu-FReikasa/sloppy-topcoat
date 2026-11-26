@@ -20,7 +20,10 @@ from topcoat_hub.project_base import Invalid, NotFound, StoreBase, get_project, 
 # what an order's mandate covers (the release of an order gives exactly these)
 ORDER_ACTIONS = ("create_prototype", "fix")
 # probe: the tries of an issue's investigation, a mandate of its own (issue_probes.py)
-ACTIONS = (*ORDER_ACTIONS, "probe")
+# workshop: the drafts of a large task's sub-tasks on its branch topcoat/v-<nr> (D110, vorhaben.py);
+# a mandate of its own, never with another action and never with the push flag
+WORKSHOP = "workshop"
+ACTIONS = (*ORDER_ACTIONS, "probe", WORKSHOP)
 DEFAULT_DAYS = 14
 MAX_DAYS = 90
 BRANCH_PREFIX = "topcoat/"
@@ -88,6 +91,8 @@ class MandateMixin(StoreBase):
             raise Invalid("that is not a branch name")
         if not actions or not set(actions) <= set(ACTIONS):
             raise Invalid(f"a mandate covers {' and '.join(ACTIONS)}, nothing else")
+        if WORKSHOP in actions and (push or len(set(actions)) > 1):
+            raise Invalid("a workshop scope covers only the workshop and never pushes (D110)")
         if not 1 <= days <= MAX_DAYS:
             raise Invalid(f"a mandate runs 1 to {MAX_DAYS} days")
         async with self._sessionmaker() as db:

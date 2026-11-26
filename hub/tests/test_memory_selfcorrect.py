@@ -1,7 +1,8 @@
-"""The memory keeps itself consistent (D19 extended): explicit corrections replace, "that was a
-test" withdraws, everything else that contradicts becomes one clarification question, the
-answer is applied like a statement, and the assistant never claims to be sure about a note
-that is in dispute."""
+"""The memory keeps itself consistent (D19 extended, D124): what the model says the person called
+wrong or a test is withdrawn, a contradiction the model names is settled by the stronger
+evidence and then the latest word (when the hub settles) or becomes one clarification question,
+the answer is applied like a statement, and the assistant never claims to be sure about a note
+that is in dispute. No slots and no cue words are read."""
 
 import json
 import re
@@ -22,6 +23,7 @@ from tests.test_memory import (
     note,
     run_consolidation,
     setup_node,
+    with_contradicts,
 )
 from topcoat_hub.memory import CLARIFY_SYSTEM, EXTRACTION_SYSTEM
 from topcoat_hub.memory_clarify import Evidence
@@ -41,7 +43,8 @@ def says(replies: dict[str, dict[str, Any]], clarify: Any = None) -> Any:
             message = _user_part(user)
             for keyword, reply in replies.items():
                 if keyword in message:
-                    return json.dumps(reply)
+                    memories = with_contradicts(reply.get("memories", []), user)
+                    return json.dumps({**reply, "memories": memories})
             return json.dumps({"memories": []})
         if system.startswith(CONSOLIDATION_PREFIX):
             return json.dumps({})
@@ -60,6 +63,26 @@ LIVES = {
     "Kiel": {"memories": [note("Lebt in Kiel")]},
     "musterstadt": {"memories": [note("Lebt in Musterstadt")]},
 }
+
+
+def retracting(keyword: str, text: str, called_wrong: Sequence[str]) -> Any:
+    """A fake extraction model that reads the numbered existing notes like the real one: it
+    stores ``text`` and puts the numbers of the notes the person called wrong into "retract"."""
+
+    def answer(req: dict[str, Any]) -> str | None:
+        if req.get("stream") or req["messages"][0]["content"] != EXTRACTION_SYSTEM:
+            return None
+        user = req["messages"][-1]["content"]
+        if keyword not in _user_part(user):
+            return json.dumps({"memories": []})
+        listed = {
+            m.group(2): int(m.group(1)) for m in re.finditer(r"^(\d+)\. (.*)$", user, re.MULTILINE)
+        }
+        return json.dumps(
+            {"memories": [note(text)], "retract": [listed[t] for t in called_wrong if t in listed]}
+        )
+
+    return answer
 
 
 def states(client: TestClient) -> dict[str, str]:
@@ -96,16 +119,14 @@ def test_a_new_residence_with_the_old_ones_called_a_test_ends_the_dispute(
 ) -> None:
     node = disputed_pair(client, connect)
     conv = new_conv(client)
-    events = chat_once(
+    node.answer_fn = retracting(
+        "musterstadt", "Lebt in Musterstadt", ["Lebt in Hamburg", "Lebt in Berlin"]
+    )
+    chat_once(
         client,
         "ich wohne tatsächlich in musterstadt, die beiden anderen Städte waren zum testen",
         conv,
     )
-    mem = events[-1][1]
-    [fix] = mem["corrected"]
-    assert fix["text"] == "Lebt in Musterstadt" and fix["withdrawn"] is True
-    assert {r["text"] for r in fix["replaced"]} == {"Lebt in Hamburg", "Lebt in Berlin"}
-
     # Neither city is active or disputed any more, the question is closed, nothing is asked.
     assert states(client) == {
         "Lebt in Musterstadt": "active",
@@ -119,34 +140,42 @@ def test_a_new_residence_with_the_old_ones_called_a_test_ends_the_dispute(
         detail = client.get(f"/api/memory/{gone['id']}", headers=AUTH).json()
         last = detail["versions"][0]
         assert last["actor"] == "chat" and "wrong or a test" in last["reason"]
-        assert last["source"]["conversation_id"] == conv and last["source"]["evidence"]
+        assert last["source"]["conversation_id"] == conv
 
     # The next chat recalls only the true note.
+    node.answer_fn = says(LIVES)
     events = chat_once(client, "Wo wohne ich eigentlich?")
     assert [n["text"] for n in events[0][1]["memory"]] == ["Lebt in Musterstadt"]
-    system = "\n".join(m["content"] for m in sent_messages(node))
-    assert "Musterstadt" in system and "Hamburg" not in system and "Berlin" not in system
-
-    # ... and it is reversible: undo brings both cities back (in dispute again is not needed:
-    # the versions restore their earlier state).
-    assert client.post(f"/api/memory/{fix['id']}/undo", headers=AUTH).status_code == 200
-    assert "Lebt in Musterstadt" not in states(client) or (
-        states(client)["Lebt in Musterstadt"] == "deleted"
-    )
-    assert {"Lebt in Hamburg", "Lebt in Berlin"} <= {
-        i["text"] for i in memory_items(client, status="active")
-    } | {i["text"] for i in memory_items(client, status="disputed")}
 
 
-def test_a_correction_word_replaces_the_older_note_without_a_question(
-    client: TestClient, connect
-) -> None:
+def test_a_question_withdraws_nothing_whatever_the_model_says(client: TestClient, connect) -> None:
+    node = disputed_pair(client, connect)
+    node.answer_fn = retracting("Berlin", "Lebt in Kiel", ["Lebt in Hamburg", "Lebt in Berlin"])
+    chat_once(client, "Wohne ich in Hamburg oder in Berlin?")  # a question states nothing
+    assert states(client)["Lebt in Hamburg"] == states(client)["Lebt in Berlin"] == "disputed"
+
+
+def test_a_correction_word_decides_nothing_by_itself(client: TestClient, connect) -> None:
+    """D124: "inzwischen" is no shortcut. Without the hub's own settling the contradiction the
+    model names is one question; with it (as live) the latest word wins."""
     node = setup_node(client, connect)
     node.answer_fn = says(LIVES)
     chat_once(client, "Ich wohne in Hamburg, nur zur Info.")
     events = chat_once(client, "Ich wohne inzwischen in Kiel.")
-    mem = events[-1][1]
-    assert mem["questions"] == 0 and [c["text"] for c in mem["corrected"]] == ["Lebt in Kiel"]
+    assert events[-1][1]["corrected"] == []
+    assert states(client) == {"Lebt in Kiel": "disputed", "Lebt in Hamburg": "disputed"}
+    assert len(questions(client)) == 1
+
+
+def test_the_latest_word_replaces_the_older_note_without_a_question(
+    client: TestClient, connect
+) -> None:
+    client.app.state.settings.memory_auto_settle = True
+    node = setup_node(client, connect)
+    node.answer_fn = says(LIVES)
+    chat_once(client, "Ich wohne in Hamburg, nur zur Info.")
+    events = chat_once(client, "Ich wohne in Kiel.")
+    assert events[-1][1]["questions"] == 0
     assert states(client) == {"Lebt in Kiel": "active", "Lebt in Hamburg": "superseded"}
     assert questions(client) == []
 
@@ -175,7 +204,7 @@ def test_the_model_can_retract_a_note_the_user_calls_wrong(client: TestClient, c
 def test_the_question_names_the_notes_with_their_dates(client: TestClient, connect) -> None:
     disputed_pair(client, connect)
     [q] = questions(client)
-    assert q["status"] == "open" and q["topic"] == "residence"
+    assert q["status"] == "open" and q["topic"] == ""  # no slots (D124)
     assert [c["text"] for c in q["candidates"]] == ["Lebt in Hamburg", "Lebt in Berlin"]
     assert all(c["at"] for c in q["candidates"])
     overview = client.get("/api/memory", headers=AUTH).json()
@@ -472,22 +501,20 @@ def test_answering_a_question_leaves_no_orphaned_dispute(client: TestClient, con
     assert questions(client) == []
 
 
-def test_undoing_a_correction_leaves_no_orphaned_dispute(client: TestClient, connect) -> None:
+def test_undoing_a_decision_leaves_no_orphaned_dispute(client: TestClient, connect) -> None:
+    client.app.state.settings.memory_auto_settle = True
     node = setup_node(client, connect)
     node.answer_fn = says(LIVES)
     chat_once(client, "Ich wohne in Hamburg, nur zur Info.")
-    chat_once(client, "Ich wohne in Berlin, nur zur Info.")  # disputed pair
-    events = chat_once(client, "Ich wohne inzwischen in Kiel.")  # corrects both
-    [fix] = events[-1][1]["corrected"]
-    assert client.post(f"/api/memory/{fix['id']}/undo", headers=AUTH).status_code == 200
+    chat_once(client, "Ich wohne in Kiel.")  # the latest word wins
+    hamburg = next(i for i in memory_items(client, status="superseded"))
+    r = client.post(f"/api/memory/{hamburg['id']}/revert", headers=AUTH, json={"version": 1})
+    assert r.status_code == 200
     # both are back; whatever state they are in, none is disputed without an opponent
     live = {i["text"]: i for i in memory_items(client)}
-    for text in ("Lebt in Hamburg", "Lebt in Berlin"):
-        assert live[text]["status"] in ("active", "disputed")
+    assert live["Lebt in Hamburg"]["status"] in ("active", "disputed")
     if live["Lebt in Hamburg"]["status"] == "disputed":
-        assert live["Lebt in Berlin"]["status"] == "disputed"
-    else:
-        assert live["Lebt in Berlin"]["status"] == "active"
+        assert live["Lebt in Kiel"]["status"] == "disputed"
 
 
 def test_the_tidy_up_heals_a_disputed_note_whose_opponents_are_gone(
@@ -537,26 +564,20 @@ async def _say_instead(client: TestClient, starts_with: str, new_text: str) -> N
         await db.commit()
 
 
-def test_a_correction_in_the_source_message_settles_the_doubt_and_is_quoted(
+def test_correction_words_in_the_source_message_settle_nothing_without_the_model(
     client: TestClient, connect
 ) -> None:
-    """Hardware test: the note came from "ich wohne tatsächlich in …, die beiden anderen
-    Städte waren zum testen" and the tidy-up still only asked (resolved 0, questions 1)."""
+    """Hardware test 2026: the note came from "ich wohne tatsächlich in …, die beiden anderen
+    Städte waren zum testen". D124: those words are not read by the hub any more; the model that
+    reads the source messages is asked, and without its verdict the question stays."""
     node = trio(client, connect)
     said = "ich wohne tatsächlich in musterstadt, die beiden anderen Städte waren zum testen"
     client.portal.call(lambda: _say_instead(client, "Ich wohne in Musterstadt", said))
     node.answer_fn = says(LIVES)
     run = run_consolidation(client)
-    assert run["stats"]["resolved"] == 1 and run["stats"]["questions"] == 0
-    assert node.answer_fn.asked == []  # type: ignore[attr-defined]  # clear words: no model asked
-    assert states(client) == {
-        "Lebt in Musterstadt": "active",
-        "Lebt in Hamburg": "superseded",
-        "Lebt in Berlin": "superseded",
-    }
-    reason = note_history(client, "Lebt in Hamburg")[0]["reason"]
-    assert "corrected it" in reason and f"“{said}”" in reason  # quoted in the reason
-    assert questions(client) == []
+    assert run["stats"]["resolved"] == 0 and run["stats"]["questions"] == 1
+    assert node.answer_fn.asked  # type: ignore[attr-defined]  # the model read the messages
+    assert set(states(client).values()) == {"disputed"}
 
 
 def test_the_model_reads_the_source_messages_before_a_question_is_asked(

@@ -11,10 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from topcoat_hub.auth import CurrentUser, api_user
 from topcoat_hub.db import get_db
-from topcoat_hub.models import SheetRow
+from topcoat_hub.models import SetlistItemRow, SetlistRow, SheetRow
 from topcoat_hub.sheets import chordpro
 from topcoat_hub.sheets.render import render
 from topcoat_hub.sheets.research import Request as ResearchRequest
+from topcoat_hub.sheets.setlists import MAX_ITEMS, Item, SetlistStore
 from topcoat_hub.sheets.store import MAX_TEXT, SheetError, SheetStore
 
 router = APIRouter(prefix="/api/sheets")
@@ -109,6 +110,122 @@ async def get_research(
         return request.app.state.sheet_research.job(user.uuid, job_id).view()
     except SheetError as exc:
         raise _refused(exc) from exc
+
+
+# --- setlists: declared before /{sheet_id}, which would take "setlists" for a sheet id ----------
+
+
+def setlist_view(row: SetlistRow, items: list[SetlistItemRow]) -> dict[str, Any]:
+    return {
+        "id": str(row.id),
+        "name": row.name,
+        "items": [{"sheet_id": str(i.sheet_id), "newest": i.newest} for i in items],
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
+
+
+class SetlistItem(BaseModel):
+    """A song of a setlist: this sheet, or (``newest``) the newest version of its song."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sheet_id: uuid.UUID
+    newest: bool = False
+
+
+class SetlistCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=200)
+    items: list[SetlistItem] = Field(default_factory=list, max_length=MAX_ITEMS)
+
+
+class SetlistUpdate(BaseModel):
+    """Only the fields that are present change; ``items`` is the whole new order."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(None, min_length=1, max_length=200)
+    items: list[SetlistItem] | None = Field(None, max_length=MAX_ITEMS)
+
+
+def _items(items: list[SetlistItem]) -> list[Item]:
+    return [Item(i.sheet_id, i.newest) for i in items]
+
+
+async def _view(store: SetlistStore, row: SetlistRow) -> dict[str, Any]:
+    return setlist_view(row, (await store.items([row.id]))[row.id])
+
+
+@router.get("/setlists")
+async def list_setlists(
+    user: CurrentUser = Depends(api_user), db: AsyncSession = Depends(get_db)
+) -> dict[str, Any]:
+    store = SetlistStore(db, user.uuid)
+    rows = await store.setlists()
+    items = await store.items([r.id for r in rows])
+    return {"setlists": [setlist_view(r, items[r.id]) for r in rows]}
+
+
+@router.post("/setlists", status_code=201)
+async def create_setlist(
+    body: SetlistCreate, user: CurrentUser = Depends(api_user), db: AsyncSession = Depends(get_db)
+) -> dict[str, Any]:
+    store = SetlistStore(db, user.uuid)
+    try:
+        row = await store.create(body.name, _items(body.items))
+    except SheetError as exc:
+        raise _refused(exc) from exc
+    await db.commit()
+    await db.refresh(row)
+    return await _view(store, row)
+
+
+@router.get("/setlists/{setlist_id}")
+async def get_setlist(
+    setlist_id: uuid.UUID,
+    user: CurrentUser = Depends(api_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    store = SetlistStore(db, user.uuid)
+    try:
+        row = await store.get(setlist_id)
+    except SheetError as exc:
+        raise _refused(exc) from exc
+    return await _view(store, row)
+
+
+@router.patch("/setlists/{setlist_id}")
+async def update_setlist(
+    setlist_id: uuid.UUID,
+    body: SetlistUpdate,
+    user: CurrentUser = Depends(api_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    store = SetlistStore(db, user.uuid)
+    try:
+        row = await store.update(
+            setlist_id,
+            name=body.name,
+            items=None if body.items is None else _items(body.items),
+        )
+    except SheetError as exc:
+        raise _refused(exc) from exc
+    await db.commit()
+    await db.refresh(row)
+    return await _view(store, row)
+
+
+@router.delete("/setlists/{setlist_id}", status_code=204)
+async def delete_setlist(
+    setlist_id: uuid.UUID, user: CurrentUser = Depends(api_user), db: AsyncSession = Depends(get_db)
+) -> None:
+    try:
+        await SetlistStore(db, user.uuid).delete(setlist_id)
+    except SheetError as exc:
+        raise _refused(exc) from exc
+    await db.commit()
 
 
 class SheetCreate(BaseModel):

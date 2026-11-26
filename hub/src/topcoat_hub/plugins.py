@@ -3,8 +3,8 @@ manifest of ``proto/plugin/manifest.schema.json``, and the one list of commands 
 
 Nothing here changes how a program works: the manifests are derived from the program rows the hub
 already has (``ui_templates``), and the commands from them. The registry (versions, install,
-remove, live reload) is the next step; until then a program row is its own plug-in, version
-``1.<rev>.0``.
+remove, live reload) is ``plugin_registry.py``; a program row that is not registered there (an
+admin's own program) is its own plug-in, version ``1.<rev>.0``.
 
 The command list is what a person may do, filtered by what they may see: the web's command
 palette, the menus a theme draws, the desktop client's selector and tray, and the Windows command
@@ -21,9 +21,11 @@ from typing import Any
 
 import jsonschema
 
+from topcoat_hub import tool_groups
 from topcoat_hub.config import REPO_ROOT
 
 CHAT_MODULE = "page.chat"
+INTERNET = "internet"  # the contracts' name for the web switch (tool group ``web``)
 
 
 @lru_cache(maxsize=1)
@@ -42,18 +44,25 @@ def problems(manifest: Any) -> list[str]:
     ]
 
 
-def _tools(agent: Any) -> list[str]:
-    if not isinstance(agent, dict):
-        return []
-    for key in ("tools", "capabilities", "groups"):
-        value = agent.get(key)
-        if isinstance(value, list):
-            return [str(v)[:80] for v in value if isinstance(v, str)][:200]
-    return []
+def agent_ceiling(agent: Any) -> list[str]:
+    """The tool ceiling of a program's agent block in the words of a manifest: its tool groups
+    (``groups`` None = every group) and ``internet`` unless the web is switched off."""
+    agent = agent if isinstance(agent, dict) else {}
+    scope = agent.get("tool_scope") if isinstance(agent.get("tool_scope"), dict) else {}
+    groups = scope.get("groups")
+    out = (
+        list(tool_groups.SELECTABLE)
+        if not isinstance(groups, list)
+        else [str(g)[:80] for g in groups if isinstance(g, str)]
+    )
+    if scope.get("internet") is not False:
+        out.append(INTERNET)
+    return out[:200]
 
 
-def manifest_of(program: dict[str, Any]) -> dict[str, Any]:
-    """The manifest of one built-in program (a ``template_view`` of the UI API)."""
+def manifest_of(program: dict[str, Any], version: str | None = None) -> dict[str, Any]:
+    """The manifest of one program (a ``template_view`` of the UI API); ``version`` by default
+    ``1.<rev>.0``."""
     key = str(program["key"])
     title_key = str(program.get("title_key") or f"workspace.{key}")
     modules = [str(m) for m in program.get("modules") or [] if isinstance(m, str)]
@@ -77,7 +86,7 @@ def manifest_of(program: dict[str, Any]) -> dict[str, Any]:
         )
     manifest: dict[str, Any] = {
         "id": key,
-        "version": f"1.{int(program.get('rev') or 0)}.0",
+        "version": version or f"1.{int(program.get('rev') or 0)}.0",
         "builtin": bool(program.get("builtin", True)),
         "title_key": title_key,
         "requires_role": role,
@@ -91,9 +100,7 @@ def manifest_of(program: dict[str, Any]) -> dict[str, Any]:
     }
     if program.get("icon"):
         manifest["icon"] = str(program["icon"])[:40]
-    tools = _tools(program.get("agent"))
-    if tools:
-        manifest["agent"] = {"tools_ceiling": tools}
+    manifest["agent"] = {"tools_ceiling": agent_ceiling(program.get("agent"))}
     return manifest
 
 

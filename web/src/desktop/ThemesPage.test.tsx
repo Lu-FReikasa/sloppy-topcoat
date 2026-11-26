@@ -39,9 +39,10 @@ describe("ThemesPage", () => {
     setup();
     const list = await screen.findByTestId("theme-list");
     await within(list).findByText("Wall");
-    expect(within(list).getAllByRole("button", { name: "Kopieren und ändern" })).toHaveLength(4);
+    expect(within(list).getAllByRole("button", { name: "Kopieren und ändern" })).toHaveLength(5);
     expect(within(list).getByText("Terminal")).toBeTruthy();
-    expect(within(list).getAllByText("eingebaut")).toHaveLength(3);
+    expect(within(list).getByText("Terminal Nest")).toBeTruthy();
+    expect(within(list).getAllByText("eingebaut")).toHaveLength(4);
   });
 
   it("edits a theme, tells what is wrong, and saves only a valid one", async () => {
@@ -117,6 +118,13 @@ describe("ThemesPage", () => {
     const editor = await screen.findByTestId("theme-editor");
     await waitFor(() => expect(seen.at(-1)?.key).toBe("wall"));
     fireEvent.change(within(editor).getByLabelText("Anordnung der Anwendungen"), { target: { value: "focus" } });
+    await waitFor(() => expect(seen.at(-1)?.layout.kind).toBe("focus"));
+    // the nest layout (#15) is offered with its own name
+    const layout = within(editor).getByLabelText("Anordnung der Anwendungen") as HTMLSelectElement;
+    expect([...layout.options].find((o) => o.value === "nest")?.textContent).toBe("Verschachtelt, mit Zoom (Ebenen von Gruppen)");
+    fireEvent.change(layout, { target: { value: "nest" } });
+    await waitFor(() => expect(seen.at(-1)?.layout.kind).toBe("nest"));
+    fireEvent.change(layout, { target: { value: "focus" } });
     await waitFor(() => expect(seen.at(-1)?.layout.kind).toBe("focus"));
     // an invalid draft is not shown
     fireEvent.change(within(editor).getByLabelText("Stylesheet"), { target: { value: "@import 'x';" } });

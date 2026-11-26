@@ -121,6 +121,17 @@
             "type": "boolean"
           }
         },
+        "projectors": {
+          "type": "object",
+          "description": "vision projector (mmproj) per model name, as a file name in the model's own directory, or \"none\" for no projector; wins over the node's own matching (mmproj-<model>.gguf, <model>.mmproj.gguf, <model>-mmproj*.gguf, or the only projector in the model's subfolder); {} = none (D125)",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^(none|[^/\\\\]+[.]gguf)$"
+          }
+        },
         "model_backends": {
           "type": "object",
           "description": "backend and GPU offload per model name (E2-05): e.g. a 7B on vulkan and a 30B on cpu. Absent or {} = the node's backend and llama.cpp's own fit to device memory",
@@ -561,6 +572,21 @@
           "maximum": 300,
           "description": "time limit of one capability call (default 20)"
         },
+        "voice": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "the capabilities voice.transcribe (whisper.cpp) and voice.speak (Piper), D127: pinned builds, one process per request, models in <data dir>/voice-models/stt (ggml-*.bin) and tts (*.onnx + *.onnx.json); absent = off",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "backend": {
+              "type": "string",
+              "enum": ["auto", "cpu"],
+              "description": "whisper.cpp: auto = CUDA on Windows with an NVIDIA GPU, otherwise the CPU (there is no Linux GPU or Vulkan build)"
+            }
+          }
+        },
         "workshop": {
           "type": "object",
           "additionalProperties": false,
@@ -643,6 +669,29 @@
           "type": "string",
           "pattern": "^[a-z][a-z0-9-]{0,31}$",
           "description": "the channel whose builds this node may install (default stable)"
+        }
+      }
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "the image runner (stable-diffusion.cpp's sd-server, D126): a pinned official build, downloaded when the first image model loads, bound to 127.0.0.1; absent = off",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "backend": {
+          "type": "string",
+          "enum": ["auto", "vulkan", "cuda", "cpu"],
+          "description": "default auto; there is no Linux CUDA build, Linux uses vulkan or cpu"
+        },
+        "model_dirs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "extra read-only directories with image models (besides <data dir>/image-models)"
         }
       }
     },

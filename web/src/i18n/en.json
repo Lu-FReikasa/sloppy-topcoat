@@ -128,6 +128,13 @@
     "unload": "Unload",
     "offlineHint": "The node is offline – actions are not possible.",
     "loadedModels": "Loaded models",
+    "glanceGpu": "GPU",
+    "glanceGpuValue": "{{name}}: {{used}} / {{total}} GB VRAM",
+    "glanceGpuShared": "{{used}} / {{total}} GB shared",
+    "glanceLoaded": "Loaded now",
+    "glanceLoadedValue": "{{name}} ({{vram}} GB VRAM)",
+    "glanceNone": "none",
+    "factsMore": "Details: system, CPU, network, versions",
     "contextLength": "Context: {{value}}",
     "contextPerSlot": "Context: {{value}} per slot × {{slots}} slots",
     "events": "Recent events",
@@ -1007,7 +1014,154 @@
     "grantAllFor": "{{user}}: all read-only capabilities",
     "grantFor": "{{user}}: {{capability}}",
     "grantsSave": "Save",
-    "grantsSaved": "Saved"
+    "grantsSaved": "Saved",
+    "cap": {
+      "system": {
+        "info": "Host name, OS, kernel, uptime, load, CPUs, RAM and swap of this machine.",
+        "memory": "What the RAM is spent on: programs, cache, kernel, swap, ZFS ARC and the processes that hold the most."
+      },
+      "disk": {
+        "usage": "Usage of every mounted data file system (size, used, free, inodes), fullest first."
+      },
+      "docker": {
+        "ps": "Containers of this Docker host with state, health, restarts and start time.",
+        "inspect": "Status details of one container: state, exit code, restarts, health checks, mounts, networks. Never its environment variables.",
+        "logs": "The last log lines of one container, secrets masked.",
+        "restart": "Restart one container that the node's config lists; its service is down for a few seconds."
+      },
+      "compose": {
+        "projects": "Compose projects (stacks) on this Docker host with the state of each service.",
+        "file": "One file of a compose project (compose or .env file), secrets masked; only in released folders.",
+        "logs": "Logs of a whole compose project, all its containers merged by time.",
+        "restart": "Restart a whole compose project, dependencies first; its services are down meanwhile."
+      },
+      "journal": {
+        "logs": "Journal lines of one systemd unit, secrets masked."
+      },
+      "service": {
+        "status": "State of one systemd unit: active state, last result, main PID, restarts, memory, since when.",
+        "failed": "The systemd units that are failed right now.",
+        "restart": "Restart one systemd unit that the node's config lists; the service is down meanwhile."
+      },
+      "health": {
+        "check": "The general state of this machine in one call: failed units, troubled containers, full disks, RAM, load and recent errors."
+      },
+      "logs": {
+        "search": "Search for a text in the logs of all containers and the journal at once."
+      },
+      "certs": {
+        "expiry": "TLS certificates of the configured services: issuer, expiry date, days left and whether the chain is valid."
+      },
+      "net": {
+        "check": "Reachability of the configured hosts from this node: DNS, ping and ports."
+      },
+      "inventory": {
+        "snapshot": "What runs on this machine, for the hub's inventory: host facts, Docker containers and systemd services."
+      },
+      "shell": {
+        "read": "Run one read-only shell command as an unprivileged user without network; secrets masked."
+      },
+      "docs": {
+        "list": "List the Markdown and text files of a folder released for the knowledge base.",
+        "read": "Read one Markdown or text file of the knowledge base, page by page, secrets masked."
+      },
+      "files": {
+        "list": "List one folder inside a folder released for reading on this node.",
+        "read": "Read a text file inside a folder released for reading, page by page or its last lines."
+      },
+      "kuma": {
+        "monitors": "Uptime Kuma: every monitor with its status, response time and certificate expiry."
+      },
+      "omada": {
+        "sites": "Omada controller: the sites.",
+        "devices": "Omada controller: the devices of a site with status, model, IP and firmware.",
+        "clients": "Omada controller: the clients connected now.",
+        "events": "Omada controller: the site's event log in a time window.",
+        "audit_logs": "Omada controller: who changed what in the controller, in a time window.",
+        "alerts": "Omada controller: the site's alerts in a time window.",
+        "firmware": "Omada controller: the latest firmware known for one device."
+      },
+      "keycloak": {
+        "snapshot": "Keycloak: users, groups and clients with their role mappings, in one call.",
+        "user": "Keycloak: one person's groups and the roles they effectively have."
+      },
+      "web": {
+        "search": "Search the web through the operator's own search engine (SearXNG).",
+        "fetch": "Read one public web page as text.",
+        "images": "Search for pictures through the operator's own search engine (SearXNG).",
+        "image": "Fetch one public picture so the hub can keep it with a report."
+      },
+      "windows": {
+        "system": "Windows version and build, uptime, model, RAM, CPU, BIOS, time zone and the newest updates.",
+        "services": "Windows services with display name, state and start type.",
+        "events": "Entries of the System or Application event log (never Security), newest first.",
+        "storage": "Volumes and physical disks with size, free space and health.",
+        "network": "Network adapters, IPv4 addresses, DNS servers, routes and the network profile.",
+        "processes": "The processes using the most CPU time or memory.",
+        "programs": "Installed programs with version and publisher.",
+        "startup": "What starts by itself: startup commands and scheduled tasks.",
+        "defender": "Microsoft Defender status and the registered antivirus products.",
+        "devices": "Devices with a problem in Device Manager, and the graphics adapters with their drivers.",
+        "power": "Power settings: active plan, supported sleep states, last wake source and devices allowed to wake the PC."
+      },
+      "repo": {
+        "sync": "Clone the repository into the workshop or fetch its default branch.",
+        "status": "The state of the worktree: branch, head commit and changed files.",
+        "list": "List the files of the worktree; files that may hold credentials are left out.",
+        "read": "Read a text file of the worktree by line range, secrets masked.",
+        "search": "Search the worktree for a text or a regular expression.",
+        "outline": "A map of the worktree: each source file with its named places and their lines.",
+        "diff": "The change made so far as a unified diff, or only the list of files.",
+        "start": "Start a work branch from the current default branch.",
+        "edit": "Replace one exact piece of text in a file of the worktree.",
+        "write": "Create a file of the worktree or replace it completely.",
+        "apply_patch": "Apply a unified diff to the worktree, all or nothing.",
+        "reset": "Throw away every uncommitted change in the worktree.",
+        "test": "Run the repository's tests in a throw-away container with limits.",
+        "test_start": "Start the repository's tests in the background.",
+        "test_status": "The state of a background test run and the end of its output.",
+        "test_cancel": "Stop a background test run.",
+        "build_node": "Cross-build the node for Linux and Windows from the worktree; the binaries stay unsigned.",
+        "build_list": "The builds kept in the workshop for a repository, with sizes and SHA-256.",
+        "push": "Commit the change and push it to a work branch on the remote; needs a confirmed proposal.",
+        "branches": "The branches of a local repository: last commit and how far ahead or behind each is.",
+        "commit": "Commit the change in the worktree on its work branch in the workshop; nothing leaves the workshop."
+      },
+      "workshop": {
+        "create": "Create a new local repository with a first commit.",
+        "clone": "Create a local repository as a full copy of a remote one.",
+        "branch": "Create a branch in a local repository.",
+        "merge": "Merge a branch of a local repository into another; a conflict changes nothing.",
+        "publish": "Push a branch of a local repository to its remote, never forced.",
+        "pull": "Bring a branch of a local repository up to date with its remote (fast-forward only).",
+        "remove": "Delete a local repository from this workshop; this cannot be undone."
+      },
+      "browser": {
+        "open": "Open a headless browser on the repository's GUI with a faked hub, in a container without network.",
+        "close": "End the browser session and remove its container.",
+        "snapshot": "The page as a compact tree of what a user can see and operate.",
+        "act": "Operate the page: click, type, hover, scroll or press a key.",
+        "shot": "A small picture of the page or of a region.",
+        "console": "Console messages, page errors and failed requests.",
+        "audit": "Check the page by measurement and return only the violations.",
+        "animations": "Measure the animations on the page: timing, sampled values, frame times and layout shifts.",
+        "viewport": "Set the size of the page and optionally pixel ratio, color scheme and reduced motion."
+      },
+      "build": {
+        "fetch": "Fetch a commit, branch or tag into the build mirror and name the changes since the last release.",
+        "node_release": "Build the node for Linux and Windows from a pinned commit and upload the files to the hub; signs nothing.",
+        "hub_image": "Build the hub image from a pinned commit in a fresh clone.",
+        "node_container_image": "Build the container image of the CPU node from a pinned commit.",
+        "smoke_test": "Start the image built last with a database and check that it migrates and answers."
+      },
+      "hub": {
+        "update": "Roll the hub out to an image already on this host, with digest check, dump, health check and a way back."
+      },
+      "voice": {
+        "transcribe": "Turns a short recording into text with whisper.cpp on this machine; the audio is not kept.",
+        "speak": "Reads a text aloud with a Piper voice on this machine and returns the sound."
+      }
+    }
   },
   "params": {
     "title": "Parameters",
@@ -1189,7 +1343,9 @@
     },
     "event": {
       "pause": "Paused by you",
-      "resume": "Resumed by you"
+      "resume": "Resumed by you",
+      "vision_routed": "looked at the images (a model that can see)",
+      "vision_blind": "cannot see images: they were not sent"
     },
     "control": {
       "pause": "Pause",
@@ -1304,7 +1460,9 @@
     "error": "The task failed: {{message}}",
     "checks": "Checks",
     "checkProgress": "{{steps}} steps, {{calls}} calls",
-    "checkOpen": "open"
+    "checkOpen": "open",
+    "noTask": "No task open",
+    "noTaskHint": "A task opens from the inbox or from a check in a chat."
   },
   "proposal": {
     "heading": "Proposed changes",
@@ -2460,13 +2618,15 @@
     "targets": {
       "research": "Research",
       "dev": "Development",
-      "admin": "Administration"
+      "admin": "Administration",
+      "project": "This project"
     },
     "actions": {
       "request_report": "request a report",
       "create_branch": "create a branch",
       "create_prototype": "create a prototype",
-      "read_released": "read released data"
+      "read_released": "read released data",
+      "decompose": "split large tasks into sub-tasks"
     },
     "tree": "Tree",
     "noNodes": "Nothing here yet. Add a topic, a task or a report above.",
@@ -2958,6 +3118,11 @@
     "programs": "Applications",
     "program": "application",
     "action": "action",
+    "nest": {
+      "zoomIn": "Zoom in (towards the program in front)",
+      "zoomOut": "Zoom out one level",
+      "overview": "Overview of all programs"
+    },
     "views": "Views of {{program}}",
     "minimise": "Minimise {{program}}",
     "maximise": "Maximise {{program}}",
@@ -2971,7 +3136,8 @@
     "looks": {
       "terminal": "Terminal",
       "leitstand": "Control room",
-      "schreibtisch": "Desk"
+      "schreibtisch": "Desk",
+      "terminal-nest": "Terminal Nest"
     },
     "signal": {
       "amber": "something to read",
@@ -3125,6 +3291,28 @@
       "ok": "done",
       "failed": "failed",
       "stopped": "stopped"
+    },
+    "programs": {
+      "research_report": "Research report with revision",
+      "theme_design": "Desktop theme with check and revision",
+      "two_node_check": "Two answers, a third model compares",
+      "wiki_check": "Check one wiki page against code, live state and topcoat.guide",
+      "doc_section": "Document one part of the repository from its code",
+      "issue_check": "Find the cause of an issue in the code the hub runs",
+      "issue_fix": "Write the fix of an issue as exact edits",
+      "issue_steps": "Plan the fix of an issue as small steps, one place each",
+      "fix_step": "Write one step of a planned fix as exact edits at one place",
+      "issue_area": "Round 0 of an issue's investigation: which part of the code it is about",
+      "issue_investigate": "Investigate an issue in rounds with Development and Administration, end with a plan",
+      "investigate_round": "One round of an issue's investigation: ask further, or write the report and plan",
+      "review_plan": "Second look at an issue's plan: right places for what the checks want?",
+      "probe_dev": "Answer one question of an issue's investigation in Development",
+      "probe_admin": "Answer one question of an issue's investigation in Administration",
+      "probe_read": "Find the code an investigation's test must call",
+      "probe_test": "Write one small test that tries a guess of an investigation",
+      "issue_plan": "Carry out an issue's settled plan step by step",
+      "decompose": "Cut a large task into checked sub-tasks",
+      "checklist_check": "Work through a task's checklist, one item per fresh run"
     }
   },
   "pools": {
@@ -3251,6 +3439,55 @@
     "loads": "Loads in the last seven days",
     "noLabel": "not labelled yet"
   },
+  "plugins": {
+    "title": "Plug-ins",
+    "hint": "Applications as data (manifests): install, update, roll back, switch off or remove one while the hub runs. Every version is kept. A plug-in can narrow the tools of its program, never widen them. Built-in programs are registered here and cannot be removed.",
+    "name": "Plug-in",
+    "version": "Version",
+    "state": "State",
+    "actions": "Actions",
+    "builtin": "Built in",
+    "enabled": "On",
+    "disabled": "Off",
+    "enable": "Switch on",
+    "disable": "Switch off",
+    "remove": "Remove",
+    "cancel": "Cancel",
+    "confirmRemove": "Remove the plug-in {{key}} with all its versions?",
+    "removed": "{{key}} removed.",
+    "enabledNote": "{{key}} is on.",
+    "disabledNote": "{{key}} is off.",
+    "installed": "{{key}} installed.",
+    "updated": "New version of {{key}} installed.",
+    "rolledBack": "{{key}} is back at version {{version}}.",
+    "refused": "The hub refused the change:",
+    "notJson": "The manifest is not a JSON object.",
+    "noId": "The manifest has no id.",
+    "installTitle": "Install or update",
+    "installHint": "Paste a manifest or load it from a file. A new id is installed; the id of an installed plug-in needs a higher version number and becomes its new version.",
+    "manifest": "Manifest (JSON)",
+    "fromFile": "From a file",
+    "installOrUpdate": "Install or update",
+    "versionsOf": "Versions of {{name}}",
+    "installedBy": "Installed",
+    "byHub": "the hub",
+    "hash": "SHA-256",
+    "inForce": "(in force)",
+    "compare": "Compare",
+    "rollBack": "Roll back to this",
+    "diffOf": "What changed from {{a}} to {{b}}",
+    "same": "The two versions are the same.",
+    "changes": "Changes",
+    "action": {
+      "register": "registered at {{to}}",
+      "install": "installed at {{to}}",
+      "update": "updated from {{from}} to {{to}}",
+      "rollback": "rolled back from {{from}} to {{to}}",
+      "enable": "switched on",
+      "disable": "switched off",
+      "remove": "removed at {{from}}"
+    }
+  },
   "modelSwitches": {
     "title": "Model changes on the machines",
     "hint": "How often a machine had to load a model it did not have, and how often it changed the model it served, per day and machine. Loads caused by the second look are shown apart. Only figures; nothing is changed by them.",
@@ -3316,7 +3553,8 @@
       "columns": "Columns",
       "rows": "Rows",
       "focus": "One large, the rest at the side",
-      "cascade": "Overlapping, the front one on top"
+      "cascade": "Overlapping, the front one on top",
+      "nest": "Nested, with zoom (levels of groups)"
     },
     "barPosition": "Taskbar",
     "positions": {
@@ -3860,7 +4098,8 @@
     "navigation": "Navigation",
     "applications": "Applications",
     "system": "System",
-    "toWindows": "Window view"
+    "toWindows": "Window view",
+    "moved": "This page has moved or does not exist."
   },
   "research": {
     "title": "Research",
@@ -4008,6 +4247,13 @@
     "changes": "Changes ({{count}})",
     "newFile": "new file",
     "tests": "Tests: {{state}}",
+    "testsPassed": "{{n}} passed",
+    "testsFailed": "{{n}} failed",
+    "testsErrored": "{{n}} errored",
+    "testsSkipped": "{{n}} skipped",
+    "testsNoFailure": "No failing test in the log: the run failed elsewhere (lint, type check, a crash or a cut-off part). The full output says where.",
+    "firstFailure": "First failure:",
+    "testOutput": "Full test output",
     "sameFailure": "{{count}}× the same failure",
     "rollout": "Roll-out",
     "apply": "Apply and test",
@@ -4042,8 +4288,7 @@
   "sheets": {
     "title": "Sheets",
     "list": "Your sheets",
-    "empty": "No sheets yet. Start a research or paste a sheet.",
-    "pick": "Pick a sheet on the left, or start a research for a song.",
+    "empty": "No sheets yet. Research a song or paste a sheet with “New sheet …”.",
     "loading": "Loading …",
     "capoN": "Capo {{n}}",
     "key": "Key",
@@ -4064,6 +4309,8 @@
     "cancel": "Cancel",
     "flow": "Flow of the song",
     "repeat": "repeat",
+    "collapse": "Collapse repeats",
+    "asAbove": "as above",
     "tab": {
       "sheet": "Sheet",
       "sources": "Sources ({{n}})",
@@ -4125,7 +4372,79 @@
       "search": "Search songs",
       "artist": "Artist",
       "allArtists": "All artists",
-      "none": "No sheet matches."
+      "none": "No sheet matches.",
+      "keys": "/ or Ctrl+F: search · Enter: open the first song"
+    },
+    "sort": {
+      "label": "Sort",
+      "title": "By title",
+      "artist": "By artist",
+      "added": "Newest first"
+    },
+    "stage": {
+      "open": "Stage mode",
+      "exit": "Leave",
+      "prev": "Previous song",
+      "next": "Next song",
+      "scroll": "Too long for one screen: scroll"
+    },
+    "setlists": {
+      "title": "Setlists",
+      "choose": "Choose a setlist",
+      "new": "New setlist",
+      "name": "Name of the setlist",
+      "create": "Create",
+      "play": "Play on stage",
+      "playFrom": "Play on stage from this song",
+      "delete": "Delete setlist",
+      "deleteConfirm": "Delete the setlist \"{{name}}\"? Its sheets stay.",
+      "empty": "No songs yet.",
+      "keys": "Drag to reorder, or Alt + ↑/↓ on a song.",
+      "add": "Add \"{{title}}\"",
+      "addHint": "Open a sheet to add it to the setlist.",
+      "which": "Version",
+      "newestOption": "Always the newest version",
+      "thisOption": "This version (v{{n}})",
+      "newest": "newest (v{{n}})",
+      "up": "Move up",
+      "down": "Move down",
+      "remove": "Remove from the setlist",
+      "missing": "Sheet deleted",
+      "position": "{{name}} · {{n}} of {{total}}",
+      "side": "Setlist",
+      "search": "Search the setlist",
+      "view": "View",
+      "views": {
+        "setlist": "Setlist order",
+        "title": "Title",
+        "artist": "Artist, then title"
+      },
+      "sortedHint": "Sorted or searched: the numbers are the setlist positions. Reorder in setlist order without a search.",
+      "noMatch": "No song of the setlist matches."
+    },
+    "back": "Back to the list",
+    "close": "Close",
+    "versions": "Versions",
+    "new": {
+      "open": "New sheet …",
+      "title": "New sheet"
+    }
+  },
+  "images": {
+    "attach": "Add images",
+    "attachHint": "Add images (up to {{max}}); you can also paste or drop them here",
+    "image": "Image",
+    "remove": "Remove {{name}}",
+    "open": "Show the image whole",
+    "viewer": "Image",
+    "close": "Close",
+    "missing": "Image not available",
+    "blind": "The model of this answer cannot see images, so it did not get them.",
+    "problem": {
+      "type": "Only JPEG, PNG, WebP, GIF and BMP images can go with a message.",
+      "size": "An image may have at most 15 MB.",
+      "count": "At most {{max}} images go with one message.",
+      "read": "The image could not be read."
     }
   }
 }

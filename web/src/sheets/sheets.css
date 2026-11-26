@@ -1,4 +1,6 @@
-/* Sheets (SheetsPage.tsx): the list and the research on the left, the open sheet on the right.
+/* Sheets (SheetsPage.tsx), two views (#148): the library (search, sort, artist, the songs as a
+   table, the setlists beside it) and the open sheet over the whole width, with a setlist as a
+   narrow side list only when the song was opened from one.
    A part of the song has one colour in the flow and in the sheet (--part); the colours are mixed
    from the theme's text colour so they read on light and dark themes. A theme may set
    --sheet-font for the lyrics and --sheet-chord for the chords. */
@@ -7,22 +9,193 @@
   container-type: inline-size;
 }
 
-.sheets {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1.25rem;
-  align-items: start;
-}
-
-@container (min-width: 760px) {
-  .sheets {
-    grid-template-columns: 17rem minmax(0, 1fr);
-  }
+.sheets-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .sheets-title {
   font-size: 1.2rem;
-  margin: 0 0 0.75rem;
+  margin: 0;
+}
+
+/* --- the library ---------------------------------------------------------------------------- */
+
+.sheets-library-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem 2rem;
+  align-items: start;
+}
+
+@container (min-width: 900px) {
+  .sheets-library-body {
+    grid-template-columns: minmax(0, 1fr) 20rem;
+  }
+}
+
+/* search first and wide; sort and artist on the line below it */
+.sheets-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.sheets-filter .sheets-search {
+  flex: 1 1 100%;
+  min-width: 0;
+  font-size: 16px;
+  padding: 0.5rem 0.65rem;
+}
+
+.sheets-filter select {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* below 760 px touch.css gives selects 40 px; this rule would beat it, so it is for wider screens */
+@media (min-width: 760px) {
+  .sheets-filter select {
+    min-height: 2.2rem;
+  }
+}
+
+.sheets-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sheets-table th {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.sheets-table td {
+  padding: 0.3rem 0.5rem;
+  vertical-align: baseline;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.sheets-table tbody tr:hover {
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.sheets-col-title a {
+  display: inline-block;
+  padding-block: 0.25rem;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.sheets-col-title a:hover,
+.sheets-col-title a:focus-visible {
+  text-decoration: underline;
+}
+
+.sheets-col-key {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheets-versions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.6rem;
+}
+
+.sheets-versions a {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* the artist under the title on narrow screens, in its own column on wide ones */
+.sheets-row-artist {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+/* on a narrow page the key ("A · Capo 2") may break and the column titles get small, or the
+   versions column is pushed out of the page at 320 px (or at 390 with a long artist name) */
+@container (max-width: 559.98px) {
+  .sheets-col-key {
+    white-space: normal;
+  }
+
+  .sheets-table th {
+    letter-spacing: 0;
+    hyphens: auto;
+    overflow-wrap: anywhere;
+  }
+
+  .sheets-table th,
+  .sheets-table td {
+    padding-inline: 0.3rem;
+  }
+}
+
+.sheets-col-artist {
+  display: none;
+}
+
+@container (min-width: 560px) {
+  .sheets-row-artist {
+    display: none;
+  }
+
+  .sheets-col-artist {
+    display: table-cell;
+  }
+}
+
+.sheets-jobs {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.sheets-job {
+  padding: 0.4rem 0.5rem;
+  border-left: 3px solid var(--border, #8884);
+  margin-bottom: 0.35rem;
+}
+
+.sheets-job-running {
+  border-left-color: var(--accent, #7aa7ff);
+}
+
+.sheets-job-failed {
+  border-left-color: #e5534b;
+}
+
+.sheets-job-done {
+  border-left-color: #57ab5a;
+}
+
+.sheets-badge {
+  font-size: 0.7rem;
+  padding: 0 0.35rem;
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+/* "New sheet …": the research and the paste in one dialog */
+.sheets-new {
+  display: grid;
+  gap: 0.5rem;
 }
 
 .sheets-form {
@@ -55,89 +228,61 @@
   flex: 1 1 8rem;
 }
 
-.sheets-jobs,
-.sheets-list {
-  list-style: none;
-  margin: 0 0 1rem;
-  padding: 0;
-}
+/* --- the open sheet: back to the list, and the setlist beside it when opened from one ------- */
 
-.sheets-job {
-  padding: 0.4rem 0.5rem;
-  border-left: 3px solid var(--border, #8884);
-  margin-bottom: 0.35rem;
-}
-
-.sheets-job-running {
-  border-left-color: var(--accent, #7aa7ff);
-}
-
-.sheets-job-failed {
-  border-left-color: #e5534b;
-}
-
-.sheets-job-done {
-  border-left-color: #57ab5a;
-}
-
-.sheets-badge {
-  font-size: 0.7rem;
-  padding: 0 0.35rem;
-  border-radius: 0.6rem;
-  background: color-mix(in srgb, currentColor 12%, transparent);
-}
-
-.sheets-list a {
-  display: grid;
-  padding: 0.35rem 0.5rem;
-  border-radius: 0.35rem;
-  text-decoration: none;
-  color: inherit;
-}
-
-.sheets-list a:hover,
-.sheets-list a[aria-current="page"] {
-  background: color-mix(in srgb, currentColor 9%, transparent);
-}
-
-.sheets-list-title {
-  font-weight: 600;
-}
-
-.sheets-filter {
+.sheets-bar {
   display: flex;
-  gap: 0.4rem;
-  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
 }
 
-.sheets-filter input,
-.sheets-filter select {
-  flex: 1 1 0;
-  min-width: 0;
+.sheets-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
 }
 
-.sheets-group-head {
+.sheets-side-toggle[aria-pressed="true"] {
+  font-weight: 700;
+  outline: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+}
+
+.sheets-open-body {
   display: grid;
-  padding: 0.35rem 0.5rem 0.1rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem 2rem;
+  align-items: start;
 }
 
-.sheets-versions {
-  list-style: none;
-  margin: 0;
-  padding: 0 0 0 0.75rem;
+/* narrow: the sheet first, its setlist below it (the next song is where the song ends) */
+.sheets-side {
+  order: 1;
 }
 
-.sheets-list .sheets-versions a {
-  display: flex;
-  gap: 0.5rem;
-  align-items: baseline;
-  padding: 0.2rem 0.5rem;
+@container (min-width: 900px) {
+  .has-side .sheets-open-body {
+    grid-template-columns: 16rem minmax(0, 1fr);
+  }
+
+  .sheets-side {
+    order: 0;
+  }
 }
 
-.sheets-version {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+/* the side list is for going through the evening: open or play a song; moving and removing
+   stay in the library (drag and Alt+↑/↓ still work here) */
+.sheets-side .setlist-edit {
+  display: none;
 }
+
+.sheets-side .setlist-title[aria-current="page"] {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
 
 /* --- the parts of a song: one hue each ------------------------------------------------------ */
 
@@ -299,6 +444,15 @@
   background: color-mix(in srgb, var(--part) 25%, transparent);
 }
 
+/* a part played again: its name and count on one line (#141) */
+.sheet-again .sheet-part-label {
+  margin: 0;
+}
+
+.sheet-times {
+  font-variant-numeric: tabular-nums;
+}
+
 .sheet-comment {
   font-style: italic;
   color: var(--muted);
@@ -345,9 +499,290 @@
 }
 
 @media print {
-  .sheets-nav,
+  .sheets-bar,
+  .sheets-side,
   .sheet-controls,
   .sheet-tabs {
     display: none;
   }
+}
+
+/* --- stage mode: the sheet alone, fitted on one screen (SheetsPage.tsx Stage, fit.ts) -------- */
+
+.sheet-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.4rem 1rem 0.6rem;
+  background: var(--bg, Canvas);
+  color: var(--text, CanvasText);
+}
+
+/* at the bottom, under the sheet: the arrows sit where a hand holding a turned laptop reaches them */
+.sheet-stage-head {
+  order: 1;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 1rem;
+  font-size: 14px;
+}
+
+/* title, artist, key: one line, cut with "…" so the buttons never move to a second line */
+.sheet-stage-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* key, capo, setlist place and hint stay whole; only the title and the artist give way */
+.sheet-stage-info > * {
+  flex: 0 0 auto;
+}
+
+.sheet-stage-info > strong:first-of-type,
+.sheet-stage-info > .muted {
+  flex: 0 1 auto;
+  min-width: 2.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sheet-stage-info > .muted {
+  flex-shrink: 3;
+}
+
+.sheet-stage-hint {
+  color: #d29922;
+}
+
+.sheet-stage-tools {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  opacity: 0.45;
+}
+
+/* the arrows are touched with a finger on a turned laptop: big targets */
+.sheet-stage-arrow {
+  min-width: 3.5rem;
+  min-height: 2.75rem;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.sheet-stage-tools:hover,
+.sheet-stage-tools:focus-within {
+  opacity: 1;
+}
+
+.sheet-stage-box {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sheet-stage-box.is-scroll {
+  overflow-y: auto;
+}
+
+/* the columns the stage placed the parts into (SheetsPage.tsx Stage, fit.ts packColumns) */
+.sheet-stage-cols {
+  display: grid;
+  align-items: start;
+}
+
+/* the rule sits in the middle of the gap: a column keeps the full width it was measured at */
+.sheet-stage-col + .sheet-stage-col {
+  position: relative;
+}
+
+.sheet-stage-col + .sheet-stage-col::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1em;
+  border-left: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+/* the hidden copy the parts are measured in */
+.sheet-stage-measure {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.sheet-stage-body .sheet-body {
+  display: block;
+}
+
+.sheet-stage-body .sheet-part {
+  break-inside: avoid;
+  margin-bottom: 0.6em;
+}
+
+.sheet-stage-body .sheet-part-label {
+  font-size: 0.7em;
+}
+
+/* "· as above" / "· repeat" grow with the fitted font, not a fixed rem (#141 review) */
+.sheet-stage-body .sheet-part-label .small {
+  font-size: 0.85em;
+}
+
+.sheet-stage-body .sheet-text {
+  white-space: pre-wrap;
+}
+
+/* Setlists (Setlists.tsx): the songs of one evening in order, reordered by drag or Alt+↑/↓. */
+.sheets-setlists {
+  margin: 0 0 1rem;
+}
+
+.sheets-setlists h2 {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0.25rem 0 0.4rem;
+}
+
+.sheets-setlists select {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.setlist {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.setlist .sheets-row > input {
+  min-width: 0;
+}
+
+.setlist-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.setlist-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 0.35rem;
+  cursor: grab;
+}
+
+.setlist-item:hover,
+.setlist-item:focus-visible {
+  background: color-mix(in srgb, currentColor 9%, transparent);
+}
+
+/* a sorted or searched view (#149): rows are not dragged there */
+.setlist-item.is-fixed {
+  cursor: default;
+}
+
+/* search and view of one setlist: side by side in a wide panel; in the narrow side column
+   (300 px) the select wraps below the search, so neither cuts its text */
+.setlist-view > input[type="search"] {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: 16px;
+}
+
+.setlist-view > select {
+  flex: 1 1 12rem;
+}
+
+.setlist-item.is-dragged {
+  opacity: 0.5;
+}
+
+/* the position number sits on the title's line, also when the row has an artist or version line */
+.setlist-n {
+  align-self: baseline;
+  min-width: 1.4em;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.setlist-song {
+  display: grid;
+  min-width: 0;
+}
+
+/* the title plays the setlist from this song; it reads as the song's name, not as a button */
+.sheets-setlists .setlist-title {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.sheets-setlists .setlist-title:hover {
+  text-decoration: underline;
+}
+
+.setlist-tools {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.setlist-tools button {
+  padding-inline: 0.3rem;
+}
+
+/* Below 760 px touch.css gives every button and select 40 px; these rules would beat it, so they
+   are for wider screens only (the ↑ ↓ × buttons and the title were 30 and 20 px on phones). */
+@media (min-width: 760px) {
+  .sheets-setlists .setlist-title {
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .setlist-tools button {
+    min-width: 2rem;
+  }
+
+  /* alone on its line in the narrow nav column, the select would keep its 19 px native height */
+  .sheets-setlists select {
+    min-height: 2.2rem;
+  }
+}
+
+.setlist-add {
+  margin: 0;
+}
+
+.sheet-stage-set {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }

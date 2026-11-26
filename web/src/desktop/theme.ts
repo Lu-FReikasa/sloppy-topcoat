@@ -7,9 +7,10 @@
 // core hands it.
 import { tile, type Rect } from "./tiling";
 
-/** How the programs that are shown are laid out. */
-export type LayoutKind = "tile" | "columns" | "rows" | "focus" | "cascade";
-export const LAYOUT_KINDS: readonly LayoutKind[] = ["tile", "columns", "rows", "focus", "cascade"];
+/** How the programs that are shown are laid out. `nest`: splits that nest, with a view that zooms
+ *  to a part of them (nest.ts; the desktop places these itself, not with `layoutRects`). */
+export type LayoutKind = "tile" | "columns" | "rows" | "focus" | "cascade" | "nest";
+export const LAYOUT_KINDS: readonly LayoutKind[] = ["tile", "columns", "rows", "focus", "cascade", "nest"];
 
 /** Where the taskbar stands. `hidden`: not drawn; the palette (Ctrl+K) and the keys still work. */
 export type BarPosition = "bottom" | "top" | "left" | "right" | "hidden";
@@ -49,8 +50,40 @@ const STANDARD_CHROME: ThemeManifest["chrome"] = {
   titlebar: "top",
 };
 
-/** The three themes that come with the web build: the style sheets are `desktop.css`,
- *  `leitstand.css` and `schreibtisch.css`; the rest is data like any other theme's. */
+/** The built-in style sheets a theme can start from (`base`): `desktop.css`, `leitstand.css` and
+ *  `schreibtisch.css`. */
+export const BASES: readonly NonNullable<ThemeManifest["base"]>[] = ["terminal", "leitstand", "schreibtisch"];
+
+/** Terminal Nest (#16): the terminal in panes, like a terminal multiplexer. Its own look is a style
+ *  sheet like a custom theme's, within the same limits (`cssProblems`): one thin title line per
+ *  program, the taskbar as one line at the top, crisp one-pixel borders between the panes. The fill
+ *  of the pane in front is its hue at 68 % lightness: dark text on it stays at 4.5:1 for every hue
+ *  (at 60 % the blues and purples, Research among them, fell to 3.2:1; contrast.test.ts). On a
+ *  narrow screen (below NARROW_PX) the title line, the taskbar and their buttons keep the 40 px of
+ *  touch.css, which the thin lines would otherwise beat. */
+const TERMINAL_NEST_CSS = `--radius: 0;
+font-family: ui-monospace, "JetBrains Mono", "SFMono-Regular", "DejaVu Sans Mono", Consolas, monospace;
+.dt-stage { background: var(--border); }
+.dt-program { border: 0; box-shadow: none; outline: 1px solid var(--border); outline-offset: -1px; }
+.dt-program.dt-focused { outline-color: hsl(var(--pg-hue) 70% 68%); z-index: 1; }
+.dt-titlebar { min-height: 0; height: 1.35rem; padding: 0 0 0 0.6ch; gap: 1ch; font-size: 0.8rem; background: var(--bg); border-bottom: 1px solid var(--border); }
+.dt-focused .dt-titlebar { background: hsl(var(--pg-hue) 70% 68%); color: var(--accent-text); }
+.dt-focused .dt-title, .dt-focused .dt-code { color: var(--accent-text); }
+.dt-title { font-weight: 400; }
+.dt-lamp, .dt-titlebar .dt-icon { display: none; }
+.dt-titlebar-buttons button { min-width: 2.2ch; height: 1.35rem; padding: 0 0.4ch; border: 0; background: transparent; color: inherit; font-size: 0.8rem; }
+.dt-titlebar-buttons button:hover { background: var(--track); }
+.dt-taskbar { min-height: 0; height: 1.6rem; padding: 0; gap: 0; border-top: 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+.dt-taskbar button { min-height: 0; height: 1.6rem; border: 0; border-radius: 0; padding: 0 1ch; }
+.dt-task { width: auto; max-width: 14rem; border-bottom: 0; }
+.dt-task.dt-front, .dt-task.dt-front .dt-icon { background: hsl(var(--pg-hue) 70% 68%); color: var(--accent-text); }
+.dt-start { background: var(--accent); color: var(--accent-text); }
+.dt-program.dt-scaled .dt-titlebar { font-style: italic; }
+@media (prefers-reduced-motion: reduce) { .dt-program { animation: none; } }
+@media (max-width: 759px) { .dt-titlebar, .dt-taskbar, .dt-taskbar button, .dt-titlebar-buttons button { height: auto; min-height: 40px; } .dt-taskbar button, .dt-titlebar-buttons button { min-width: 40px; } }`;
+
+/** The themes that come with the web build: the first three are the style sheets above; the rest
+ *  is data like any other theme's. */
 export const BUILTIN_THEMES: readonly ThemeManifest[] = [
   {
     key: "terminal",
@@ -82,6 +115,16 @@ export const BUILTIN_THEMES: readonly ThemeManifest[] = [
     bar: { position: "bottom", items: STANDARD_BAR },
     chrome: STANDARD_CHROME,
     motion: { style: "fade", ms: 120 },
+  },
+  {
+    key: "terminal-nest",
+    name: "Terminal Nest",
+    base: "terminal",
+    layout: { kind: "nest" },
+    bar: { position: "top", items: ["start", "programs", "clock", "status", "me"] },
+    chrome: { buttons: ["minimise", "close"], titlebar: "top" },
+    motion: { style: "zoom", ms: 140, close: "fade" },
+    css: TERMINAL_NEST_CSS,
   },
 ];
 
@@ -116,7 +159,8 @@ export function allThemes(custom: readonly ThemeManifest[] = []): ThemeManifest[
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
 /** Where each of `n` shown programs stands, as fractions of the stage. The last one is in front for
- *  `cascade` (the others lie under it); all other engines keep the programs apart. */
+ *  `cascade` (the others lie under it); all other engines keep the programs apart. `nest` keeps a
+ *  tree of its own (nest.ts); asked here, it tiles. */
 export function layoutRects(kind: LayoutKind, n: number): Rect[] {
   if (n <= 0) return [];
   switch (kind) {
@@ -159,6 +203,7 @@ export function layoutRects(kind: LayoutKind, n: number): Rect[] {
       }));
     }
     case "tile":
+    case "nest":
     default:
       return tile(n);
   }
@@ -176,7 +221,8 @@ export function themeProblems(value: unknown): string[] {
   const m = value as Record<string, unknown>;
   if (typeof m.key !== "string" || !KEY.test(m.key)) out.push("key: lower case letters, digits, '-'");
   if (typeof m.name !== "string" || m.name.trim() === "" || m.name.length > 60) out.push("name: 1 to 60 characters");
-  if (m.base !== undefined && !isBuiltin(String(m.base))) out.push("base: one of the built-in themes");
+  if (m.base !== undefined && !BASES.includes(m.base as NonNullable<ThemeManifest["base"]>))
+    out.push(`base: one of ${BASES.join(", ")}`);
   const layout = m.layout as { kind?: unknown } | undefined;
   if (!layout || !LAYOUT_KINDS.includes(layout.kind as LayoutKind))
     out.push(`layout.kind: one of ${LAYOUT_KINDS.join(", ")}`);
@@ -317,7 +363,7 @@ export function safeCss(theme: ThemeManifest): string {
 export const DT_CLASSES: readonly string[] = [
   "dt-root", "dt-solo", "dt-overlay", "dt-arriving", "dt-leaving", "dt-meter", "dt-moving", "dt-snap-preview", "dt-tile", "dt-settings", "dt-overlay-hint", "dt-screen", "dt-pin", "dt-grip",
   "dt-grip-n", "dt-grip-s", "dt-grip-e", "dt-grip-w", "dt-grip-ne", "dt-grip-nw", "dt-grip-se", "dt-grip-sw", "dt-stage", "dt-view", "dt-banner", "dt-empty", "dt-note",
-  "dt-program", "dt-focused", "dt-maxi", "dt-closing", "dt-titlebar", "dt-lamp", "dt-code", "dt-title", "dt-icon",
+  "dt-program", "dt-focused", "dt-maxi", "dt-closing", "dt-scaled", "dt-unframed", "dt-titlebar", "dt-lamp", "dt-code", "dt-title", "dt-icon",
   "dt-titlebar-buttons", "dt-minimise", "dt-maximise", "dt-close", "dt-program-body", "dt-nav",
   "dt-taskbar", "dt-start", "dt-tasks", "dt-task", "dt-open", "dt-min", "dt-front", "dt-label",
   "dt-signal", "dt-signal-red", "dt-signal-amber", "dt-signal-green",
