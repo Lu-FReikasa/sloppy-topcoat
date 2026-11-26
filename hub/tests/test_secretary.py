@@ -332,3 +332,46 @@ def test_in_chat_the_secretary_answering_itself_keeps_the_answer(
     assert status == 200 and events[-1][0] == "done"
     meta = next(d for e, d in events if e == "meta")
     assert meta.get("node") != "hub"  # the model wrote the answer, nothing was handed on
+
+
+async def test_a_dev_answer_comes_back_unreviewed_too(client: TestClient) -> None:
+    fake = QueueFake(client.app.state.sessionmaker)
+    conv = await _conversation(client, DEV_ADMIN_ID)
+    decision = secretary.Route("hand_on", "dev", "Explain the queue module", (), True)
+    handed = await secretary.hand_on(_service(client, fake), DEV_ADMIN_ID, True, conv, decision)
+    service = _service(client, fake)
+    request = await service.store.get_node(DEV_ADMIN_ID, handed.message.id)
+    task = await _task(client, request.task_id)
+    await service.deliver_dev_result(
+        DEV_ADMIN_ID, request, {"summary": "The queue hands tasks to workers."}, task
+    )
+    request = await service.store.get_node(DEV_ADMIN_ID, handed.message.id)
+    assert request.msg_state == "accepted"  # no review of the project
+    assert len(fake.calls) == 1  # no reviewer run was started
+    results = [
+        m
+        for m in await service.store.messages_of(DEV_ADMIN_ID, request.project_id)
+        if m.message_type == "dev.result"
+    ]
+    assert len(results) == 1 and results[0].target_app == "assistant"
+    assert (await _order(client, handed)).status == "done"
+    said = [m.content for m in await _messages(client, conv)]
+    assert len(said) == 1 and "The queue hands tasks to workers." in said[0]
+
+
+async def test_a_question_back_makes_the_order_wait_without_a_planner(client: TestClient) -> None:
+    handed, fake, conv = await _hand_on(client, report=True)
+    service = _service(client, fake)
+    request = await service.store.get_node(DEV_ADMIN_ID, handed.message.id)
+    task = await _task(client, request.task_id)
+    await service.deliver_clarification(
+        DEV_ADMIN_ID, request, {"questions": ["Which two tools?"]}, task
+    )
+    request = await service.store.get_node(DEV_ADMIN_ID, handed.message.id)
+    assert request.msg_state == "waiting"
+    assert len(fake.calls) == 1  # no planner run was started
+    order = await _order(client, handed)
+    assert order.status == "waiting" and order.reported_at is None
+    assert await _messages(client, conv) == []  # waiting is not done: nothing reported yet
+    text = await secretary.status_lines(client.app.state.sessionmaker, DEV_ADMIN_ID, conv)
+    assert "has a question back" in text
