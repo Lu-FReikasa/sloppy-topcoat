@@ -2,7 +2,7 @@
 // version" or "the newest version"; which version is newest is decided here, where the sheets are
 // grouped into songs (group.ts), so a new version shows up in every setlist that wants the newest.
 
-import { groupSheets, type SheetGroup } from "./group";
+import { groupSheets, matchesSearch, type SheetGroup } from "./group";
 import type { SetlistItem, SheetSummary } from "./types";
 
 export interface SetlistEntry {
@@ -46,4 +46,36 @@ export function moveItem<T>(items: T[], from: number, to: number): T[] {
   const [moved] = out.splice(from, 1);
   out.splice(target, 0, moved!);
   return out;
+}
+
+/** How a setlist is looked at: in the order it is played, or as an index by title or by artist
+ *  then title. Only the view changes; the stored order stays. */
+export type SetlistView = "setlist" | "title" | "artist";
+export const SETLIST_VIEWS: SetlistView[] = ["setlist", "title", "artist"];
+
+/** The positions (indexes into `entries`) in the order the view shows them, keeping only the
+ *  songs the search finds (same matching as the library). Each row keeps its position, so the
+ *  title view reads like an index of the set. Deleted sheets come last in a sorted view and are
+ *  never found by a search; equal songs keep their setlist order. */
+export function viewOrder(entries: SetlistEntry[], view: SetlistView, query: string): number[] {
+  const shown = entries
+    .map((e, i) => ({ e, i }))
+    .filter(({ e }) => !query.trim() || (!!e.sheet && matchesSearch(e.sheet.title, e.sheet.artist, query)));
+  if (view !== "setlist") {
+    const byTitle = (a: SetlistEntry, b: SetlistEntry) => a.sheet!.title.localeCompare(b.sheet!.title);
+    shown.sort((x, y) => {
+      const a = x.e;
+      const b = y.e;
+      if (!a.sheet || !b.sheet) return (a.sheet ? 0 : 1) - (b.sheet ? 0 : 1) || x.i - y.i;
+      const order = view === "artist" ? a.sheet.artist.localeCompare(b.sheet.artist) || byTitle(a, b) : byTitle(a, b);
+      return order || x.i - y.i;
+    });
+  }
+  return shown.map(({ i }) => i);
+}
+
+/** Whether the rows may be reordered: only in setlist order without a search, where a moved row
+ *  lands where it is seen. */
+export function canReorder(view: SetlistView, query: string): boolean {
+  return view === "setlist" && !query.trim();
 }

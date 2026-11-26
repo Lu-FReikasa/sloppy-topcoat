@@ -7,7 +7,7 @@ import { describeError, toActionError } from "../errors";
 import { chooseFit } from "./fit";
 import { move, ORIENTATIONS, pageBox, pageRule, PAPERS, printColumns, type Orientation, type Paper } from "./print";
 import { asWritten, collapseRepeats } from "./collapse";
-import { Body, withoutTabs } from "./SheetsPage";
+import { Body } from "./SheetsPage";
 import type { SheetDetail, SheetViewParams } from "./types";
 import "./print.css";
 
@@ -23,7 +23,6 @@ export interface PrintSong {
 export interface PrintOptions {
   paper: Paper;
   orientation: Orientation;
-  hideTabs: boolean;
   /** Repeated parts as one line ("Chorus ×2"), as the stage mode can show them. */
   collapse: boolean;
 }
@@ -34,8 +33,7 @@ interface DialogProps {
   songs: PrintSong[];
   /** The view of every sheet (instrument, transposition); empty: each sheet's own. */
   view?: SheetViewParams;
-  /** The stage mode's choices, the start values here. */
-  hideTabs: boolean;
+  /** The stage mode's choice, the start value here. */
   collapse: boolean;
   onClose: () => void;
 }
@@ -45,13 +43,13 @@ const keyOf = (s: PrintSong): string => s.key ?? s.id;
 /** The class on <body> while sheets are printed: the print style then shows only them. */
 export const PRINTING_CLASS = "sheets-printing";
 
-/** Print or save as PDF: pick and order the songs, choose paper and tab lines, then the browser's
+/** Print or save as PDF: pick and order the songs, choose the paper, then the browser's
  *  print dialog opens with one song per page. Saved as a PDF, the songs open without the hub. */
-export function PrintDialog({ api, songs, view = {}, hideTabs, collapse, onClose }: DialogProps): ReactElement {
+export function PrintDialog({ api, songs, view = {}, collapse, onClose }: DialogProps): ReactElement {
   const { t, i18n } = useTranslation();
   const [order, setOrder] = useState<PrintSong[]>(songs);
   const [picked, setPicked] = useState<Set<string>>(() => new Set(songs.map(keyOf)));
-  const [options, setOptions] = useState<PrintOptions>({ paper: "a4", orientation: "portrait", hideTabs, collapse });
+  const [options, setOptions] = useState<PrintOptions>({ paper: "a4", orientation: "portrait", collapse });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sheets, setSheets] = useState<SheetDetail[] | null>(null);
@@ -148,10 +146,6 @@ export function PrintDialog({ api, songs, view = {}, hideTabs, collapse, onClose
               </option>
             ))}
           </select>
-          <label className="check">
-            <input type="checkbox" checked={options.hideTabs} onChange={(e) => setOptions({ ...options, hideTabs: e.target.checked })} />{" "}
-            {t("sheets.stage.hideTabs")}
-          </label>
           <label className="check">
             <input type="checkbox" checked={options.collapse} onChange={(e) => setOptions({ ...options, collapse: e.target.checked })} />{" "}
             {t("sheets.collapse")}
@@ -267,7 +261,7 @@ export function PrintPages({
       <style>{pageRule(options.paper, options.orientation)}</style>
       {sheets.map((s, i) => {
         const v = s.view;
-        const sections = options.hideTabs ? withoutTabs(v.sections) : v.sections;
+        const sections = v.sections;
         return (
           <section key={i} className="sheet-print-page" style={{ width: `${box.width}px`, height: `${box.height}px` }} data-testid="sheet-print-page">
             <header className="sheet-print-head">

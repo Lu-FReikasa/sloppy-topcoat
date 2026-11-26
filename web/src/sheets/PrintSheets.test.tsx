@@ -113,7 +113,7 @@ describe("PrintDialog", () => {
       "GET /api/sheets/s3": detail("s3", "Third Song"),
     });
     const onClose = vi.fn();
-    render(<PrintDialog api={api} songs={SONGS} hideTabs collapse={false} onClose={onClose} />);
+    render(<PrintDialog api={api} songs={SONGS} collapse={false} onClose={onClose} />);
     const dialog = screen.getByTestId("sheet-print-dialog");
     // leave out the second song, put the third one first
     fireEvent.click(within(dialog).getByRole("checkbox", { name: /Second Song/ }));
@@ -129,33 +129,11 @@ describe("PrintDialog", () => {
     expect(print).toHaveBeenCalledTimes(1);
   });
 
-  it("leaves tab lines out when asked and keeps them otherwise", async () => {
-    let bodies: string[] = [];
-    desktopPrint(() => {
-      bodies = screen.getAllByTestId("sheet-print-page").map((p) => p.textContent ?? "");
-    });
-    const { api } = client({ "GET /api/sheets/s1": detail("s1", "First Song") });
-    const onClose = vi.fn();
-    const { unmount } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} hideTabs collapse={false} onClose={onClose} />);
-    fireEvent.click(screen.getByTestId("sheet-print-start"));
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(bodies[0]).toContain("Words of First Song");
-    expect(bodies[0]).not.toContain("e|--");
-    unmount();
-
-    onClose.mockClear();
-    render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} hideTabs collapse={false} onClose={onClose} />);
-    fireEvent.click(screen.getByRole("checkbox", { name: /Hide tabs|Tabs ausblenden/ }));
-    fireEvent.click(screen.getByTestId("sheet-print-start"));
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(bodies[0]).toContain("e|--0--2--3--|");
-  });
-
   it("removes the pages and the print class once printed", async () => {
     desktopPrint();
     const { api } = client({ "GET /api/sheets/s1": detail("s1", "First Song") });
     const onClose = vi.fn();
-    const { rerender } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} hideTabs={false} collapse={false} onClose={onClose} />);
+    const { rerender } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} collapse={false} onClose={onClose} />);
     fireEvent.click(screen.getByTestId("sheet-print-start"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     // the parent closes the dialog: nothing of the songs stays in the page
@@ -168,7 +146,7 @@ describe("PrintDialog", () => {
     const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
     const { api } = client({ "GET /api/sheets/s1": detail("s1", "First Song") });
     const onClose = vi.fn();
-    const { rerender } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} hideTabs={false} collapse={false} onClose={onClose} />);
+    const { rerender } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} collapse={false} onClose={onClose} />);
     fireEvent.click(screen.getByTestId("sheet-print-start"));
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
     // the print is laid out after the call: the pages and the class are still there
@@ -190,7 +168,7 @@ describe("PrintDialog", () => {
     const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
     const { api } = client({ "GET /api/sheets/s1": detail("s1", "First Song") });
     const onClose = vi.fn();
-    const { rerender } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} hideTabs={false} collapse={false} onClose={onClose} />);
+    const { rerender } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} collapse={false} onClose={onClose} />);
     fireEvent.click(screen.getByTestId("sheet-print-start"));
     await waitFor(() => expect((screen.getByTestId("sheet-print-start") as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(screen.getByTestId("sheet-print-start"));
@@ -210,7 +188,7 @@ describe("PrintDialog", () => {
       "GET /api/sheets/s1": detail("s1", "First Song"),
       "GET /api/sheets/s2": jsonResponse({ detail: "boom" }, 500),
     });
-    render(<PrintDialog api={api} songs={SONGS.slice(0, 2)} hideTabs collapse={false} onClose={() => undefined} />);
+    render(<PrintDialog api={api} songs={SONGS.slice(0, 2)} collapse={false} onClose={() => undefined} />);
     fireEvent.click(screen.getByTestId("sheet-print-start"));
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(print).not.toHaveBeenCalled();
@@ -334,14 +312,14 @@ describe("Printing a setlist", () => {
     const count = () => text.split("Sing the chorus line").length - 1;
 
     const onClose = vi.fn();
-    const { unmount } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} hideTabs collapse onClose={onClose} />);
+    const { unmount } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} collapse onClose={onClose} />);
     fireEvent.click(screen.getByTestId("sheet-print-start"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(count()).toBe(1);
     unmount();
 
     onClose.mockClear();
-    render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} hideTabs collapse onClose={onClose} />);
+    render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} collapse onClose={onClose} />);
     fireEvent.click(screen.getByRole("checkbox", { name: /Collapse repeats|Wiederholungen kürzen/ }));
     fireEvent.click(screen.getByTestId("sheet-print-start"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());

@@ -7,8 +7,8 @@ Imported sheets carry the same patterns over and over; they are fixed here as ru
                  transposition and the instrument view cover it. A line with a word that is no chord
                  (:func:`topcoat_hub.sheets.chords.parse_chord`) stays text; a heading in front
                  ("Intro:") and bar lines or repeat marks ("|", "x2") may stand with the chords.
-``tab blocks``   tab staff lines (``e|--3--``) are a part of kind ``tab`` (``{start_of_tab}``), no
-                 lyrics and no comments, so a reader can show or hide them.
+``tab``          tab staff lines (``e|--3--``) and tab parts go: a chord sheet is lyrics and chords
+                 only. A part that keeps no chord without its staves (a riff's heading) goes too.
 ``header``       the lines before the first chord that name the title, artist, tuning, source or a
                  credit ("Title: …", "by …", "Standard tuning", a web address) go: title, artist,
                  key, tempo and tuning into the sheet's facts when it has none, the rest away.
@@ -19,7 +19,7 @@ Every rule leaves a sheet it has cleaned as it is, so running them twice changes
 import re
 from dataclasses import dataclass, field
 
-from topcoat_hub.sheets.chordpro import Line, Section, Segment, Sheet, kind_of, parse_line
+from topcoat_hub.sheets.chordpro import Line, Section, Sheet, kind_of, parse_line
 from topcoat_hub.sheets.chords import Key, parse_chord, uses_german_names
 from topcoat_hub.sheets.plaintext import _FILLER, _TAB, _without_remark
 
@@ -32,7 +32,7 @@ _LABELLED = re.compile(r"^(\s*\[?\s*)([^:\]\[]{2,30}?)(\s*\]?\s*:\s*|\s*\]\s*)(\
 @dataclass
 class Applied:
     chord_lines: int = 0  # lines whose chords were plain text
-    tabs: int = 0  # tab blocks made a part of their own
+    tabs: int = 0  # parts with tab lines (dropped)
     removed: list[str] = field(default_factory=list)  # header lines dropped or made facts
 
 
@@ -42,7 +42,24 @@ def apply(sheet: Sheet) -> Applied:
     _chord_lines(sheet, done)
     _tab_blocks(sheet, done)
     _header(sheet, done)
+    _accents(sheet)
     return done
+
+
+def _accents(sheet: Sheet) -> None:
+    """Accent stars ("*  A   A", a lone "**") on lines without words go: a reader plays from the
+    chords; a line left with nothing goes too."""
+    for sec in sheet.sections:
+        keep: list[Line] = []
+        for ln in sec.lines:
+            if ln.comment is None and re.fullmatch(r"[\s*]*", ln.lyrics) and "*" in ln.lyrics:
+                for g in ln.segments:
+                    g.text = g.text.replace("*", " ")
+                if not ln.chords and not any(g.raw for g in ln.segments):
+                    continue
+            keep.append(ln)
+        sec.lines = keep
+    _replace(sheet, list(sheet.sections))
 
 
 # --- chord lines -----------------------------------------------------------------------------
@@ -110,6 +127,10 @@ def _chord_lines(sheet: Sheet, done: Applied) -> None:
         part, implicit = sec, _unnamed(sec)
         for ln in lines:
             text = _plain(ln)
+            if text is None and not _is_tab(ln) and len(_chord_marks(ln.lyrics, german) or []) >= 2:
+                # chords over chords ("[A]A   [D]D"): a line of chords converted once already, its
+                # brackets often shifted; the chords written as text are the line
+                text = ln.lyrics
             found = None if text is None or _TAB.match(text) else _as_chord_line(text, german)
             if found is None:
                 part.lines.append(ln)
@@ -139,65 +160,46 @@ def _unnamed(sec: Section) -> bool:
 # --- tab blocks ------------------------------------------------------------------------------
 
 
+# one stave of staves side by side ("e|--0--|   e|--2--|"); a fret letter may stand in it
+_STAVE = re.compile(r"[A-Za-z]?\|[-0-9A-Za-z/\\~^().|]*--[-0-9A-Za-z/\\~^().|]*")
+
+
+def _line_text(ln: Line) -> str:
+    """A line as it was written, chords inline without brackets."""
+    if ln.comment is not None:
+        return ln.comment
+    return "".join((g.chord.name() if g.chord else (g.raw or "")) + g.text for g in ln.segments)
+
+
 def _is_tab(ln: Line) -> bool:
-    text = _plain(ln)
-    return text is not None and bool(_TAB.match(text))
+    # a tab line may hold a fret letter the import took for a chord ("e|--[h]0--|")
+    text = _line_text(ln)
+    return bool(text.strip()) and bool(
+        _TAB.match(text) or all(_STAVE.fullmatch(t) for t in text.split())
+    )
 
 
 def _tab_blocks(sheet: Sheet, done: Applied) -> None:
+    """Tab goes: a chord sheet holds lyrics and chords only (the maintainer's call, 2026-11-26).
+    A tab part, the tab lines of a part, and a part left with no chord after them (a riff's
+    heading over its staves) are dropped."""
     out: list[Section] = []
     for sec in sheet.sections:
-        if sec.kind == "tab" or sec.repeat_of is not None or not any(map(_is_tab, sec.lines)):
+        if sec.repeat_of is not None:
             out.append(sec)
             continue
-        name = sec.label if sec.kind in _PLAYED and sec.label else "Tab"
-        # a part of tab and comments ("(let ring)") is one tab block: the comments stay in it
-        if all(_is_tab(ln) or ln.comment is not None for ln in sec.lines):
-            prev = out[-1] if out else None
-            if _unnamed(sec) and prev is not None and prev.kind == "tab" and prev.repeat_of is None:
-                prev.lines.extend(_staff(ln) for ln in sec.lines)  # the next staves of a block
-                continue
-            sec.kind, sec.label = "tab", name
-            sec.lines = [_staff(ln) for ln in sec.lines]
-            _add(out, sec, done)
+        if sec.kind == "tab":
+            done.tabs += 1
             continue
-        pieces: list[tuple[bool, list[Line]]] = []
-        for ln in sec.lines:
-            tab = _is_tab(ln)
-            if pieces and pieces[-1][0] == tab:
-                pieces[-1][1].append(ln)
-            else:
-                pieces.append((tab, [ln]))
-        used = False  # the part keeps its place (a {chorus} may repeat it) with its first lines
-        for tab, lines in pieces:
-            if tab:
-                _add(out, Section("tab", name, [_staff(ln) for ln in lines]), done)
-            elif not used:
-                sec.lines, used = lines, True
-                out.append(sec)
-            else:
-                out.append(Section(sec.kind, sec.label, lines))
+        lines = [ln for ln in sec.lines if not _is_tab(ln)]
+        if len(lines) < len(sec.lines):
+            done.tabs += 1
+            text = [ln for ln in lines if (ln.comment or ln.lyrics).strip()]
+            if not any(ln.chords for ln in lines) and len(text) <= 1:
+                continue  # a riff's heading ("Riff 1:") over its staves, nothing to play from
+            sec.lines = lines
+        out.append(sec)
     _replace(sheet, out)
-
-
-def _staff(ln: Line) -> Line:
-    """A tab line as a line of its own (no comment): the tab block shows it as it is."""
-    return Line([Segment(ln.comment)]) if ln.comment is not None and _is_tab(ln) else ln
-
-
-def _add(out: list[Section], sec: Section, done: Applied) -> None:
-    """A tab block; one right after another of the same name (the next staves) joins it."""
-    prev = out[-1] if out else None
-    if (
-        prev is not None
-        and prev.kind == "tab"
-        and prev.repeat_of is None
-        and prev.label == sec.label
-    ):
-        prev.lines.extend(sec.lines)
-        return
-    out.append(sec)
-    done.tabs += 1
 
 
 def _replace(sheet: Sheet, sections: list[Section]) -> None:
@@ -208,7 +210,8 @@ def _replace(sheet: Sheet, sections: list[Section]) -> None:
     for s in keep:
         if s.repeat_of is not None:
             s.repeat_of = new_of_old.get(s.repeat_of)
-    sheet.sections = keep
+    # a repeat of a part that went (a tab) goes with it
+    sheet.sections = [s for s in keep if s.repeat_of is not None or s.lines]
 
 
 # --- header ----------------------------------------------------------------------------------
@@ -224,7 +227,12 @@ _FACT_NAMES = {
     "performed by": "artist", "tuning": "tuning", "stimmung": "tuning", "key": "key",
     "tonart": "key", "tempo": "tempo", "bpm": "tempo",
 }  # fmt: skip
+# the names of riffs over tab that is gone ("*Riff 1:   **Riff 2:", "Main riff")
+_RIFF_NAMES = re.compile(
+    r"^(?:[\s*#()\[\]:.,-]*(?:main\s+)?(?:riff|lick|tab)\s*\d*[\s*()\[\]:.,-]*)+$", re.I
+)
 # "Standard tuning", "Drop D tuning", "Eb tuning (half step down)"
+_HERTZ = re.compile(r"\b(4[0-9]{2}(?:[.,][0-9]+)?)\s*hz\b", re.I)
 _TUNING = re.compile(r"^(\S+(?:\s+\S+){0,3})\s+tuning\s*((?:[:(\-].*)?)$", re.I)
 _SOURCE = re.compile(
     r"^(?:source|quelle|from|taken from|found (?:at|on))\s*:|https?://|www\.|"
@@ -273,11 +281,21 @@ def _header_line(text: str, sheet: Sheet) -> bool:
         elif what in ("tuning", "tempo"):
             sheet.meta.setdefault("x_tuning" if what == "tuning" else "tempo", value)
         return bool(what)
+    m = _HERTZ.search(t)
+    if m and re.search(r"\btun", t, re.I):  # "Tune your guitar to 440 Hz ..."
+        sheet.meta.setdefault("x_tuning", f"{m.group(1)} Hz")
+        return True
     m = _TUNING.match(t)
     if m:
         sheet.meta.setdefault("x_tuning", (m.group(1) + m.group(2)).strip())
         return True
-    return bool(_SOURCE.search(t) or _CREDIT.search(t) or _by_name(t) or _names_song(t, sheet))
+    return bool(
+        _SOURCE.search(t)
+        or _CREDIT.search(t)
+        or _RIFF_NAMES.match(t)
+        or _by_name(t)
+        or _names_song(t, sheet)
+    )
 
 
 def _by_name(text: str) -> bool:

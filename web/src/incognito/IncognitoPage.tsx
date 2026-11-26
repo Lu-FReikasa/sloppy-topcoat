@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
 import { Markdown } from "../chat/Markdown";
 import { ImageAttachButton, ImageDraftStrip, MessageImages } from "../chat/ChatImages";
-import { imageFiles, useImageDraft } from "../chat/images";
+import { imageFiles, pastedImages, useImageDraft } from "../chat/images";
 import { requestOpen } from "../layout/intent";
 import type { IncognitoMessage, IncognitoTab } from "../types";
 import { reducedMotion } from "../motion";
@@ -266,7 +266,7 @@ export function IncognitoPage({ api }: Props) {
               placeholder={t("incognito.placeholder")}
               onChange={(e) => setDraft(e.target.value)}
               onPaste={(e) => {
-                const files = imageFiles(e.clipboardData);
+                const files = pastedImages(e.clipboardData);
                 if (files.length === 0) return;
                 e.preventDefault();
                 void pictures.add(files);

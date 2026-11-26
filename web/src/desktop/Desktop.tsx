@@ -944,9 +944,11 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
         nestStep("out");
         return;
       }
-      // in the overlay Esc hides the overlay (the client's key), it does not minimise
+      // in the overlay Esc hides the overlay (the client's key), it does not minimise; a page that
+      // took Esc for itself (Sheets: back to the list, #148) keeps its window
       if (
         e.key === "Escape" &&
+        !e.defaultPrevented &&
         !overlay &&
         state.focus &&
         !typing(e.target) &&
