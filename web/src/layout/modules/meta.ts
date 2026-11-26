@@ -93,12 +93,31 @@ export const KNOWN_MODULES: ReadonlySet<string> = new Set(MODULES.map((m) => m.i
 
 type Props = Record<string, string | number | boolean | null>;
 
-/** The module and props an address stands for, or null (the menu page, the workspaces themselves). */
-export function routeToModule(route: Route): { module: string; props: Props } | null {
+/** The module and props an address stands for, or null: the workspaces themselves, and the bare
+ *  address (`#/`), which names no page and keeps the workspace the person used last. Retired
+ *  addresses (bookmarks of pages that became a tab or a section) lead to their new home; an
+ *  address nobody knows leads to Start, which says so (`moved`). */
+export function routeToModule(route: Route): { module: string; props: Props; moved?: true } | null {
   switch (route.view) {
     case "w":
-    case "more":
+    case "start":
       return null;
+    case "unknown":
+      return { module: "page.home", props: {}, moved: true };
+    // the menu of everything is the overview of the applications on Start
+    case "more":
+      return { module: "page.home", props: {} };
+    case "research":
+      return { module: "page.research", props: {} };
+    // pages that became a tab of a view or a section of Settings (phase 4)
+    case "params":
+      return { module: "page.models", props: { tab: "params" } };
+    case "identity":
+      return { module: "layout.workspaces", props: { tab: "identity" } };
+    case "memory":
+      return { module: "page.settings", props: { section: "memory" } };
+    case "instructions":
+      return { module: "page.settings", props: { section: "assistant" } };
     case "talk":
       return { module: "page.chat", props: {} };
     case "library": {
