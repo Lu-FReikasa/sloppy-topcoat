@@ -277,6 +277,22 @@
   gap: 0.5rem;
 }
 
+.plugin-versions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plugin-versions > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
 .plugin-diff-box {
   margin: 0;
   min-width: 0;

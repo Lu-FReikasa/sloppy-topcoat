@@ -17,14 +17,19 @@ export function problemsOf(err: unknown): string[] {
 }
 
 /** The manifest typed or loaded into the form: its id, or the reason it cannot be sent. */
-export function parseManifest(text: string): { manifest: Record<string, unknown>; id: string } | { error: "json" | "id" } {
+export function parseManifest(
+  text: string,
+):
+  | { manifest: Record<string, unknown>; id: string }
+  | { error: "json" | "id" } {
   let doc: unknown;
   try {
     doc = JSON.parse(text);
   } catch {
     return { error: "json" };
   }
-  if (!doc || typeof doc !== "object" || Array.isArray(doc)) return { error: "json" };
+  if (!doc || typeof doc !== "object" || Array.isArray(doc))
+    return { error: "json" };
   const id = (doc as Record<string, unknown>).id;
   if (typeof id !== "string" || !id) return { error: "id" };
   return { manifest: doc as Record<string, unknown>, id };
@@ -32,7 +37,8 @@ export function parseManifest(text: string): { manifest: Record<string, unknown>
 
 /** The class of one line of a unified diff. */
 export function diffLineClass(line: string): string {
-  if (line.startsWith("+++") || line.startsWith("---")) return "plugin-diff-head";
+  if (line.startsWith("+++") || line.startsWith("---"))
+    return "plugin-diff-head";
   if (line.startsWith("@@")) return "plugin-diff-hunk";
   if (line.startsWith("+")) return "plugin-diff-add";
   if (line.startsWith("-")) return "plugin-diff-del";
@@ -76,18 +82,26 @@ export function PluginsPage({ api, events }: Props) {
   const [picked, setPicked] = useState<string | null>(null);
   const rows = list.data ?? [];
   // a plug-in removed meanwhile (here or by another admin) is no longer picked
-  const selected = picked !== null && rows.some((r) => r.key === picked) ? picked : null;
+  const selected =
+    picked !== null && rows.some((r) => r.key === picked) ? picked : null;
   const detail = usePlugin(api, selected, events);
   const [text, setText] = useState("");
   const [problems, setProblems] = useState<string[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  // the answer to an action is shown where it was asked: at the list or at the form
+  const [where, setWhere] = useState<"list" | "form">("list");
 
   const title = (r: { key: string; title_key: string | null }): string =>
     r.title_key && i18n.exists(r.title_key) ? t(r.title_key) : r.key;
 
-  async function run(what: () => Promise<unknown>, done: string): Promise<boolean> {
+  async function run(
+    what: () => Promise<unknown>,
+    done: string,
+    at: "list" | "form" = "list",
+  ): Promise<boolean> {
+    setWhere(at);
     setBusy(true);
     setNote(null);
     setProblems([]);
@@ -108,14 +122,23 @@ export function PluginsPage({ api, events }: Props) {
     e.preventDefault();
     const parsed = parseManifest(text);
     if ("error" in parsed) {
+      setWhere("form");
       setNote(null);
-      setProblems([t(parsed.error === "json" ? "plugins.notJson" : "plugins.noId")]);
+      setProblems([
+        t(parsed.error === "json" ? "plugins.notJson" : "plugins.noId"),
+      ]);
       return;
     }
     const installed = rows.some((r) => r.key === parsed.id);
     const ok = await run(
-      () => (installed ? api.updatePlugin(parsed.id, parsed.manifest) : api.installPlugin(parsed.manifest)),
-      t(installed ? "plugins.updated" : "plugins.installed", { key: parsed.id }),
+      () =>
+        installed
+          ? api.updatePlugin(parsed.id, parsed.manifest)
+          : api.installPlugin(parsed.manifest),
+      t(installed ? "plugins.updated" : "plugins.installed", {
+        key: parsed.id,
+      }),
+      "form",
     );
     if (ok) {
       setText("");
@@ -129,8 +152,29 @@ export function PluginsPage({ api, events }: Props) {
   }
 
   async function remove(key: string): Promise<void> {
-    if (await run(() => api.removePlugin(key), t("plugins.removed", { key }))) setConfirmRemove(null);
+    if (await run(() => api.removePlugin(key), t("plugins.removed", { key })))
+      setConfirmRemove(null);
   }
+
+  const feedback = (
+    <>
+      {note && (
+        <p className="muted" role="status">
+          {note}
+        </p>
+      )}
+      {problems.length > 0 && (
+        <div className="error" role="alert" data-testid="plugin-problems">
+          <p>{t("plugins.refused")}</p>
+          <ul>
+            {problems.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  );
 
   return (
     <section data-testid="plugins" className="plugins-page">
@@ -155,35 +199,62 @@ export function PluginsPage({ api, events }: Props) {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.key} data-testid="plugin-row" aria-selected={r.key === selected}>
+              <tr
+                key={r.key}
+                data-testid="plugin-row"
+                aria-selected={r.key === selected}
+              >
                 <td>
-                  <button type="button" className="link" onClick={() => setPicked(r.key === selected ? null : r.key)}>
+                  <button
+                    type="button"
+                    className="link"
+                    onClick={() => setPicked(r.key === selected ? null : r.key)}
+                  >
                     {title(r)}
-                  </button>{" "}
-                  <code className="muted small">{r.key}</code>
+                  </button>
+                  {title(r) !== r.key && (
+                    <>
+                      {" "}
+                      <code className="muted small">{r.key}</code>
+                    </>
+                  )}
                 </td>
                 <td>{r.version}</td>
                 <td>{t(STATE_KEY[stateOf(r)])}</td>
-                <td className="plugin-actions">
-                  {!r.builtin && (
-                    <>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() =>
-                          void run(
-                            () => api.setPluginEnabled(r.key, !r.enabled),
-                            t(r.enabled ? "plugins.disabledNote" : "plugins.enabledNote", { key: r.key }),
-                          )
-                        }
-                      >
-                        {r.enabled ? t("plugins.disable") : t("plugins.enable")}
-                      </button>
-                      <button type="button" className="danger" disabled={busy} onClick={() => setConfirmRemove(r.key)}>
-                        {t("plugins.remove")}
-                      </button>
-                    </>
-                  )}
+                <td>
+                  <div className="plugin-actions">
+                    {!r.builtin && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(
+                              () => api.setPluginEnabled(r.key, !r.enabled),
+                              t(
+                                r.enabled
+                                  ? "plugins.disabledNote"
+                                  : "plugins.enabledNote",
+                                { key: r.key },
+                              ),
+                            )
+                          }
+                        >
+                          {r.enabled
+                            ? t("plugins.disable")
+                            : t("plugins.enable")}
+                        </button>
+                        <button
+                          type="button"
+                          className="danger"
+                          disabled={busy}
+                          onClick={() => setConfirmRemove(r.key)}
+                        >
+                          {t("plugins.remove")}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -191,7 +262,10 @@ export function PluginsPage({ api, events }: Props) {
         </table>
       </div>
       {confirmRemove && (
-        <p role="alertdialog" aria-label={t("plugins.confirmRemove", { key: confirmRemove })}>
+        <p
+          role="alertdialog"
+          aria-label={t("plugins.confirmRemove", { key: confirmRemove })}
+        >
           {t("plugins.confirmRemove", { key: confirmRemove })}{" "}
           <button
             type="button"
@@ -206,21 +280,7 @@ export function PluginsPage({ api, events }: Props) {
           </button>
         </p>
       )}
-      {note && (
-        <p className="muted" role="status">
-          {note}
-        </p>
-      )}
-      {problems.length > 0 && (
-        <div className="error" role="alert" data-testid="plugin-problems">
-          <p>{t("plugins.refused")}</p>
-          <ul>
-            {problems.map((p) => (
-              <li key={p}>{p}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {where === "list" && feedback}
       {selected && detail.data && (
         <PluginVersions
           api={api}
@@ -228,7 +288,12 @@ export function PluginsPage({ api, events }: Props) {
           busy={busy}
           events={events}
           title={title(detail.data)}
-          onRollback={(v) => void run(() => api.rollbackPlugin(detail.data!.key, v), t("plugins.rolledBack", { key: detail.data!.key, version: v }))}
+          onRollback={(v) =>
+            void run(
+              () => api.rollbackPlugin(detail.data!.key, v),
+              t("plugins.rolledBack", { key: detail.data!.key, version: v }),
+            )
+          }
           lang={i18n.language}
         />
       )}
@@ -248,12 +313,21 @@ export function PluginsPage({ api, events }: Props) {
         <div className="plugin-install-row">
           <label>
             {t("plugins.fromFile")}
-            <input type="file" accept="application/json,.json" onChange={(e) => void loadFile(e.target.files?.[0])} />
+            <input
+              type="file"
+              accept="application/json,.json"
+              onChange={(e) => void loadFile(e.target.files?.[0])}
+            />
           </label>
-          <button type="submit" className="primary" disabled={busy || !text.trim()}>
+          <button
+            type="submit"
+            className="primary"
+            disabled={busy || !text.trim()}
+          >
             {t("plugins.installOrUpdate")}
           </button>
         </div>
+        {where === "form" && feedback}
       </form>
     </section>
   );
@@ -279,7 +353,8 @@ function PluginVersions({
   const { t } = useTranslation();
   // compared: an earlier or later version against the one in force
   const [other, setOther] = useState<string | null>(null);
-  const compared = other && detail.versions.some((v) => v.version === other) ? other : null;
+  const compared =
+    other && detail.versions.some((v) => v.version === other) ? other : null;
   const [a, b] = compared ? ordered(detail, compared) : [null, null];
   const diff = useResource(
     `plugin-diff:${detail.key}:${a ?? ""}:${b ?? ""}`,
@@ -288,61 +363,66 @@ function PluginVersions({
   );
 
   return (
-    <section className="plugin-detail" data-testid="plugin-detail" aria-label={title}>
-      <h3>
-        {t("plugins.versionsOf", { name: title })}
-      </h3>
-      <div className="table-wrap">
-        <table className="ws-admin-table">
-          <thead>
-            <tr>
-              <th>{t("plugins.version")}</th>
-              <th>{t("plugins.installedBy")}</th>
-              <th>{t("plugins.hash")}</th>
-              <th>
-                <span className="sr-only">{t("plugins.actions")}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {detail.versions.map((v) => {
-              const current = v.version === detail.version;
-              return (
-                <tr key={v.version} data-testid="plugin-version">
-                  <td>
-                    {v.version} {current && <strong>{t("plugins.inForce")}</strong>}
-                  </td>
-                  <td className="small">
-                    {v.installed_by ?? t("plugins.byHub")}
-                    <br />
-                    <span className="muted">{when(v.installed_at, lang)}</span>
-                  </td>
-                  <td>
-                    <code className="small" title={v.sha256}>
-                      {v.sha256.slice(0, HASH_SHOWN)}
-                    </code>
-                  </td>
-                  <td className="plugin-actions">
-                    {!current && (
-                      <>
-                        <button type="button" aria-pressed={compared === v.version} onClick={() => setOther(compared === v.version ? null : v.version)}>
-                          {t("plugins.compare")}
-                        </button>
-                        <button type="button" disabled={busy} onClick={() => onRollback(v.version)}>
-                          {t("plugins.rollBack")}
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+    <section
+      className="plugin-detail"
+      data-testid="plugin-detail"
+      aria-label={title}
+    >
+      <h3>{t("plugins.versionsOf", { name: title })}</h3>
+      <ul className="plugin-versions">
+        {detail.versions.map((v) => {
+          const current = v.version === detail.version;
+          return (
+            <li key={v.version} data-testid="plugin-version">
+              <div>
+                <strong>{v.version}</strong> {current && t("plugins.inForce")}{" "}
+                <code
+                  className="small muted"
+                  title={v.sha256}
+                  aria-label={`${t("plugins.hash")} ${v.sha256}`}
+                >
+                  {v.sha256.slice(0, HASH_SHOWN)}
+                </code>
+                <br />
+                <span className="small">
+                  {t("plugins.installedBy")}:{" "}
+                  {v.installed_by ?? t("plugins.byHub")}
+                  {v.installed_at && (
+                    <span className="muted">
+                      , {when(v.installed_at, lang)}
+                    </span>
+                  )}
+                </span>
+              </div>
+              {!current && (
+                <div className="plugin-actions">
+                  <button
+                    type="button"
+                    aria-pressed={compared === v.version}
+                    onClick={() =>
+                      setOther(compared === v.version ? null : v.version)
+                    }
+                  >
+                    {t("plugins.compare")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onRollback(v.version)}
+                  >
+                    {t("plugins.rollBack")}
+                  </button>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
       {a && b && (
         <figure className="plugin-diff-box">
-          <figcaption className="small">{t("plugins.diffOf", { a, b })}</figcaption>
+          <figcaption className="small">
+            {t("plugins.diffOf", { a, b })}
+          </figcaption>
           {diff.data && diff.data.length === 0 && !diff.loading ? (
             <p className="muted small">{t("plugins.same")}</p>
           ) : (
@@ -363,7 +443,11 @@ function PluginVersions({
           <ul className="small plugin-changes">
             {detail.changes.map((c, i) => (
               <li key={i}>
-                {when(c.at, lang)}: {t(`plugins.action.${c.action}`, { from: c.from_version ?? "", to: c.to_version ?? "" })}
+                {when(c.at, lang)}:{" "}
+                {t(`plugins.action.${c.action}`, {
+                  from: c.from_version ?? "",
+                  to: c.to_version ?? "",
+                })}
                 {" · "}
                 {c.by ?? t("plugins.byHub")}
               </li>
@@ -377,8 +461,10 @@ function PluginVersions({
 
 /** The two versions of a diff, older first. */
 function ordered(detail: PluginDetail, other: string): [string, string] {
-  const index = (v: string) => detail.versions.findIndex((x) => x.version === v);
+  const index = (v: string) =>
+    detail.versions.findIndex((x) => x.version === v);
   // versions are newest first: a higher index is older
-  return index(other) > index(detail.version) ? [other, detail.version] : [detail.version, other];
+  return index(other) > index(detail.version)
+    ? [other, detail.version]
+    : [detail.version, other];
 }
-
