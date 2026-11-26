@@ -28,6 +28,7 @@ interface Props {
 const POLL_MS = 3000;
 const SORT_KEY = "topcoat.sheets.sort";
 const TABS_KEY = "topcoat.sheets.hideTabs";
+const STAGE_KEY = "topcoat.sheets.stage";
 
 /** A remembered choice of this browser; storage may be missing or blocked. */
 function remembered(key: string): string | null {
@@ -83,9 +84,28 @@ export function SheetsPage({ api, id }: Props) {
     setSortState(m);
     remember(SORT_KEY, m);
   };
-  const [stage, setStage] = useState(false);
+  // the stage mode survives paging: a new address may mount this page afresh
+  const [stage, setStageState] = useState(() => {
+    try {
+      return window.sessionStorage.getItem(STAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setStage = useCallback((on: boolean) => {
+    setStageState(on);
+    try {
+      if (on) window.sessionStorage.setItem(STAGE_KEY, "1");
+      else window.sessionStorage.removeItem(STAGE_KEY);
+    } catch {
+      /* the stage mode then ends with this page */
+    }
+  }, []);
   const [printing, setPrinting] = useState(false);
-  const exitStage = useCallback(() => setStage(false), []);
+  const exitStage = useCallback(() => {
+    setStage(false);
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => undefined);
+  }, [setStage]);
   const groups = useMemo(() => visibleGroups(list ?? [], query, artist, sort), [list, query, artist, sort]);
 
   useEffect(() => {
@@ -622,8 +642,10 @@ export function withoutTabs(sections: SheetSection[]): SheetSection[] {
 /** The stage mode: the sheet alone, full screen, fitted on one screen in columns. ←/→ and
  *  PageUp/PageDown (a foot pedal sends these) page through the songs of the list as it is
  *  filtered and sorted; Esc leaves. */
-function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups: SheetGroup[]; onExit: () => void }) {
+function Stage({ api, id: startId, groups, onExit }: { api: ApiClient; id: string; groups: SheetGroup[]; onExit: () => void }) {
   const { t, i18n } = useTranslation();
+  // paging stays inside the stage: a new address would be taken over by the desktop shell
+  const [id, setId] = useState(startId);
   const [sheet, setSheet] = useState<SheetDetail | null>(null);
   const [error, setError] = useState("");
   const [hideTabs, setHideTabsState] = useState(() => remembered(TABS_KEY) !== "0");
@@ -648,12 +670,16 @@ function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups
   const prev = neighbour(groups, id, -1);
   const next = neighbour(groups, id, 1);
   const go = (to: string | null) => {
-    if (to) window.location.hash = sheetsHref(to);
+    if (to) setId(to);
   };
+  const leave = useCallback(() => {
+    onExit();
+    if (id !== startId) window.location.hash = sheetsHref(id);
+  }, [onExit, id, startId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onExit();
+      if (e.key === "Escape") leave();
       else if (e.key === "ArrowRight" || e.key === "PageDown") go(next);
       else if (e.key === "ArrowLeft" || e.key === "PageUp") go(prev);
       else return;
@@ -663,23 +689,11 @@ function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  // full screen where the browser allows it; leaving full screen (Esc there) leaves the stage too
+  // full screen where the browser allows it. Leaving full screen does not end the stage (some
+  // browsers drop full screen on their own); Esc and the button do.
   useEffect(() => {
-    const el = document.documentElement;
-    let entered = false;
-    el.requestFullscreen?.().then(
-      () => (entered = true),
-      () => undefined,
-    );
-    const onChange = () => {
-      if (entered && !document.fullscreenElement) onExit();
-    };
-    document.addEventListener("fullscreenchange", onChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", onChange);
-      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => undefined);
-    };
-  }, [onExit]);
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => undefined);
+  }, []);
 
   const sections = useMemo(
     () => (sheet ? (hideTabs ? withoutTabs(sheet.view.sections) : sheet.view.sections) : []),
@@ -739,7 +753,7 @@ function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups
           <button type="button" aria-pressed={hideTabs} onClick={() => setHideTabs(!hideTabs)}>
             {t("sheets.stage.hideTabs")}
           </button>
-          <button type="button" onClick={onExit}>
+          <button type="button" onClick={leave}>
             {t("sheets.stage.exit")}
           </button>
         </div>
