@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   addProgram,
+  followZoom,
   groupOf,
   keysOf,
   loadNests,
   moveDivider,
   moveProgram,
+  nodeAt,
   normalise,
   overview,
   pathOf,
@@ -136,6 +138,12 @@ describe("rects", () => {
     expect(tiny.scale).toBeCloseTo(80 / 320);
   });
 
+  it("does not scale a program whose rect has no size (a stage not measured yet)", () => {
+    const [p] = rects(leaf("a"), { x: 0, y: 0, w: 0, h: 0 }, [], { w: 480, h: 320 });
+    expect(p!.scale).toBe(1);
+    expect(Number.isFinite(p!.rect.w / p!.scale)).toBe(true);
+  });
+
   it("is empty for an empty tree and ignores a zoom that leads nowhere", () => {
     expect(rects(null, AREA)).toEqual([]);
     expect(rects(SAMPLE, AREA, [7, 3], NO_MIN)).toEqual(rects(SAMPLE, AREA, [], NO_MIN));
@@ -145,6 +153,29 @@ describe("rects", () => {
 });
 
 describe("zoom", () => {
+  it("follows the programs it framed when the tree changes", () => {
+    // b / (c | d) is framed; a leaves, the paths shift, the same programs stay framed
+    const noA = removeProgram(SAMPLE, "a");
+    expect(followZoom(SAMPLE, [1], noA)).toEqual([]);
+    expect(keysOf(noA)).toEqual(["b", "c", "d"]);
+    // c | d is framed; b leaves and c | d is flattened into a | c | d: no part holds only c and d,
+    // so the smallest that holds both is framed
+    const noB = removeProgram(SAMPLE, "b");
+    expect(followZoom(SAMPLE, [1, 1], noB)).toEqual([]);
+    expect(keysOf(noB)).toEqual(["a", "c", "d"]);
+    // c is framed alone and leaves: its neighbour d, not the overview
+    const noC = removeProgram(SAMPLE, "c");
+    expect(nodeAt(noC, followZoom(SAMPLE, [1, 1, 0], noC))).toEqual(leaf("d"));
+    // c | d is framed and both leave: one level out, to what is left of b / (c | d)
+    const noCD = removeProgram(noC, "d");
+    expect(nodeAt(noCD, followZoom(SAMPLE, [1, 1], noCD))).toEqual(leaf("b"));
+    // everything gone
+    expect(followZoom(SAMPLE, [1, 1], null)).toEqual([]);
+    // a program framed alone that moves stays framed alone
+    const moved = moveProgram(SAMPLE, "c", "a", "bottom");
+    expect(nodeAt(moved, followZoom(SAMPLE, [1, 1, 0], moved))).toEqual(leaf("c"));
+  });
+
   it("steps into the focused program's groups, out one level, and to the overview", () => {
     let z = overview();
     z = zoomIn(SAMPLE, z, "d");
@@ -256,6 +287,22 @@ describe("changing the tree", () => {
     const w = (tiny as { children: { children: { weights: number[] }[] }[] }).children[1]!.children[1]!.weights;
     expect(w[1]).toBeCloseTo(WEIGHT_MIN);
     expect(w[0]! + w[1]!).toBeCloseTo(1);
+    // the shares lifted to the minimum stay there while the others give up room
+    const five = setWeights(
+      { axis: "x", children: ["a", "b", "c", "d", "e"].map(leaf), weights: [1, 1, 1, 1, 1] },
+      [],
+      [1, 0.03, 0.03, 1, 1],
+    ) as { weights: number[] };
+    expect(Math.min(...five.weights)).toBeCloseTo(WEIGHT_MIN);
+    expect(five.weights.reduce((a, b) => a + b, 0)).toBeCloseTo(1);
+    // more children than 1 / WEIGHT_MIN: no negative share, the sum stays 1
+    const keys = Array.from({ length: 25 }, (_, i) => `p${i}`);
+    const crowd = setWeights({ axis: "x", children: keys.map(leaf), weights: keys.map(() => 1) }, [], [
+      100,
+      ...keys.slice(1).map(() => 0.0001),
+    ]) as { weights: number[] };
+    expect(Math.min(...crowd.weights)).toBeGreaterThan(0);
+    expect(crowd.weights.reduce((a, b) => a + b, 0)).toBeCloseTo(1);
     // wrong length, a leaf or bad numbers: unchanged
     expect(setWeights(SAMPLE, [], [1])).toBe(SAMPLE);
     expect(setWeights(SAMPLE, [0], [1, 1])).toBe(SAMPLE);

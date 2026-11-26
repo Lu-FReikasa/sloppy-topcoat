@@ -190,7 +190,9 @@ export function rects(
       w: r.w * sx,
       h: r.h * sy,
     };
-    const scale = Math.min(1, min.w > 0 ? rect.w / min.w : 1, min.h > 0 ? rect.h / min.h : 1);
+    // a rect without size (a stage not measured yet) is not scaled: rect / scale must stay finite
+    const scale =
+      rect.w > 0 && rect.h > 0 ? Math.min(1, min.w > 0 ? rect.w / min.w : 1, min.h > 0 ? rect.h / min.h : 1) : 1;
     const framed = z.every((v, i) => path[i] === v);
     return { key, rect, scale, framed };
   });
@@ -217,6 +219,29 @@ export function zoomOut(tree: NestTree, zoom: readonly number[]): ZoomPath {
 /** Everything at once. */
 export function overview(): ZoomPath {
   return [];
+}
+
+/** The zoom after the tree changed from `before` to `after` (a program added, removed or moved,
+ *  programs dropped): the paths of a tree shift when it changes, so the zoom follows the programs
+ *  it framed. It frames the smallest part of `after` that holds all of them that are still there
+ *  (one program alone when only one is left); when none are, it steps out in `before` until it
+ *  frames some that are (the overview at worst). A program that was added is not framed by this
+ *  unless it joined the framed part; whether to show it is the caller's choice (`groupOf`). */
+export function followZoom(before: NestTree, zoom: readonly number[], after: NestTree): ZoomPath {
+  const left = new Set(keysOf(after));
+  let z = validZoom(before, zoom);
+  for (;;) {
+    const keys = keysOf(nodeAt(before, z)).filter((k) => left.has(k));
+    if (keys.length > 0) {
+      const paths = keys.map((k) => pathOf(after, k) as ZoomPath);
+      const first = paths[0] as ZoomPath;
+      let n = 0;
+      while (n < first.length && paths.every((p) => p[n] === first[n])) n += 1;
+      return first.slice(0, n);
+    }
+    if (z.length === 0) return [];
+    z = z.slice(0, -1);
+  }
 }
 
 /** The group a program stands in (its innermost split), or [] for a lone program. */
@@ -316,16 +341,21 @@ export function setWeights(tree: NestTree, path: readonly number[], weights: rea
 
 function shares(weights: readonly number[]): number[] {
   const sum = weights.reduce((a, b) => a + b, 0);
-  let w = weights.map((v) => v / sum);
-  // lift the small ones to the minimum and take what they got from the others, in proportion
-  for (let round = 0; round < w.length; round += 1) {
-    const low = w.map((v) => v < WEIGHT_MIN);
-    if (!low.some(Boolean)) break;
-    const need = w.reduce((a, v, i) => a + (low[i] ? WEIGHT_MIN - v : 0), 0);
-    const rest = w.reduce((a, v, i) => a + (low[i] ? 0 : v), 0);
-    w = w.map((v, i) => (low[i] ? WEIGHT_MIN : v - (need * v) / rest));
+  const w = weights.map((v) => v / sum);
+  // a split of more than 1 / WEIGHT_MIN children cannot give each the minimum: then equal shares at most
+  const min = Math.min(WEIGHT_MIN, 1 / w.length);
+  // the small ones are lifted to the minimum for good; the others share what is left, in proportion
+  const lifted = new Set<number>();
+  for (;;) {
+    const free = w.map((_, i) => i).filter((i) => !lifted.has(i));
+    const room = 1 - lifted.size * min;
+    const freeSum = free.reduce((a, i) => a + (w[i] as number), 0);
+    const low = free.filter((i) => ((w[i] as number) * room) / freeSum < min);
+    if (low.length === 0 || low.length === free.length) {
+      return w.map((v, i) => (lifted.has(i) || low.length === free.length ? min : (v * room) / freeSum));
+    }
+    low.forEach((i) => lifted.add(i));
   }
-  return w;
 }
 
 /** The divider after child `index` of the split at `path` moves to `at` (0..1 along the split):
