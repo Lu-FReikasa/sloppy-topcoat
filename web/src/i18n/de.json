@@ -4310,6 +4310,8 @@
     "cancel": "Abbrechen",
     "flow": "Ablauf des Songs",
     "repeat": "Wiederholung",
+    "collapse": "Wiederholungen kürzen",
+    "asAbove": "wie oben",
     "tab": {
       "sheet": "Sheet",
       "sources": "Quellen ({{n}})",

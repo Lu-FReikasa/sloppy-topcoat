@@ -299,6 +299,15 @@
   background: color-mix(in srgb, var(--part) 25%, transparent);
 }
 
+/* a part played again: its name and count on one line (#141) */
+.sheet-again .sheet-part-label {
+  margin: 0;
+}
+
+.sheet-times {
+  font-variant-numeric: tabular-nums;
+}
+
 .sheet-comment {
   font-style: italic;
   color: var(--muted);
@@ -381,6 +390,8 @@
 .sheet-stage-tools {
   margin-left: auto;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.3rem;
   opacity: 0.45;
 }
@@ -417,6 +428,11 @@
 
 .sheet-stage-body .sheet-part-label {
   font-size: 0.7em;
+}
+
+/* "· as above" / "· repeat" grow with the fitted font, not a fixed rem (#141 review) */
+.sheet-stage-body .sheet-part-label .small {
+  font-size: 0.85em;
 }
 
 .sheet-stage-body .sheet-text {
