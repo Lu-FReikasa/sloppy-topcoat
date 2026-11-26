@@ -281,7 +281,7 @@ Seeing images in the chat, making images locally, and talking to Topcoat.
 
 | # | Decision | Status |
 |---|---|---|
-| [D125](decisions/D125.md) | The chat sees images the person gives it | Decided, not built |
+| [D125](decisions/D125.md) | The chat sees images the person gives it | Current |
 | [D126](decisions/D126.md) | Images are made locally by a second runner on a node | Decided, not built |
 | [D127](decisions/D127.md) | Voice: a live conversation with an agent | Decided, not built |
 

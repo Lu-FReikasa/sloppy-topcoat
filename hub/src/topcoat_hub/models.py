@@ -2220,6 +2220,31 @@ class ReportImage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class ChatImage(Base):
+    """An image a person gave the chat (D125): re-encoded by the hub (no metadata such as a
+    location survives), kept within size limits and shown only to its person (D20). It belongs to
+    the user message it was sent with; deleting the message or the conversation deletes it."""
+
+    __tablename__ = "chat_images"
+    __table_args__ = (Index("ix_chat_images_message_id", "message_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE")
+    )
+    message_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("messages.id", ondelete="CASCADE")
+    )
+    content_type: Mapped[str] = mapped_column(String(20))
+    width: Mapped[int] = mapped_column(Integer)
+    height: Mapped[int] = mapped_column(Integer)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class WikiPage(Base):
     """A page of Topcoat's own wiki: a report of the application ``wiki`` (its versions, status and
     release live there, D102) with a place in the tree. Personal (D20): only read or written

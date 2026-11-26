@@ -1339,7 +1339,9 @@
     },
     "event": {
       "pause": "Von dir pausiert",
-      "resume": "Von dir fortgesetzt"
+      "resume": "Von dir fortgesetzt",
+      "vision_routed": "hat die Bilder angesehen (ein Modell, das sehen kann)",
+      "vision_blind": "kann keine Bilder sehen: sie wurden nicht geschickt"
     },
     "control": {
       "pause": "Pause",
@@ -4357,6 +4359,23 @@
       "artist": "Interpret",
       "allArtists": "Alle Interpreten",
       "none": "Kein Sheet passt."
+    }
+  },
+  "images": {
+    "attach": "Bilder anhängen",
+    "attachHint": "Bilder anhängen (bis zu {{max}}); du kannst sie auch hier einfügen oder hineinziehen",
+    "image": "Bild",
+    "remove": "{{name}} entfernen",
+    "open": "Bild ganz zeigen",
+    "viewer": "Bild",
+    "close": "Schließen",
+    "missing": "Bild nicht verfügbar",
+    "blind": "Das Modell dieser Antwort kann keine Bilder sehen und hat sie deshalb nicht bekommen.",
+    "problem": {
+      "type": "Nur Bilder können mit einer Nachricht mitgehen.",
+      "size": "Ein Bild darf höchstens 15 MB groß sein.",
+      "count": "Höchstens {{max}} Bilder gehen mit einer Nachricht mit.",
+      "read": "Das Bild konnte nicht gelesen werden."
     }
   }
 }

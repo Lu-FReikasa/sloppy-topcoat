@@ -1339,7 +1339,9 @@
     },
     "event": {
       "pause": "Paused by you",
-      "resume": "Resumed by you"
+      "resume": "Resumed by you",
+      "vision_routed": "looked at the images (a model that can see)",
+      "vision_blind": "cannot see images: they were not sent"
     },
     "control": {
       "pause": "Pause",
@@ -4357,6 +4359,23 @@
       "artist": "Artist",
       "allArtists": "All artists",
       "none": "No sheet matches."
+    }
+  },
+  "images": {
+    "attach": "Add images",
+    "attachHint": "Add images (up to {{max}}); you can also paste or drop them here",
+    "image": "Image",
+    "remove": "Remove {{name}}",
+    "open": "Show the image whole",
+    "viewer": "Image",
+    "close": "Close",
+    "missing": "Image not available",
+    "blind": "The model of this answer cannot see images, so it did not get them.",
+    "problem": {
+      "type": "Only images can go with a message.",
+      "size": "An image may have at most 15 MB.",
+      "count": "At most {{max}} images go with one message.",
+      "read": "The image could not be read."
     }
   }
 }
