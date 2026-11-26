@@ -8,7 +8,7 @@
   "additionalProperties": false,
   "properties": {
     "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,39}$" },
-    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "maxLength": 20 },
     "requires_core": { "type": "string", "maxLength": 40 },
     "builtin": { "type": "boolean", "description": "shipped with the hub; cannot be removed" },
     "title_key": { "type": "string", "maxLength": 80 },
