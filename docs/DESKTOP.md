@@ -38,7 +38,7 @@ it. The admin may still copy and change programs.
 | `Ctrl+K` | the **command palette**, in the middle: programs, views, settings and actions by name; Enter opens |
 | `Ctrl+Enter` | the conversation of the focused program (its chat, in its context) |
 | `Alt+1` … `Alt+9` | the n-th program of the taskbar: open, or bring forward |
-| `Escape` | close the palette; in a `nest` theme zoomed in: out one level; otherwise minimise the focused program |
+| `Escape` | close the palette; in a `nest` theme zoomed in (wide screen): out one level; otherwise minimise the focused program |
 | `Alt+↓` / `Alt+↑` / `Alt+0` | `nest` themes only: zoom in one level towards the focused program / out one level / the overview of all |
 
 A key does nothing while the person types in a field, except `Ctrl+K` and `Escape`.
@@ -52,7 +52,8 @@ drawn scaled down; its content takes no input then, and a click on it zooms to t
 it has its full size and brings it forward. Bringing a program forward from outside the frame (taskbar,
 `Alt+n`) zooms out just far enough to show it. In the overlay `Escape` stays the client's key (it
 hides the overlay), so `Alt+↑` steps out there, and nest windows are not moved or sized by hand; a
-solo window shows its one program whole. The zoom commands are also in the palette.
+solo window shows its one program whole and keeps no nest. On a narrow screen, which shows the program in
+front alone, the zoom keys do nothing and `Escape` minimises. The zoom commands are also in the palette.
 
 ## 3. State
 

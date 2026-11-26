@@ -245,5 +245,20 @@ describe("the nest layout", () => {
     fireEvent.keyDown(window, { key: "ArrowDown", altKey: true });
     await act(async () => new Promise((r) => setTimeout(r, 20)));
     expect(place(archive)).toEqual(["0%", "0%", "100%", "100%"]);
+    // it shares the storage with the overlay in the desktop client: its one-program tree is not kept
+    expect(window.localStorage.getItem("topcoat.nest")).toBeNull();
+  });
+
+  it("leaves Esc to minimise on a narrow screen, where the nest is not drawn", async () => {
+    window.localStorage.setItem(
+      "topcoat.nest",
+      JSON.stringify({ 0: { tree: { axis: "x", children: [{ key: "settings" }, { key: "archive" }], weights: [1, 1] }, zoom: [1] } }),
+    );
+    setNarrow(true);
+    const h = show(desk(["settings", "archive"]));
+    await screen.findByRole("region", { name: "Archive" });
+    fireEvent.keyDown(window, { key: "ArrowDown", altKey: true });
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(h.prefs().desktop.minimised).toEqual(["archive"]));
   });
 });
