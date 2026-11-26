@@ -37,9 +37,9 @@ describe("chooseFit", () => {
     expect(chooseFit(3, () => false)).toEqual({ columns: 3, font: MIN_FONT, fits: false });
   });
 
-  it("uses three columns across and two upright", () => {
-    expect(maxColumns(1920)).toBe(3);
-    expect(maxColumns(1200)).toBe(2);
+  it("lets a scaled laptop screen try several columns", () => {
+    expect(maxColumns(1920)).toBe(4);
+    expect(maxColumns(800)).toBe(3);
     expect(maxColumns(400)).toBe(1);
   });
 });

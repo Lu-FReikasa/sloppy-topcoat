@@ -14,10 +14,11 @@ export interface Fit {
   fits: boolean;
 }
 
-/** How many columns a screen of this width may use: a column wants about 560 px
- *  (1920 wide → 3, 1200 wide → 2), at least 1, at most 4. */
+/** How many columns a screen of this width may try: a column needs about 260 CSS px, at least 1,
+ *  at most 4. The fit measures each try (long lines wrap) and keeps the one with the largest font,
+ *  so a scaled laptop screen (1200 px at 150 % is 800 CSS px) still gets two columns. */
 export function maxColumns(width: number): number {
-  return Math.max(1, Math.min(4, Math.floor(width / 560)));
+  return Math.max(1, Math.min(4, Math.floor(width / 260)));
 }
 
 /** The largest font (whole px, MIN_FONT…MAX_FONT) at which fits(columns, font) holds, per column
