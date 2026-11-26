@@ -614,9 +614,17 @@ def online_node(
     name: str,
     loaded: list[str] | None = None,
     context_length: int | None = None,
+    projectors: dict[str, str] | None = None,
 ) -> FakeNode:
+    """``projectors``: model -> the vision projector the node loads with it (D125)."""
     node_id, key = pair(client, name)
     node = connect(node_id, key)
+    if projectors:
+        seeing = [
+            {"name": m, "size_bytes": 1000, "format": "gguf", "projector": p}
+            for m, p in projectors.items()
+        ]
+        node.inventory = {**INVENTORY, "models": [*INVENTORY["models"], *seeing]}
     node.handshake()
     node.loaded = [
         {
