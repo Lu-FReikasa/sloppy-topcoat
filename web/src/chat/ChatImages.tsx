@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { ChatImageRef } from "../types";
-import { MAX_IMAGES, useImageUrl, type DraftImage, type ImageProblem } from "./images";
+import { IMAGE_TYPES, MAX_IMAGES, useImageUrl, type DraftImage, type ImageProblem } from "./images";
 
 /** The composer's button that chooses image files (D125); paste and drop add to the same list. */
 export function ImageAttachButton({
@@ -33,7 +33,7 @@ export function ImageAttachButton({
       <input
         ref={input}
         type="file"
-        accept="image/*"
+        accept={IMAGE_TYPES.join(",")}
         multiple
         hidden
         data-testid="image-input"
