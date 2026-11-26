@@ -1,6 +1,6 @@
 """Clean the stored chord sheets with the rules that now apply to every import (sheets/rules.py,
-#145): chords written as text become chords, tab staff lines a tab part, header lines (title,
-artist, source, tuning) facts or nothing; tab goes (a sheet is lyrics and chords). Runs inside the hub container:
+#145, #152): chords written as text become chords, tab goes (a sheet is lyrics and chords),
+header lines (title, artist, source, tuning) become facts or go. Runs inside the hub container:
     docker cp scripts/dev/sheets_retidy.py topcoat-hub-1:/tmp/sheets_retidy.py
     docker exec topcoat-hub-1 /app/hub/.venv/bin/python /tmp/sheets_retidy.py          # dry run
     docker exec topcoat-hub-1 /app/hub/.venv/bin/python /tmp/sheets_retidy.py --apply
