@@ -39,9 +39,10 @@ describe("ThemesPage", () => {
     setup();
     const list = await screen.findByTestId("theme-list");
     await within(list).findByText("Wall");
-    expect(within(list).getAllByRole("button", { name: "Kopieren und ändern" })).toHaveLength(4);
+    expect(within(list).getAllByRole("button", { name: "Kopieren und ändern" })).toHaveLength(5);
     expect(within(list).getByText("Terminal")).toBeTruthy();
-    expect(within(list).getAllByText("eingebaut")).toHaveLength(3);
+    expect(within(list).getByText("Terminal Nest")).toBeTruthy();
+    expect(within(list).getAllByText("eingebaut")).toHaveLength(4);
   });
 
   it("edits a theme, tells what is wrong, and saves only a valid one", async () => {

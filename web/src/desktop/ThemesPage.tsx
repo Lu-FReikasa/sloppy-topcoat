@@ -7,6 +7,7 @@ import { previewTheme } from "./preview";
 import {
   BAR_ITEMS,
   BAR_POSITIONS,
+  BASES,
   BUILTIN_THEMES,
   CHROME_BUTTONS,
   LAYOUT_KINDS,
@@ -210,9 +211,9 @@ export function ThemesPage({ api }: { api: ApiClient }) {
               aria-label={t("themes.base")}
             >
               <option value="">{t("themes.baseNone")}</option>
-              {BUILTIN_THEMES.map((b) => (
-                <option key={b.key} value={b.key}>
-                  {t(`desktop.looks.${b.key}`)}
+              {BASES.map((b) => (
+                <option key={b} value={b}>
+                  {t(`desktop.looks.${b}`)}
                 </option>
               ))}
             </select>

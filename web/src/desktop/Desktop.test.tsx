@@ -263,14 +263,14 @@ describe("Desktop", () => {
     expect(screen.getByRole("region", { name: "Settings" }).querySelector(".dt-code")?.textContent).toBe("SET");
   });
 
-  it("offers all three looks and lays the programs on the desk as slips of paper", async () => {
+  it("offers all four looks and lays the programs on the desk as slips of paper", async () => {
     const h = show(desk(["settings"]));
     await screen.findByRole("region", { name: "Settings" });
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     fireEvent.change(await screen.findByRole("combobox"), { target: { value: "Optik" } });
     // the themes (hint "Optik"); the option of Settings by that name is found too
     const looks = (await screen.findAllByRole("option")).filter((o) => /\sOptik$/.test(o.textContent ?? ""));
-    expect(looks.map((o) => o.textContent?.replace(/\s*Optik$/, ""))).toEqual(["Terminal", "Leitstand", "Schreibtisch"]);
+    expect(looks.map((o) => o.textContent?.replace(/\s*Optik$/, ""))).toEqual(["Terminal", "Leitstand", "Schreibtisch", "Terminal Nest"]);
     fireEvent.click(looks[2]!);
     await waitFor(() => expect(h.prefs().look).toBe("schreibtisch"));
     expect(document.querySelector(".dt-root")?.classList.contains("dt-look-schreibtisch")).toBe(true);

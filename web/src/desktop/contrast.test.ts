@@ -4,6 +4,7 @@
 // shipped style sheets, so a change of a token is measured here.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { resolveTheme } from "./theme";
 
 const MIN = 4.5;
 
@@ -23,7 +24,12 @@ const SPACE = /\s+/g;
 
 /** The rules of a style sheet, with the at-rule each sits in. Enough for our own sheets. */
 function parse(file: string): Rule[] {
-  const css = readFileSync(`src/${file}`, "utf8").replace(COMMENT, "");
+  return parseCss(readFileSync(`src/${file}`, "utf8"));
+}
+
+/** The rules of style sheet text (a file, or the `css` of a built-in theme). */
+function parseCss(text: string): Rule[] {
+  const css = text.replace(COMMENT, "");
   const fold = (text: string) => text.trim().replace(SPACE, " ");
   const declarations = (body: string): Record<string, string> =>
     Object.fromEntries(
@@ -326,6 +332,31 @@ describe("the desk's paper", () => {
         bg,
       })),
     );
+    expect(worst(pairs)).toEqual([]);
+  });
+});
+
+describe("Terminal Nest", () => {
+  const rules = parseCss(resolveTheme("terminal-nest").css ?? "");
+  const rule = (selector: string) => {
+    const found = rules.filter((r) => r.selector === selector && r.within === "");
+    expect(found.length, selector).toBeGreaterThan(0);
+    return Object.assign({}, ...found.map((r) => r.decls)) as Record<string, string>;
+  };
+
+  it("puts readable text on the filled title line and taskbar entry of the program in front, whatever the hues", () => {
+    // the fill is the program's hue (any hue: programHue hashes unknown keys), the text follows the person's hue
+    const pairs = [".dt-focused .dt-titlebar", ".dt-task.dt-front, .dt-task.dt-front .dt-icon"].flatMap((selector) => {
+      const d = rule(selector);
+      return HUES.flatMap((hue) => {
+        const vars = looksVars("terminal", hue);
+        return ALL_HUES.map((pg) => ({
+          what: `${selector} program hue ${pg} hue ${hue}`,
+          fg: colour(d.color!, vars),
+          bg: colour(d.background!, { ...vars, "--pg-hue": String(pg) }),
+        }));
+      });
+    });
     expect(worst(pairs)).toEqual([]);
   });
 });

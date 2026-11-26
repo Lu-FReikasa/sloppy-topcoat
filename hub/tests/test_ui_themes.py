@@ -57,6 +57,8 @@ def test_a_theme_is_checked_against_the_schema() -> None:
     ):
         assert part in text, part
     assert any("built-in" in p for p in themes.theme_problems({**WALL, "key": "terminal"}))
+    # Terminal Nest (#16) is a built-in theme: its key is not free for a custom one
+    assert any("built-in" in p for p in themes.theme_problems({**WALL, "key": "terminal-nest"}))
     assert any("@import" in p for p in themes.theme_problems({**WALL, "css": "@import 'x';"}))
 
 

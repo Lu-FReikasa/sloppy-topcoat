@@ -3132,7 +3132,8 @@
     "looks": {
       "terminal": "Terminal",
       "leitstand": "Leitstand",
-      "schreibtisch": "Schreibtisch"
+      "schreibtisch": "Schreibtisch",
+      "terminal-nest": "Terminal Nest"
     },
     "signal": {
       "amber": "etwas zu lesen",

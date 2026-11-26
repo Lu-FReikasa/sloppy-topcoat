@@ -107,9 +107,13 @@ What feels like a fault (the hub's lint names each one; live 2026-11-16, Wirefra
 * `opacity`, `filter` or an animation on `.dt-program:hover` or `:not(:hover)`: windows fade while the
   pointer passes over them. A button (`.dt-close:hover`) may react to the pointer, a whole window not.
 
-The three built-in themes (`terminal`, `leitstand`, `schreibtisch`) are such documents too
-(`BUILTIN_THEMES` in `theme.ts`); their style sheets are `desktop.css`, `leitstand.css` and
-`schreibtisch.css`. The terminal is what is drawn when a person's theme does not exist.
+The built-in themes are such documents too (`BUILTIN_THEMES` in `theme.ts`). Three of them are
+also the bases a theme can start from (`terminal`, `leitstand`, `schreibtisch`); their style sheets
+are `desktop.css`, `leitstand.css` and `schreibtisch.css`. The fourth, **Terminal Nest**
+(`terminal-nest`), is a theme like a custom one: base `terminal`, layout `nest`, the taskbar as one
+line at the top, a thin title line per program and one-pixel borders between the panes, all in its
+own `css` within the limits above. Its key is kept from custom themes like the others. The terminal
+is what is drawn when a person's theme does not exist.
 
 `base` is the look a theme starts from; whatever its `css` does not restyle stays as the base draws
 it, so pick the base nearest to the look you want:

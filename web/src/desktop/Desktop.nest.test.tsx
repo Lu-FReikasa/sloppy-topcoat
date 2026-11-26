@@ -221,6 +221,22 @@ describe("the nest layout", () => {
     await waitFor(() => expect(archive.style.width).toBe("50%"));
   });
 
+  it("is what the built-in Terminal Nest uses, with its own style sheet and the bar at the top", async () => {
+    const b = desk(["settings", "archive"]);
+    show({ ...b, themes: [], prefs: { ...b.prefs, look: "terminal-nest" } });
+    const archive = await screen.findByRole("region", { name: "Archive" });
+    const root = document.querySelector(".dt-root") as HTMLElement;
+    expect(root.classList.contains("dt-theme-terminal-nest")).toBe(true);
+    expect(root.classList.contains("dt-look-terminal")).toBe(true);
+    expect(root.classList.contains("dt-bar-top")).toBe(true);
+    expect(screen.getByTestId("theme-css").textContent).toContain(".dt-theme-terminal-nest:is(.dt-root, #dt-theme) {");
+    // a thin title line: minimise and close, no maximise
+    expect(archive.querySelector(".dt-maximise")).toBeNull();
+    await waitFor(() => expect(place(archive)).toEqual(["50%", "0%", "50%", "100%"]));
+    fireEvent.keyDown(window, { key: "ArrowDown", altKey: true });
+    await waitFor(() => expect(archive.style.width).toBe("100%"));
+  });
+
   it("shows a solo window's one program whole", async () => {
     window.history.replaceState(null, "", "/?solo=archive#/w/archive");
     show(desk(["settings", "archive"]));
