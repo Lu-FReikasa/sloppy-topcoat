@@ -72,7 +72,6 @@ function AuthedApp({ token, onLogout, onUnauthorized }: AuthedProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [me, setMe] = useState<Me | null>(null);
   const [status, setStatus] = useState<StreamStatus>("connecting");
-  const [epoch, setEpoch] = useState(0);
   const [agentTick, setAgentTick] = useState(0);
   const [inboxTick, setInboxTick] = useState(0);
   // the hub says the interface data (programs, grants, choices) changed (docs/DESKTOP.md)
@@ -129,7 +128,6 @@ function AuthedApp({ token, onLogout, onUnauthorized }: AuthedProps) {
         // Catch up on anything missed while disconnected, the programs too: a hub that was
         // updated while away may offer other ones.
         refreshNodes();
-        setEpoch((e) => e + 1);
         setUiTick((n) => n + 1);
         // the data layer (web/src/data) reloads its live resources
         hubEvents.connected();
@@ -188,8 +186,6 @@ function AuthedApp({ token, onLogout, onUnauthorized }: AuthedProps) {
       refreshNodes,
       tick: agentTick,
       inboxTick,
-      epoch,
-      detail: state.detail,
       dispatch,
     }),
     [
@@ -202,8 +198,6 @@ function AuthedApp({ token, onLogout, onUnauthorized }: AuthedProps) {
       refreshNodes,
       agentTick,
       inboxTick,
-      epoch,
-      state.detail,
     ],
   );
 

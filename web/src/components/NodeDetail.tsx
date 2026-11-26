@@ -1,14 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { UnauthorizedError, type ApiClient } from "../api/client";
-import { describeError, toActionError } from "../errors";
+import type { ApiClient } from "../api/client";
+import { useNode } from "../data/useNode";
+import { useNodeActions, type ModelAction, type NodeActions } from "../data/useNodeActions";
+import type { HubEvents } from "../data/hubEvents";
+import { describeError } from "../errors";
 import { bytesToGb, formatDateTime, formatDecimal, formatInt } from "../format";
-import {
-  eventDetailKey,
-  latestBenchmarkEventId,
-  latestConfigEventId,
-  loadEventText,
-} from "../nodeActivity";
+import { eventDetailKey, loadEventText } from "../nodeActivity";
 import {
   DEFAULT_RESIDENT_PRIORITY,
   effectivePressure,
@@ -16,7 +14,6 @@ import {
   residentsOf,
 } from "../pressure";
 import { modelHref, modelsHref, overviewHref } from "../route";
-import type { Action } from "../state/store";
 import type { CpuInfo, ModelInfo, NodeDetail, NodeEvent, Resident, ResidentUpdate } from "../types";
 import { BenchmarkSection } from "./BenchmarkSection";
 import { NodeConfigForm } from "./NodeConfigForm";
@@ -32,8 +29,6 @@ import { StateBadge } from "./StateBadge";
 import { ForeignUsage, VramBar } from "./UsageBar";
 import { askConfirm } from "./askConfirm";
 import { TransferList } from "./TransferList";
-
-type ModelAction = "models.load" | "models.unload" | "models.delete";
 
 const DEFAULT_SHARED_TRIGGER_MB = PRESSURE_DEFAULTS.foreign_shared_trigger_mb;
 
@@ -51,35 +46,19 @@ function configuredThreads(node: NodeDetail): number | undefined {
 interface Props {
   api: ApiClient;
   nodeId: string;
-  detail: NodeDetail | null;
-  dispatch: Dispatch<Action>;
-  /** Changes whenever the live stream reconnects, forcing a refetch. */
-  epoch?: number;
+  /** Each detail the hub sent: the app keeps its node list in step (a rename, ...). */
+  onLoaded?: (detail: NodeDetail) => void;
+  /** The stream bus; the app's by default, a fake one in tests. */
+  events?: HubEvents;
 }
 
-export function NodeDetailView({ api, nodeId, detail, dispatch, epoch = 0 }: Props) {
+/** The node detail page: renders what `useNode` and `useNodeActions` give it (web/src/data). */
+export function NodeDetailView({ api, nodeId, onLoaded, events }: Props) {
   const { t, i18n } = useTranslation();
-  const [loadError, setLoadError] = useState<{ code: string; message: string } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    api.getNode(nodeId).then(
-      (d) => {
-        if (cancelled) return;
-        setLoadError(null);
-        dispatch({ type: "detail_loaded", detail: d });
-      },
-      (err: unknown) => {
-        if (cancelled || err instanceof UnauthorizedError) return;
-        setLoadError(toActionError(err));
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [api, nodeId, dispatch, epoch]);
-
-  const node = detail && detail.id === nodeId ? detail : null;
+  const resource = useNode(api, nodeId, { onLoad: onLoaded, events });
+  const actions = useNodeActions(api, nodeId, resource);
+  const loadError = resource.error;
+  const node = resource.data && resource.data.id === nodeId ? resource.data : null;
 
   return (
     <section>
@@ -94,7 +73,14 @@ export function NodeDetailView({ api, nodeId, detail, dispatch, epoch = 0 }: Pro
         </p>
       )}
       {!node && !loadError && <p className="muted">{t("app.loading")}</p>}
-      {node && <DetailBody api={api} node={node} dispatch={dispatch} />}
+      {node && (
+        <DetailBody
+          api={api}
+          node={node}
+          actions={actions}
+          reload={resource.reload}
+        />
+      )}
     </section>
   );
 }
@@ -102,51 +88,24 @@ export function NodeDetailView({ api, nodeId, detail, dispatch, epoch = 0 }: Pro
 function DetailBody({
   api,
   node,
-  dispatch,
+  actions,
+  reload,
 }: {
   api: ApiClient;
   node: NodeDetail;
-  dispatch: Dispatch<Action>;
+  actions: NodeActions;
+  /** Load the detail again: a section saved something the stream does not carry. */
+  reload: () => Promise<void>;
 }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const ram = useRamText(node);
   const disk = useDiskText(node);
-  const [pending, setPending] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const { pending } = actions;
+  const actionError = actions.error ? describeError(actions.error, t, i18n) : null;
+  const notice = actions.notice ? t(`power.${actions.notice}`) : null;
   const offline = !node.connected || node.state === "offline";
-  const nodeId = node.id;
-
-  const refetch = useCallback(() => {
-    api.getNode(nodeId).then(
-      (d) => dispatch({ type: "detail_loaded", detail: d }),
-      () => undefined,
-    );
-  }, [api, nodeId, dispatch]);
-
-  // Benchmark rows are not part of node_updated: refetch when a new result or the end of
-  // a run arrives through the live event stream.
-  const benchEventId = latestBenchmarkEventId(node.events);
-  const lastBenchEventId = useRef(benchEventId);
-  useEffect(() => {
-    if (benchEventId !== lastBenchEventId.current) {
-      lastBenchEventId.current = benchEventId;
-      refetch();
-    }
-  }, [benchEventId, refetch]);
-
-  // Neither is the config: refetch when the hub reports a change (another admin, a manual
-  // unload that cleared auto_reload, a benchmark that set the threads, ...).
-  const configEventId = latestConfigEventId(node.events);
-  const lastConfigEventId = useRef(configEventId);
-  useEffect(() => {
-    if (configEventId !== lastConfigEventId.current) {
-      lastConfigEventId.current = configEventId;
-      refetch();
-    }
-  }, [configEventId, refetch]);
 
   const residents = new Map(residentsOf(node.config).map((r) => [r.model, r]));
   const trigger = effectivePressure(node.config).foreign_shared_trigger_mb;
@@ -154,88 +113,16 @@ function DetailBody({
   const known = new Set(node.models.map((m) => m.name));
   const missingResidents = [...residents.values()].filter((r) => !known.has(r.model));
 
-  /** Toggle or change a resident entry; null removes it. */
-  async function changeResident(model: string, entry: ResidentUpdate | null) {
-    setPending(model);
-    setActionError(null);
-    try {
-      const res =
-        entry === null
-          ? await api.deleteResident(node.id, model)
-          : await api.putResident(node.id, model, entry);
-      dispatch({
-        type: "config_updated",
-        nodeId: node.id,
-        config: res.config,
-        configHash: res.config_hash,
-      });
-    } catch (err) {
-      if (!(err instanceof UnauthorizedError)) {
-        setActionError(describeError(toActionError(err), t, i18n));
-      }
-    } finally {
-      setPending(null);
-    }
-  }
-
   async function runModelAction(action: ModelAction, model: string) {
     if (action === "models.delete" && !(await askConfirm(t("detail.confirmDelete", { model })))) {
       return;
     }
-    setPending(model);
-    setActionError(null);
-    try {
-      const args: Record<string, unknown> = { model };
-      if (action === "models.delete") args.confirm = true;
-      const res = await api.runAction(node.id, action, args);
-      if (!res.ok) {
-        setActionError(describeError(res.error ?? { code: "unknown", message: "" }, t, i18n));
-      } else {
-        // The stream will push node_updated; refetch as a fallback.
-        refetch();
-      }
-    } catch (err) {
-      if (!(err instanceof UnauthorizedError)) {
-        setActionError(describeError(toActionError(err), t, i18n));
-      }
-    } finally {
-      setPending(null);
-    }
-  }
-
-  /** Wake-on-LAN: the hub sends the magic packet to the addresses it knows from the inventory. */
-  async function wake() {
-    setPending("wake");
-    setActionError(null);
-    setNotice(null);
-    try {
-      await api.wakeNode(node.id);
-      setNotice(t("power.wakeSent"));
-    } catch (err) {
-      if (!(err instanceof UnauthorizedError)) {
-        setActionError(describeError(toActionError(err), t, i18n));
-      }
-    } finally {
-      setPending(null);
-    }
+    await actions.runModelAction(action, model);
   }
 
   async function sleepNow() {
-    if (!await askConfirm(t("power.confirmSleep", { node: node.name }))) return;
-    setPending("sleep");
-    setActionError(null);
-    setNotice(null);
-    try {
-      const res = await api.runAction(node.id, "node.sleep", {});
-      if (res.ok) setNotice(t("power.sleepStarted"));
-      else setActionError(describeError(res.error ?? { code: "unknown", message: "" }, t, i18n));
-    } catch (err) {
-      if (!(err instanceof UnauthorizedError)) {
-        setActionError(describeError(toActionError(err), t, i18n));
-      }
-    } finally {
-      setPending(null);
-    }
+    if (!(await askConfirm(t("power.confirmSleep", { node: node.name })))) return;
+    await actions.sleep();
   }
 
   const canWake = offline && (node.network?.length ?? 0) > 0;
@@ -317,7 +204,7 @@ function DetailBody({
           </>
         )}
       </dl>
-      <NodeKindSwitch api={api} node={node} onSaved={refetch} />
+      <NodeKindSwitch node={node} compute={actions.compute} />
 
       {isTools ? (
         <ToolsSection api={api} node={node} />
@@ -360,7 +247,7 @@ function DetailBody({
           {(canWake || canSleep) && (
             <div className="power-actions">
               {canWake && (
-                <button type="button" disabled={pending !== null} onClick={() => void wake()}>
+                <button type="button" disabled={pending !== null} onClick={() => void actions.wake()}>
                   {t("power.wake")}
                 </button>
               )}
@@ -409,7 +296,7 @@ function DetailBody({
                       disabled={offline || pending !== null}
                       residentDisabled={pending !== null}
                       onAction={(a) => void runModelAction(a, m.name)}
-                      onResident={(entry) => void changeResident(m.name, entry)}
+                      onResident={(entry) => void actions.changeResident(m.name, entry)}
                     />
                   ))}
                 </tbody>
@@ -430,7 +317,7 @@ function DetailBody({
                     type="button"
                     disabled={pending !== null}
                     aria-label={t("detail.residentRemove", { model: r.model })}
-                    onClick={() => void changeResident(r.model, null)}
+                    onClick={() => void actions.changeResident(r.model, null)}
                   >
                     {t("detail.residentRemoveShort")}
                   </button>
@@ -482,7 +369,7 @@ function DetailBody({
               api={api}
               nodeId={node.id}
               config={node.config}
-              onSaved={refetch}
+              onSaved={reload}
               dedicatedGpu={node.gpus.some((g) => !g.integrated)}
             />
           </Fold>
@@ -492,13 +379,13 @@ function DetailBody({
               api={api}
               nodeId={node.id}
               config={node.config}
-              onSaved={refetch}
+              onSaved={reload}
               dedicatedGpu={node.gpus.some((g) => !g.integrated)}
             />
           </Fold>
 
           <Fold title={t("power.heading")}>
-            <PowerSettings api={api} nodeId={node.id} config={node.config} onSaved={refetch} />
+            <PowerSettings api={api} nodeId={node.id} config={node.config} onSaved={reload} />
           </Fold>
         </>
       )}
@@ -509,14 +396,14 @@ function DetailBody({
         <ToolsSection api={api} node={node} />
       )}
 
-      <HostReadSection api={api} node={node} onSaved={refetch} />
+      <HostReadSection api={api} node={node} onSaved={reload} />
 
-      <UpdateSection api={api} node={node} config={node.config} onChanged={refetch} />
+      <UpdateSection api={api} node={node} config={node.config} onChanged={reload} />
 
-      <RenameNode api={api} nodeId={node.id} name={node.name} onRenamed={refetch} />
+      <RenameNode api={api} nodeId={node.id} name={node.name} onRenamed={reload} />
 
       <Fold title={t("config.heading")}>
-        <NodeConfigForm api={api} nodeId={node.id} config={node.config} onSaved={refetch} />
+        <NodeConfigForm api={api} nodeId={node.id} config={node.config} onSaved={reload} />
       </Fold>
 
       <Fold title={t("detail.events")}>
@@ -540,51 +427,26 @@ function Fold({ title, children }: { title: string; children: ReactNode }) {
 
 /** Compute node (holds and serves models) or tool node (only capabilities): config.roles. A tool
  *  node is left out of the models page and its counts. */
-function NodeKindSwitch({
-  api,
-  node,
-  onSaved,
-}: {
-  api: ApiClient;
-  node: NodeDetail;
-  onSaved: () => void;
-}) {
+function NodeKindSwitch({ node, compute }: { node: NodeDetail; compute: NodeActions["compute"] }) {
   const { t, i18n } = useTranslation();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const roles = node.config?.roles;
   if (!node.config || !Array.isArray(roles)) return null;
-  const list = roles.filter((r): r is string => typeof r === "string");
-  const compute = list.includes("gpu");
-
-  async function change(on: boolean) {
-    setBusy(true);
-    setError(null);
-    try {
-      const next = on
-        ? [...list.filter((r) => r !== "gpu"), "gpu"]
-        : list.filter((r) => r !== "gpu");
-      await api.putNodeConfig(node.id, { ...node.config, roles: next.length > 0 ? next : ["tools"] });
-      onSaved();
-    } catch (err) {
-      if (!(err instanceof UnauthorizedError)) setError(describeError(toActionError(err), t, i18n));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const isCompute = roles.includes("gpu");
+  const busy = compute.busy;
+  const error = compute.error ? describeError(compute.error, t, i18n) : null;
 
   return (
     <div className="node-kind">
       <label>
         <input
           type="checkbox"
-          checked={compute}
+          checked={isCompute}
           disabled={busy}
-          onChange={(e) => void change(e.target.checked)}
+          onChange={(e) => void compute.set(e.target.checked)}
         />{" "}
         {t("node.computeToggle")}
       </label>
-      <p className="muted small">{t(compute ? "node.computeOn" : "node.computeOff")}</p>
+      <p className="muted small">{t(isCompute ? "node.computeOn" : "node.computeOff")}</p>
       {error && (
         <p className="error" role="alert">
           {error}
