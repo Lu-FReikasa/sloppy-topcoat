@@ -199,3 +199,57 @@ def test_an_import_applies_the_rules() -> None:
     assert s.title == "Paper Boat"
     assert s.sections[0].kind == "intro" and len(s.chords()) == 4
     assert names(s.transpose(-2))[:3] == ["A#", "D#", "F"]
+
+
+# --- patterns found on the stored sheets (2026-11-26) ----------------------------------------
+
+
+def test_a_star_as_accent_does_not_hide_a_line_of_chords() -> None:
+    s = cp("{start_of_verse}\n *    A   D\npaper boats are sailing\n{end_of_verse}\n")
+    rules.apply(s)
+    assert [c.name() for c in s.sections[0].lines[0].chords] == ["A", "D"]
+    assert [c.name() for c in s.transpose(2).sections[0].lines[0].chords] == ["B", "E"]
+
+
+def test_chords_over_chords_become_one_line_of_the_written_chords() -> None:
+    s = cp("{start_of_verse}\n[A]A        [D]D     [D]F   *  A\n[A]little [D]paper boat\n"
+           "{end_of_verse}\n")  # fmt: skip
+    done = rules.apply(s)
+    assert done.chord_lines == 1
+    assert [c.name() for c in s.sections[0].lines[0].chords] == ["A", "D", "F", "A"]
+    assert [c.name() for c in s.sections[0].lines[1].chords] == ["A", "D"]  # lyrics untouched
+
+
+def test_a_lyric_line_with_one_chord_word_is_not_a_line_of_chords() -> None:
+    s = cp("{start_of_verse}\n[A]A little [D]boat\n{end_of_verse}\n")
+    rules.apply(s)
+    assert [c.name() for c in s.sections[0].lines[0].chords] == ["A", "D"]
+    assert lyric_lines(s) == ["A little boat"]
+
+
+def test_staves_side_by_side_with_a_fret_taken_for_a_chord_are_a_tab_block() -> None:
+    s = cp("{start_of_part: Other}\ne|-------[B]0-|         e|-------2-|\n"
+           "B|-------2-|         B|-------3-|\nG|-------2-|         G|-------2-|\n{end_of_part}\n"
+           "\n{start_of_verse}\n[A]paper boat\n{end_of_verse}\n")  # fmt: skip
+    done = rules.apply(s)
+    assert done.tabs == 1
+    tab = s.sections[0]
+    assert tab.kind == "tab" and len(tab.lines) == 3
+    assert all(not ln.chords for ln in tab.lines)
+    assert tab.lines[0].lyrics.startswith("e|-------B0-|")
+
+
+def test_a_tuning_sentence_in_the_header_goes_to_the_facts() -> None:
+    s = cp("{start_of_part: Other}\nTune your guitar to 435 Hz to match the record.\n"
+           "{end_of_part}\n\n{start_of_verse}\n[C]paper boat\n{end_of_verse}\n")  # fmt: skip
+    done = rules.apply(s)
+    assert len(done.removed) == 1
+    assert s.meta.get("x_tuning") == "435 Hz"
+    assert lyric_lines(s) == ["paper boat"]
+
+
+def test_a_minor_major_ninth_is_a_chord_but_a_hum_is_not() -> None:
+    from topcoat_hub.sheets.chords import parse_chord
+
+    assert parse_chord("Ammaj9") is not None
+    assert parse_chord("Hmmm", german=True) is None

@@ -137,8 +137,14 @@ def parse_chord(text: str, german: bool = False) -> Chord | None:
     """A chord name, or ``None`` when the text is no chord (``N.C.``, ``x2``, a word)."""
     t = text.strip()
     m = _CHORD_RE.match(t)
-    if not m or not _SUFFIX_RE.match(m.group(2)) or "--" in m.group(2) or "mm" in m.group(2):
+    if (
+        not m
+        or not _SUFFIX_RE.match(m.group(2))
+        or "--" in m.group(2)
+        or re.search(r"mm(?!aj)", m.group(2))
+    ):
         # "C------" is a chord held over bars of a tab, "Hmmm" a hum: no chord names
+        # ("Ammaj9", a minor chord with a major ninth, is one)
         return None
     try:
         root = note_pc(m.group(1), german)

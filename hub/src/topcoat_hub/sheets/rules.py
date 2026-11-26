@@ -110,6 +110,10 @@ def _chord_lines(sheet: Sheet, done: Applied) -> None:
         part, implicit = sec, _unnamed(sec)
         for ln in lines:
             text = _plain(ln)
+            if text is None and not _is_tab(ln) and len(_chord_marks(ln.lyrics, german) or []) >= 2:
+                # chords over chords ("[A]A   [D]D"): a line of chords converted once already, its
+                # brackets often shifted; the chords written as text are the line
+                text = ln.lyrics
             found = None if text is None or _TAB.match(text) else _as_chord_line(text, german)
             if found is None:
                 part.lines.append(ln)
@@ -139,9 +143,23 @@ def _unnamed(sec: Section) -> bool:
 # --- tab blocks ------------------------------------------------------------------------------
 
 
+# one stave of staves side by side ("e|--0--|   e|--2--|"); a fret letter may stand in it
+_STAVE = re.compile(r"[A-Za-z]?\|[-0-9A-Za-z/\\~^().|]*--[-0-9A-Za-z/\\~^().|]*")
+
+
+def _line_text(ln: Line) -> str:
+    """A line as it was written, chords inline without brackets."""
+    if ln.comment is not None:
+        return ln.comment
+    return "".join((g.chord.name() if g.chord else (g.raw or "")) + g.text for g in ln.segments)
+
+
 def _is_tab(ln: Line) -> bool:
-    text = _plain(ln)
-    return text is not None and bool(_TAB.match(text))
+    # a tab line may hold a fret letter the import took for a chord ("e|--[h]0--|")
+    text = _line_text(ln)
+    return bool(text.strip()) and bool(
+        _TAB.match(text) or all(_STAVE.fullmatch(t) for t in text.split())
+    )
 
 
 def _tab_blocks(sheet: Sheet, done: Applied) -> None:
@@ -182,7 +200,7 @@ def _tab_blocks(sheet: Sheet, done: Applied) -> None:
 
 def _staff(ln: Line) -> Line:
     """A tab line as a line of its own (no comment): the tab block shows it as it is."""
-    return Line([Segment(ln.comment)]) if ln.comment is not None and _is_tab(ln) else ln
+    return Line([Segment(_line_text(ln))]) if _is_tab(ln) else ln
 
 
 def _add(out: list[Section], sec: Section, done: Applied) -> None:
@@ -225,6 +243,7 @@ _FACT_NAMES = {
     "tonart": "key", "tempo": "tempo", "bpm": "tempo",
 }  # fmt: skip
 # "Standard tuning", "Drop D tuning", "Eb tuning (half step down)"
+_HERTZ = re.compile(r"\b(4[0-9]{2}(?:[.,][0-9]+)?)\s*hz\b", re.I)
 _TUNING = re.compile(r"^(\S+(?:\s+\S+){0,3})\s+tuning\s*((?:[:(\-].*)?)$", re.I)
 _SOURCE = re.compile(
     r"^(?:source|quelle|from|taken from|found (?:at|on))\s*:|https?://|www\.|"
@@ -273,6 +292,10 @@ def _header_line(text: str, sheet: Sheet) -> bool:
         elif what in ("tuning", "tempo"):
             sheet.meta.setdefault("x_tuning" if what == "tuning" else "tempo", value)
         return bool(what)
+    m = _HERTZ.search(t)
+    if m and re.search(r"\btun", t, re.I):  # "Tune your guitar to 440 Hz ..."
+        sheet.meta.setdefault("x_tuning", f"{m.group(1)} Hz")
+        return True
     m = _TUNING.match(t)
     if m:
         sheet.meta.setdefault("x_tuning", (m.group(1) + m.group(2)).strip())
