@@ -224,6 +224,28 @@ def test_a_recording_over_the_limit_is_refused(client: TestClient, connect: Any)
     assert not any(c["capability"] == "voice.transcribe" for c in node.capability_calls)
 
 
+def test_only_a_few_recordings_are_read_at_once(client: TestClient, connect: Any) -> None:
+    node = voice_node(client, connect)
+    gate = threading.Event()
+    answer: dict[str, Any] = node.capability_answers["voice.transcribe"]
+
+    def slow(args: dict[str, Any]) -> dict[str, Any]:
+        gate.wait(5)
+        return answer
+
+    node.capability_answers["voice.transcribe"] = slow
+    with opened(client) as ws:
+        ws.receive_json()
+        for n in range(3):  # two are read, the third waits for none of them
+            ws.send_text(json.dumps({"type": "listen", "id": f"u{n}"}))
+            ws.send_bytes(b"\x10\x00" * 100)
+            ws.send_text(json.dumps({"type": "end", "id": f"u{n}"}))
+        refused = ws.receive_json()
+        assert (refused["id"], refused["code"]) == ("u2", "busy")
+        gate.set()
+        assert {ws.receive_json()["id"] for _ in range(2)} == {"u0", "u1"}
+
+
 def test_an_answer_comes_back_as_audio_pieces_in_order(client: TestClient, connect: Any) -> None:
     node = voice_node(client, connect)
     with opened(client) as ws:
