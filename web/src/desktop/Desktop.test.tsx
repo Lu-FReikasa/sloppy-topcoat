@@ -226,6 +226,14 @@ describe("Desktop", () => {
     window.removeEventListener("keydown", take, true);
     await new Promise((r) => setTimeout(r, 50));
     expect(h.prefs().desktop.minimised).toEqual([]);
+    // with the taskbar's menu open, Esc closes the menu and leaves the window open
+    const me = document.querySelector(".dt-taskbar [aria-haspopup='menu']") as HTMLElement;
+    fireEvent.click(me);
+    expect(screen.getByRole("menu")).toBeTruthy();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(h.prefs().desktop.minimised).toEqual([]);
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(h.prefs().desktop.minimised).toEqual(["archive"]));
   });

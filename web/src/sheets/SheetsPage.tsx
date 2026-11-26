@@ -319,9 +319,12 @@ function inFront(el: HTMLElement | null): boolean {
 
 /** Whether the shell around the page has a menu or drawer open (the web shell's drawer or user
  *  menu, the taskbar menu): Esc then closes that, it does not leave the sheet. Expanded controls
- *  inside this page or in other windows do not count. */
+ *  inside this page, in windows, or in a window's Clipper column (unfolded for as long as the
+ *  person likes, a sibling of its window) do not count. */
 function shellPopupOpen(el: HTMLElement | null): boolean {
-  return [...document.querySelectorAll('[aria-expanded="true"]')].some((x) => !el?.contains(x) && !x.closest(".dt-program"));
+  return [...document.querySelectorAll('[aria-expanded="true"]')].some(
+    (x) => !el?.contains(x) && !x.closest(".dt-program, .clipper-talk"),
+  );
 }
 
 function typing(target: EventTarget | null): boolean {

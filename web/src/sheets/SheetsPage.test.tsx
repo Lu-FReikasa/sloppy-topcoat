@@ -218,6 +218,17 @@ describe("Sheets", () => {
     expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
     expect(window.location.hash).toBe("#/sheets/s1");
     menu.remove();
+    // an unfolded Clipper column beside a window is not a menu: Esc still leaves the sheet
+    const dock = document.createElement("aside");
+    dock.className = "clipper-talk";
+    const figure = document.createElement("button");
+    figure.setAttribute("aria-expanded", "true");
+    dock.appendChild(figure);
+    document.body.appendChild(dock);
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(false);
+    expect(window.location.hash).toBe("#/sheets");
+    dock.remove();
+    window.location.hash = "#/sheets/s1";
     // taken by the page (the desktop shell then does not minimise the window)
     expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(false);
     expect(window.location.hash).toBe("#/sheets");

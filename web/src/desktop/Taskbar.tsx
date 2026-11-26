@@ -56,7 +56,13 @@ export function Taskbar({
     const away = (e: Event) => {
       if (menuRoot.current && !menuRoot.current.contains(e.target as Node)) setMenu(false);
     };
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
+    // this Esc is the menu's: the desktop then does not minimise the window in front, and a page
+    // (Sheets) does not take it either
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      setMenu(false);
+    };
     document.addEventListener("pointerdown", away);
     document.addEventListener("keydown", esc);
     return () => {
