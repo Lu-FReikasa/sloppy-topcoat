@@ -5,7 +5,7 @@ import { IncognitoPage } from "../incognito/IncognitoPage";
 import { TalkPage } from "../talk/TalkPage";
 import { jsonResponse, mockFetch } from "../test/mockFetch";
 import type { ChatMessage, ConversationDetail } from "../types";
-import { acceptable, MAX_IMAGE_BYTES, MAX_IMAGES } from "./images";
+import { acceptable, MAX_IMAGE_BYTES, MAX_IMAGES, pastedImages } from "./images";
 
 /** The eight bytes a PNG file starts with: enough for the browser side, which reads no pixels. */
 const PNG_SIGNATURE = "\x89PNG\r\n\x1a\n";
@@ -96,6 +96,29 @@ describe("which files may go with a message", () => {
     expect(take).toHaveLength(MAX_IMAGES);
     expect(problem).toBe("count");
     expect(acceptable([pngFile()], MAX_IMAGES).take).toHaveLength(0);
+    // formats the hub cannot read are left out at once, not refused with the whole message later
+    const heic = new File([PNG], "IMG_0001.heic", { type: "image/heic" });
+    const svg = new File(["<svg/>"], "logo.svg", { type: "image/svg+xml" });
+    expect(acceptable([heic, svg], 0)).toEqual({ take: [], problem: "type" });
+  });
+});
+
+describe("what a paste gives the message", () => {
+  function clipboard(files: File[], text: string, html = "") {
+    return {
+      items: files.map((f) => ({ kind: "file", getAsFile: () => f })),
+      files,
+      getData: (type: string) => (type === "text/plain" ? text : type === "text/html" ? html : ""),
+    } as unknown as DataTransfer;
+  }
+
+  it("takes a copied picture, but leaves text from an office program to be pasted as text", () => {
+    const shot = pngFile();
+    expect(pastedImages(clipboard([shot], ""))).toEqual([shot]);
+    // Excel and Word put a picture of the selection next to its text
+    expect(pastedImages(clipboard([shot], "A1\tB1\r\n", "<table><tr><td>A1</td></tr></table>"))).toEqual([]);
+    // "copy image" in a browser: the HTML holds the picture
+    expect(pastedImages(clipboard([shot], "https://example.lan/a.png", '<img src="a.png">'))).toEqual([shot]);
   });
 });
 

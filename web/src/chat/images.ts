@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *  only checks what it can see before sending (type, size, how many). */
 export const MAX_IMAGES = 4;
 export const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+/** The picture formats the hub reads (chat_images.FORMATS): anything else it refuses, and the
+ *  whole message with it, so the composer leaves such a file out at once (HEIC, AVIF, SVG, TIFF). */
+export const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"];
 
 /** An image chosen for the next message: what is sent (base64) and what is shown meanwhile. */
 export interface DraftImage {
@@ -45,7 +48,7 @@ export function acceptable(
   let problem: ImageProblem | null = null;
   const take: File[] = [];
   for (const f of files) {
-    if (!f.type.startsWith("image/")) problem = "type";
+    if (!IMAGE_TYPES.includes(f.type)) problem = "type";
     else if (f.size > MAX_IMAGE_BYTES) problem = "size";
     else if (already + take.length >= MAX_IMAGES) problem = "count";
     else take.push(f);
@@ -101,6 +104,17 @@ export function imageFiles(data: DataTransfer | null): File[] {
   }
   if (out.length === 0) out.push(...Array.from(data.files ?? []));
   return out;
+}
+
+/** The image files of a paste. Office programs (Excel, Word, LibreOffice) put a picture of the
+ *  copied cells or text on the clipboard next to the text itself: then the text is what the person
+ *  pastes, not the picture. A copied picture from a web page carries an <img> in its HTML. */
+export function pastedImages(data: DataTransfer | null): File[] {
+  if (!data) return [];
+  const text = data.getData?.("text/plain") ?? "";
+  const html = data.getData?.("text/html") ?? "";
+  if (text.trim() !== "" && !/<img[\s>]/i.test(html)) return [];
+  return imageFiles(data);
 }
 
 /** The object URL of a picture the hub keeps, loaded with the token (an <img> cannot send it). */

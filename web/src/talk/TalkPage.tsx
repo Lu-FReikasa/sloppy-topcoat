@@ -20,7 +20,7 @@ import { ReportCardView } from "../chat/ReportCard";
 import { ReviewNote, useReviewLights, useReviews } from "../chat/ReviewNote";
 import { useChat } from "../chat/useChat";
 import { ImageAttachButton, ImageDraftStrip, MessageImages } from "../chat/ChatImages";
-import { imageFiles, useImageDraft, type DraftImage } from "../chat/images";
+import { imageFiles, pastedImages, useImageDraft, type DraftImage } from "../chat/images";
 import { useStickToBottom } from "../chat/useStickToBottom";
 import { dayKey, dayLabel } from "../chat/time";
 import { COMPOSE_EVENT, takeCompose } from "../desktop/compose";
@@ -784,7 +784,7 @@ export function TalkPage({
           onKeyDown={onKey}
           onPaste={(e) => {
             // a screenshot on the clipboard becomes an image of the message (D125)
-            const files = imageFiles(e.clipboardData);
+            const files = pastedImages(e.clipboardData);
             if (files.length === 0) return;
             e.preventDefault();
             void pictures.add(files);
