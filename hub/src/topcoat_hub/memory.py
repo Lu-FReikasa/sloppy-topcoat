@@ -42,19 +42,13 @@ from topcoat_hub.memory_clarify import (
     Verdict,
     _words,
     auto_verdict,
-    clash,
     conflict_groups,
     entities,
-    has_correction,
-    has_retraction,
     judge,
     last_word,
     question_context,
-    same_topic,
-    slot_of,
     statements,
     supports,
-    test_sentences,
     unproven,
     values_differ,
 )
@@ -226,12 +220,6 @@ def is_personal(query: str) -> bool:
     return any(w in _PERSONAL_WORDS for w in words) and any(
         w in _LIFE_WORDS or w.startswith("lieblings") for w in words
     )
-
-
-def _cue_pattern() -> str:
-    from topcoat_hub.memory_clarify import CORRECTION_CUES
-
-    return CORRECTION_CUES.pattern
 
 
 _FOLLOWUP = re.compile(
@@ -628,8 +616,7 @@ class MemoryService:
             for rank, (item, _) in enumerate(hits):
                 score[item.id] = score.get(item.id, 0.0) + 1.0 / (RRF_K + rank)
                 items[item.id] = item
-        # relevance x reliability x usefulness (E3-05): an old note nobody confirmed and that
-        # never helped sinks, one that proved useful rises a little
+        # relevance x reliability (E3-05, D124): an old note nobody confirmed sinks
         now = memory_care.utcnow()
         for item_id in score:
             score[item_id] *= memory_care.rank_factor(items[item_id], now, self.care_config)
@@ -1103,33 +1090,23 @@ class MemoryService:
 
         * a note the user stated is stored, or *confirms* an existing one (a counter, never a
           new version; never both notes of a dispute in one go);
-        * a statement that contradicts notes of the same kind (where the user lives …):
-          explicit correction words ("tatsächlich", "nicht mehr") replace them, words that call
-          them a test or wrong withdraw them — both undoable, with the evidence as the reason;
-          a plain contradicting statement is not decided: both notes become ``disputed`` and
-          the user gets a clarification question;
+        * a stated note that the extraction says contradicts existing notes (``contradicts``)
+          is settled like every contradiction (D124): the stronger evidence wins, then the
+          latest statement of the person; contradicting assumptions are archived; only when
+          that does not decide is the person asked. No cue words are read;
+        * notes the extraction says the person called wrong or a test (``retract``) are
+          withdrawn (undoable), when the message states something at all (a question does not);
         * the user saying a disputed note again settles the dispute for that note.
         Whatever the user did not state and the notes already say is dropped (an echo of the
         prompt is neither new nor a confirmation)."""
         said = statements(user_text)
-        correction = has_correction(user_text)
-        retraction = has_retraction(user_text)
         live = await store.live()
         gone: set[uuid.UUID] = set()
-        cue = ""
-        if correction and (m := re.search(_cue_pattern(), said, re.IGNORECASE)):
-            cue = m.group(0)
 
-        # 1. withdrawals without a replacement: the model names the notes (needs a cue in the
-        # message), and a sentence that calls something a test names what it means.
-        if retraction:
+        # 1. withdrawals without a replacement: the model names the notes the person called wrong
+        # or a test; a message that only asks withdraws nothing.
+        if retract and said.strip():
             named = {r.id for r in retract}
-            for sentence in test_sentences(user_text):
-                words = {_fold(w) for w in _words(sentence)}
-                for n in live:
-                    values = entities(n.text)
-                    if values and all(v in words for v in values):
-                        named.add(n.id)
             for n in live:
                 if (
                     n.id in named
@@ -1155,18 +1132,6 @@ class MemoryService:
             # The same fact again (same words, the same values for the same kind of thing, or
             # a near-duplicate that adds no value) confirms the note instead of adding one.
             existing = await store.find_same(text, self.embedder.id)
-            if existing is None:
-                existing = next(
-                    (
-                        n
-                        for n in live
-                        if n.id not in gone
-                        and same_topic(text, n.text)
-                        and entities(text, [n.text])
-                        and entities(text, [n.text]) == entities(n.text, [text])
-                    ),
-                    None,
-                )
             if existing is None and cand.vec is not None:
                 near = await store.nearest(cand.vec, self.embedder.id, 1)
                 # Near-duplicates merge only if the new note adds no value the old lacks.
@@ -1197,16 +1162,13 @@ class MemoryService:
                     await self._settle_by_restatement(store, item, user_text, source, result)
                     live = [n for n in await store.live() if n.id not in gone]
                 continue
-            conflicts = [n for n in live if n.id not in gone and clash(text, n.text)]
+            conflicts: list[Any] = []
             for ref in cand.refs:
                 note = next((n for n in live if n.id == ref.id and n.id not in gone), None)
                 if note is not None and note not in conflicts and values_differ(text, note.text):
                     conflicts.append(note)
             if conflicts and stated:
-                await self._contradict(
-                    store, cand, conflicts, source, said, cue, correction, retraction, result
-                )
-                gone |= {n.id for n in conflicts} if (correction or retraction) else set()
+                await self._contradict(store, cand, conflicts, source, result)
                 live = [n for n in await store.live() if n.id not in gone]
                 continue
             if not stated:
@@ -1248,58 +1210,22 @@ class MemoryService:
         cand: Candidate,
         conflicts: list[Any],
         source: dict[str, Any],
-        said: str,
-        cue: str,
-        correction: bool,
-        retraction: bool,
         result: Extraction,
     ) -> None:
-        """A stated note that contradicts notes of the same kind."""
-        ref = {**source, **({"correction": True, "cue": cue} if correction or retraction else {})}
+        """A stated note that contradicts notes the extraction named: stored, then settled like
+        every contradiction (:meth:`_doubt`: the stronger evidence, then the latest word)."""
         item = await store.add(
             cand.text,
             embedding=cand.vec,
             embedder=self.embedder.id if cand.vec is not None else None,
             confidence=cand.confidence,
             source_type="chat",
-            source_ref={**ref, **cand.source_extra()},
+            source_ref={**source, **cand.source_extra()},
             reason="remembered from conversation",
             actor="chat",
             **cand.fields(memory_care.utcnow()),
         )
-        if correction or retraction:
-            # An explicit statement of the user counts as certain (D19): no question.
-            withdrawn = retraction
-            why = (
-                "the user said the earlier statement was wrong or a test"
-                if withdrawn
-                else "the user corrected it"
-            )
-            for old in conflicts:
-                await store.change(
-                    old.id,
-                    reason=f"{why}: “{item.text}” replaces “{old.text}”"
-                    + (f" (“{cue}”)" if cue else ""),
-                    actor="chat",
-                    status="deleted" if withdrawn else "superseded",
-                    superseded_by=item.id,
-                    disputed_with=None,
-                    source={**source, "evidence": "user statement", "cue": cue},
-                )
-            await store.close_questions_about(
-                [n.id for n in conflicts], f"{why} (explicit statement): “{item.text}”"
-            )
-            result.corrected.append(
-                {
-                    "id": str(item.id),
-                    "text": item.text,
-                    "evidence": item.evidence,
-                    "replaced": [{"id": str(n.id), "text": n.text} for n in conflicts],
-                    "withdrawn": withdrawn,
-                }
-            )
-            return
-        # Not decided: both stay, marked, and the user is asked.
+        # the hub settles it (memory_auto_settle) or, when that does not decide, asks
         await self._doubt(store, [*conflicts, item], "chat", result, newest=item)
         result.remembered.append(
             {
@@ -1344,7 +1270,9 @@ class MemoryService:
         rivals = [
             n
             for n in await store.live()
-            if n.id != item.id and n.status == "disputed" and clash(item.text, n.text)
+            if n.id != item.id
+            and n.status == "disputed"
+            and (n.id == item.disputed_with or n.disputed_with == item.id)
         ]
         if not rivals or any(supports(user_text, n.text) for n in rivals):
             return
@@ -1438,10 +1366,9 @@ class MemoryService:
         for q in await store.questions("open"):
             if set(q.item_ids) < wanted:
                 await store.close_question(q.id, "answered", "replaced by a wider question")
-        slot = slot_of(group[0].text)
         opened = await store.add_question(
             [n.id for n in group],
-            slot.name if slot else "",
+            "",
             origin,
             question_context(group, question),
         )
@@ -1580,9 +1507,7 @@ class MemoryService:
             if not isinstance(number, int) or isinstance(number, bool) or number not in (1, 2):
                 return "unclear", None, ""
             kept, other = group[number - 1], group[2 - number]
-            if clash(kept.text, other.text) or set(re.findall(r"\d+", other.text)) - set(
-                re.findall(r"\d+", kept.text)
-            ):
+            if set(re.findall(r"\d+", other.text)) - set(re.findall(r"\d+", kept.text)):
                 return "unclear", None, ""
             return relation, kept, ""
         if relation == "contradict":
@@ -1726,7 +1651,7 @@ class MemoryService:
                 for o in live
                 if o.id != n.id
                 and o.status == "disputed"
-                and (o.id == n.disputed_with or o.disputed_with == n.id or clash(n.text, o.text))
+                and (o.id == n.disputed_with or o.disputed_with == n.id)
             ]
             if opponents:
                 continue
@@ -1754,9 +1679,9 @@ class MemoryService:
     async def tidy_conflicts(
         self, store: MemoryStore, stats: dict[str, Any], model: str | None = None
     ) -> None:
-        """No model needed: notes of the same kind that contradict each other (also the ones
-        already ``disputed``) are looked at again with everything known now — a newer
-        explicit statement or a repeated one settles it, anything else stays a question.
+        """No model needed: notes in a dispute are looked at again with everything known now —
+        a repeated statement, the stronger evidence or the latest word settles it, anything else
+        stays a question.
         A disputed note whose rival is gone is active again."""
         live = await store.live()
         # one memory at a time (D74): the core with the core, a program with itself; what two

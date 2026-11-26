@@ -229,18 +229,21 @@ def test_an_old_note_that_is_often_used_stays_and_is_only_checked() -> None:
     assert plan.checks == [old] and plan.archive == []
 
 
-def test_recall_ranks_by_relevance_reliability_and_usefulness() -> None:
+def test_recall_ranks_by_reliability_and_never_by_use_counts() -> None:
+    """D124: how often a note was recalled or used is no ranking input; reliability is."""
     fresh = note(created_at=days(1), kind="operational")
-    dull = note(created_at=days(90), kind="operational", recalled_count=25)
-    helpful = note(
+    old = note(created_at=days(90), kind="operational")
+    counted = note(
         created_at=days(1),
         kind="operational",
         recalled_count=10,
         used_count=9,
         last_used_at=days(1),
+        feedback_positive=3,
     )
-    f, d, h = (mc.rank_factor(n, NOW) for n in (fresh, dull, helpful))
-    assert h > f > d
+    f, o, c = (mc.rank_factor(n, NOW) for n in (fresh, old, counted))
+    assert c == f > o
+    assert mc.rank_factor(note(created_at=days(1), kind="operational", recalled_count=25), NOW) == f
     # an old note without any data is not buried
     assert mc.rank_factor(note(created_at=days(2000)), NOW) > 0.15
 
