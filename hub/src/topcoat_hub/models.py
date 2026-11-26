@@ -1381,6 +1381,63 @@ class UiTemplate(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class Plugin(Base):
+    """D105 step 2: one installed data plug-in (a manifest, ``proto/plugin/manifest.schema.json``).
+    Owned by the installation, not by a person. ``version`` names the :class:`PluginVersion` that
+    is in force; a rollback points it at an earlier one. Built-in programs are registered by the
+    hub at start (``builtin``) and cannot be removed."""
+
+    __tablename__ = "plugins"
+
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    version: Mapped[str] = mapped_column(String(20))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    builtin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PluginVersion(Base):
+    """One version of a plug-in: the manifest as it was installed and its hash. An admin's version
+    is never edited (a change is a new version); only the version ``1.0.0`` of a built-in program
+    belongs to the code and is re-written at start when the code changed the program."""
+
+    __tablename__ = "plugin_versions"
+    __table_args__ = (UniqueConstraint("plugin_key", "version", name="uq_plugin_versions"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    plugin_key: Mapped[str] = mapped_column(
+        String(40), ForeignKey("plugins.key", ondelete="CASCADE"), index=True
+    )
+    version: Mapped[str] = mapped_column(String(20))
+    manifest: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    sha256: Mapped[str] = mapped_column(String(64))
+    installed_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    installed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class PluginChange(Base):
+    """The audit of the registry: every install, update, rollback, disable, enable and removal,
+    who did it and when. Rows are never edited and outlive the plug-in they name."""
+
+    __tablename__ = "plugin_changes"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    plugin_key: Mapped[str] = mapped_column(String(40), index=True)
+    action: Mapped[str] = mapped_column(String(20))
+    from_version: Mapped[str | None] = mapped_column(String(20))
+    to_version: Mapped[str | None] = mapped_column(String(20))
+    sha256: Mapped[str | None] = mapped_column(String(64))
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class InboxItem(Base):
     """PLATFORM.md 3.7: something that happened and wants to be read. Personal (D20): only ever
     read or written through :class:`topcoat_hub.inbox.InboxStore`. ``urgent`` items stay in the
