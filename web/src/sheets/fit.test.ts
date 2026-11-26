@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseFit, isTabLine, maxColumns, MAX_FONT, MIN_FONT, neighbour, sortGroups, visibleGroups } from "./fit";
+import { chooseFit, isTabLine, maxColumns, MAX_FONT, MIN_FONT, neighbour, positionOf, sortGroups, visibleGroups } from "./fit";
 import { groupSheets } from "./group";
 import type { SheetSummary } from "./types";
 
@@ -69,6 +69,12 @@ describe("sorting and paging", () => {
     expect(neighbour(groups, "a", -1)).toBe("b2");
     expect(neighbour(groups, "b", 1)).toBe("a");
     expect(neighbour(groups, "c", 1)).toBeNull();
+    // a song shown twice (a setlist's encore): the position decides where paging goes on
+    const twice = [groups[0]!, groups[1]!, groups[0]!];
+    expect(positionOf(twice, groups[0]!.versions[0]!.id, 2)).toBe(2);
+    expect(positionOf(twice, groups[0]!.versions[0]!.id, 1)).toBe(0);
+    expect(neighbour(twice, groups[0]!.versions[0]!.id, 1, 2)).toBeNull();
+    expect(neighbour(twice, groups[0]!.versions[0]!.id, 1, 0)).toBe(groups[1]!.versions.at(-1)!.id);
     expect(neighbour(visibleGroups(LIST, "yak", "", "title"), "b", 1)).toBe("c");
     expect(neighbour(groups, "gone", 1)).toBeNull();
   });

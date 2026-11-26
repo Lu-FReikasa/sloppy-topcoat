@@ -2360,3 +2360,42 @@ class SheetRow(Base):
         CheckConstraint("instrument IN ('guitar', 'piano')", name="ck_sheets_instrument"),
         CheckConstraint("capo >= 0 AND capo <= 12", name="ck_sheets_capo"),
     )
+
+
+class SetlistRow(Base):
+    """A setlist of the program Sheets: the order of songs for one evening (rehearsal or gig).
+    Personal (D20): only read or written through :class:`topcoat_hub.sheets.setlists.SetlistStore`.
+    Its songs are :class:`SetlistItemRow` rows, in ``position`` order."""
+
+    __tablename__ = "setlists"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SetlistItemRow(Base):
+    """One song of a setlist: a sheet of the same person, either that version (``newest`` false)
+    or whatever version of the song is newest when the setlist is played (``newest`` true; the
+    sheet names the song). Deleting the sheet or the setlist deletes the item."""
+
+    __tablename__ = "setlist_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    setlist_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("setlists.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    sheet_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sheets.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int] = mapped_column(Integer)
+    newest: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+
+    __table_args__ = (UniqueConstraint("setlist_id", "position", name="uq_setlist_items_position"),)

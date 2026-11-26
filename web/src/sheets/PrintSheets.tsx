@@ -6,12 +6,15 @@ import { Dialog } from "../components/Dialog";
 import { describeError, toActionError } from "../errors";
 import { chooseFit } from "./fit";
 import { move, ORIENTATIONS, pageBox, pageRule, PAPERS, printColumns, type Orientation, type Paper } from "./print";
+import { asWritten, collapseRepeats } from "./collapse";
 import { Body, withoutTabs } from "./SheetsPage";
 import type { SheetDetail, SheetViewParams } from "./types";
 import "./print.css";
 
 /** A song offered for printing: the sheet (one version) and how the list names it. */
 export interface PrintSong {
+  /** Tells the songs apart when a sheet is in the list twice (a setlist): its position there. */
+  key?: string;
   id: string;
   title: string;
   artist: string;
@@ -21,6 +24,8 @@ export interface PrintOptions {
   paper: Paper;
   orientation: Orientation;
   hideTabs: boolean;
+  /** Repeated parts as one line ("Chorus ×2"), as the stage mode can show them. */
+  collapse: boolean;
 }
 
 interface DialogProps {
@@ -29,21 +34,24 @@ interface DialogProps {
   songs: PrintSong[];
   /** The view of every sheet (instrument, transposition); empty: each sheet's own. */
   view?: SheetViewParams;
-  /** The stage mode's choice, the start value here. */
+  /** The stage mode's choices, the start values here. */
   hideTabs: boolean;
+  collapse: boolean;
   onClose: () => void;
 }
+
+const keyOf = (s: PrintSong): string => s.key ?? s.id;
 
 /** The class on <body> while sheets are printed: the print style then shows only them. */
 export const PRINTING_CLASS = "sheets-printing";
 
 /** Print or save as PDF: pick and order the songs, choose paper and tab lines, then the browser's
  *  print dialog opens with one song per page. Saved as a PDF, the songs open without the hub. */
-export function PrintDialog({ api, songs, view = {}, hideTabs, onClose }: DialogProps): ReactElement {
+export function PrintDialog({ api, songs, view = {}, hideTabs, collapse, onClose }: DialogProps): ReactElement {
   const { t, i18n } = useTranslation();
   const [order, setOrder] = useState<PrintSong[]>(songs);
-  const [picked, setPicked] = useState<Set<string>>(() => new Set(songs.map((s) => s.id)));
-  const [options, setOptions] = useState<PrintOptions>({ paper: "a4", orientation: "portrait", hideTabs });
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(songs.map(keyOf)));
+  const [options, setOptions] = useState<PrintOptions>({ paper: "a4", orientation: "portrait", hideTabs, collapse });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sheets, setSheets] = useState<SheetDetail[] | null>(null);
@@ -51,7 +59,7 @@ export function PrintDialog({ api, songs, view = {}, hideTabs, onClose }: Dialog
   // or until the person closes this dialog
   const [waiting, setWaiting] = useState(false);
   const [run, setRun] = useState(0);
-  const chosen = order.filter((s) => picked.has(s.id));
+  const chosen = order.filter((s) => picked.has(keyOf(s)));
 
   const toggle = (id: string) =>
     setPicked((old) => {
@@ -94,7 +102,7 @@ export function PrintDialog({ api, songs, view = {}, hideTabs, onClose }: Dialog
         {order.length > 1 && (
           <p className="small">
             {t("sheets.print.picked", { count: chosen.length, total: order.length })}{" "}
-            <button type="button" className="link-button" onClick={() => setPicked(new Set(order.map((s) => s.id)))}>
+            <button type="button" className="link-button" onClick={() => setPicked(new Set(order.map(keyOf)))}>
               {t("sheets.print.all")}
             </button>{" "}
             <button type="button" className="link-button" onClick={() => setPicked(new Set())}>
@@ -104,9 +112,9 @@ export function PrintDialog({ api, songs, view = {}, hideTabs, onClose }: Dialog
         )}
         <ol className="sheet-print-songs" aria-label={t("sheets.print.songs")}>
           {order.map((s, i) => (
-            <li key={s.id}>
+            <li key={keyOf(s)}>
               <label className="check">
-                <input type="checkbox" checked={picked.has(s.id)} onChange={() => toggle(s.id)} />
+                <input type="checkbox" checked={picked.has(keyOf(s))} onChange={() => toggle(keyOf(s))} />
                 <span>
                   {s.title}
                   {s.artist && <span className="muted small"> · {s.artist}</span>}
@@ -143,6 +151,10 @@ export function PrintDialog({ api, songs, view = {}, hideTabs, onClose }: Dialog
           <label className="check">
             <input type="checkbox" checked={options.hideTabs} onChange={(e) => setOptions({ ...options, hideTabs: e.target.checked })} />{" "}
             {t("sheets.stage.hideTabs")}
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={options.collapse} onChange={(e) => setOptions({ ...options, collapse: e.target.checked })} />{" "}
+            {t("sheets.collapse")}
           </label>
         </div>
         {error && (
@@ -253,11 +265,11 @@ export function PrintPages({
   return createPortal(
     <div ref={root} className="sheet-print" data-testid="sheet-print">
       <style>{pageRule(options.paper, options.orientation)}</style>
-      {sheets.map((s) => {
+      {sheets.map((s, i) => {
         const v = s.view;
         const sections = options.hideTabs ? withoutTabs(v.sections) : v.sections;
         return (
-          <section key={s.id} className="sheet-print-page" style={{ width: `${box.width}px`, height: `${box.height}px` }} data-testid="sheet-print-page">
+          <section key={i} className="sheet-print-page" style={{ width: `${box.width}px`, height: `${box.height}px` }} data-testid="sheet-print-page">
             <header className="sheet-print-head">
               <strong>{v.title}</strong>
               {v.artist && <span>{v.artist}</span>}
@@ -270,7 +282,7 @@ export function PrintPages({
             </header>
             <div className="sheet-print-box">
               <div className="sheet-print-body">
-                <Body sections={sections} />
+                <Body items={options.collapse ? collapseRepeats(sections) : asWritten(sections)} />
               </div>
             </div>
           </section>

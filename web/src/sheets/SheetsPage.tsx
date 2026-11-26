@@ -5,6 +5,7 @@ import { describeError, toActionError } from "../errors";
 import { sheetsHref } from "../route";
 import type {
   Instrument,
+  Setlist,
   SheetComparison,
   SheetDetail,
   SheetLine,
@@ -12,9 +13,22 @@ import type {
   SheetSection,
   SheetSummary,
 } from "./types";
-import { chooseFit, isTabLine, maxColumns, neighbour, SORT_MODES, visibleGroups, type Fit, type SortMode } from "./fit";
+import {
+  chooseFit,
+  isTabLine,
+  maxColumns,
+  neighbour,
+  positionOf,
+  SORT_MODES,
+  visibleGroups,
+  type Fit,
+  type SortMode,
+} from "./fit";
 import { artistsOf, type SheetGroup } from "./group";
-import { PrintDialog } from "./PrintSheets";
+import { PrintDialog, type PrintSong } from "./PrintSheets";
+import { asWritten, collapseRepeats, type BodyItem } from "./collapse";
+import { setlistGroups } from "./setlist";
+import { Setlists } from "./Setlists";
 import "./sheets.css";
 
 export { artistsOf, groupSheets, type SheetGroup } from "./group";
@@ -28,6 +42,7 @@ interface Props {
 const POLL_MS = 3000;
 const SORT_KEY = "topcoat.sheets.sort";
 const TABS_KEY = "topcoat.sheets.hideTabs";
+const COLLAPSE_KEY = "topcoat.sheets.stageCollapse";
 const STAGE_KEY = "topcoat.sheets.stage";
 
 /** A remembered choice of this browser; storage may be missing or blocked. */
@@ -101,12 +116,25 @@ export function SheetsPage({ api, id }: Props) {
       /* the stage mode then ends with this page */
     }
   }, []);
-  const [printing, setPrinting] = useState(false);
+  // the songs offered for printing: the shown list or a setlist (null: no print dialog)
+  const [printSongs, setPrintSongs] = useState<PrintSong[] | null>(null);
+  // a setlist played on the stage: its songs page instead of the list, from the song at `at`.
+  // The address stays as it is (paging happens inside the stage), so the page is not remounted.
+  const [playing, setPlaying] = useState<{ setlist: Setlist; at: number } | null>(null);
   const exitStage = useCallback(() => {
     setStage(false);
+    setPlaying(null);
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => undefined);
   }, [setStage]);
   const groups = useMemo(() => visibleGroups(list ?? [], query, artist, sort), [list, query, artist, sort]);
+  const playGroups = useMemo(() => (playing ? setlistGroups(playing.setlist.items, list ?? []) : null), [playing, list]);
+  const play = (setlist: Setlist, from: number) => {
+    const songs = setlistGroups(setlist.items, list ?? []);
+    const at = Math.max(0, songs.findIndex((g) => Number(g.key) >= from));
+    if (!songs[at]) return;
+    setPlaying({ setlist, at });
+    setStage(true);
+  };
 
   useEffect(() => {
     api.sheets().then((r) => setList(r.sheets), fail);
@@ -126,6 +154,20 @@ export function SheetsPage({ api, id }: Props) {
     return () => window.clearInterval(timer);
   }, [api, running, reload]);
 
+  const first = playing && playGroups?.[playing.at]?.versions[0];
+  if (stage && playing && playGroups && first)
+    return (
+      <Stage
+        key={`setlist:${playing.setlist.id}:${playing.at}`}
+        api={api}
+        id={first.id}
+        from={id}
+        groups={playGroups}
+        at={playing.at}
+        setlistName={playing.setlist.name}
+        onExit={exitStage}
+      />
+    );
   if (stage && id) return <Stage api={api} id={id} groups={groups} onExit={exitStage} />;
   return (
     <section className="sheets-shell" data-testid="sheets">
@@ -141,6 +183,7 @@ export function SheetsPage({ api, id }: Props) {
           {/* a finished research shows as its sheet in the list; only running and failed ones here */}
           {jobs.some((j) => j.status !== "done") && <Jobs jobs={jobs.filter((j) => j.status !== "done")} />}
           <PasteForm api={api} onError={fail} />
+          {list && list.length > 0 && <Setlists api={api} list={list} openId={id} onPlay={play} onPrint={(s) => setPrintSongs(setlistSongs(s, list))} onError={fail} />}
           {list !== null && list.length === 0 && <p className="muted small">{t("sheets.empty")}</p>}
           {list && list.length > 0 && <SheetList
               list={list}
@@ -149,20 +192,17 @@ export function SheetsPage({ api, id }: Props) {
               filter={{ query, setQuery, artist, setArtist, sort, setSort }}
             />}
           {groups.length > 0 && (
-            <button type="button" className="link-button small" onClick={() => setPrinting(true)} data-testid="sheets-print-list">
+            <button type="button" className="link-button small" onClick={() => setPrintSongs(songsOf(groups))} data-testid="sheets-print-list">
               {t("sheets.print.list")}
             </button>
           )}
-          {printing && (
+          {printSongs && (
             <PrintDialog
               api={api}
-              songs={groups.flatMap((g) => {
-                // the newest version of each song, as the stage mode pages through them
-                const s = g.versions[g.versions.length - 1];
-                return s ? [{ id: s.id, title: g.title, artist: g.artist }] : [];
-              })}
+              songs={printSongs}
               hideTabs={remembered(TABS_KEY) !== "0"}
-              onClose={() => setPrinting(false)}
+              collapse={remembered(COLLAPSE_KEY) !== "0"}
+              onClose={() => setPrintSongs(null)}
             />
           )}
         </nav>
@@ -174,6 +214,20 @@ export function SheetsPage({ api, id }: Props) {
       </div>
     </section>
   );
+}
+
+/** The songs to print, in the given order: the newest version of each (a setlist's songs hold
+ *  only the sheet it plays). A song's key tells apart a sheet that is in a setlist twice. */
+function songsOf(groups: SheetGroup[]): PrintSong[] {
+  return groups.flatMap((g) => {
+    const s = g.versions[g.versions.length - 1];
+    return s ? [{ key: g.key, id: s.id, title: g.title, artist: g.artist }] : [];
+  });
+}
+
+/** A setlist's songs to print, in its order; sheets deleted meanwhile are left out. */
+export function setlistSongs(setlist: Setlist, list: SheetSummary[]): PrintSong[] {
+  return songsOf(setlistGroups(setlist.items, list));
 }
 
 interface ListFilter {
@@ -380,6 +434,7 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"sheet" | "sources" | "chordpro">("sheet");
   const [printing, setPrinting] = useState(false);
+  const [collapse, setCollapse] = useState(false);
   const fail = useCallback((e: unknown) => setError(describeError(toActionError(e), t, i18n)), [t, i18n]);
 
   useEffect(() => {
@@ -446,6 +501,9 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
               +
             </button>
           </div>
+          <button type="button" aria-pressed={collapse} onClick={() => setCollapse(!collapse)}>
+            {t("sheets.collapse")}
+          </button>
           <button type="button" onClick={() => setPrinting(true)} data-testid="sheet-print-open">
             {t("sheets.print.open")}
           </button>
@@ -473,11 +531,12 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
           songs={[{ id, title: v.title, artist: v.artist }]}
           view={{ instrument: instrument ?? undefined, transpose }}
           hideTabs={remembered(TABS_KEY) !== "0"}
+          collapse={collapse}
           onClose={() => setPrinting(false)}
         />
       )}
       {error && <p className="error">{error}</p>}
-      {tab === "sheet" && <Body sections={v.sections} />}
+      {tab === "sheet" && <Body items={collapse ? collapseRepeats(v.sections) : asWritten(v.sections)} />}
       {tab === "sources" && <Sources api={api} sheet={sheet} />}
       {tab === "chordpro" && <pre className="sheet-chordpro">{v.chordpro}</pre>}
     </article>
@@ -502,21 +561,40 @@ function Flow({ sheet }: { sheet: SheetDetail }) {
   );
 }
 
-export function Body({ sections }: { sections: SheetSection[] }) {
+export function Body({ items }: { items: BodyItem[] }) {
   const { t } = useTranslation();
+  const name = (s: SheetSection) => s.label || t(`sheets.kind.${KINDS.includes(s.kind) ? s.kind : "other"}`);
   return (
     <div className="sheet-body">
-      {sections.map((s) => (
-        <section key={s.index} id={`sheet-part-${s.index}`} className={`sheet-part ${kindClass(s.kind)}`}>
-          <h3 className="sheet-part-label">
-            {s.label || t(`sheets.kind.${KINDS.includes(s.kind) ? s.kind : "other"}`)}
-            {s.repeat_of !== null && <span className="muted small"> · {t("sheets.repeat")}</span>}
-          </h3>
-          {s.lines.map((ln, i) => (
-            <Line key={i} line={ln} />
-          ))}
-        </section>
-      ))}
+      {items.map(({ section: s, again, times, indices }) => {
+        // the flow links to every part; parts merged into this block keep their anchor here
+        const anchors = indices.slice(1).map((i) => <span key={i} id={`sheet-part-${i}`} />);
+        const count = times > 1 && <span className="sheet-times"> ×{times}</span>;
+        if (again)
+          return (
+            <section key={s.index} id={`sheet-part-${s.index}`} className={`sheet-part sheet-again ${kindClass(s.kind)}`} data-testid="sheet-again">
+              {anchors}
+              <h3 className="sheet-part-label">
+                {name(s)}
+                {count}
+                <span className="muted small"> · {t("sheets.asAbove")}</span>
+              </h3>
+            </section>
+          );
+        return (
+          <section key={s.index} id={`sheet-part-${s.index}`} className={`sheet-part ${kindClass(s.kind)}`}>
+            {anchors}
+            <h3 className="sheet-part-label">
+              {name(s)}
+              {count}
+              {s.repeat_of !== null && <span className="muted small"> · {t("sheets.repeat")}</span>}
+            </h3>
+            {s.lines.map((ln, i) => (
+              <Line key={i} line={ln} />
+            ))}
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -641,20 +719,46 @@ export function withoutTabs(sections: SheetSection[]): SheetSection[] {
 
 /** The stage mode: the sheet alone, full screen, fitted on one screen in columns. ←/→ and
  *  PageUp/PageDown (a foot pedal sends these) page through the songs of the list as it is
- *  filtered and sorted; Esc leaves. */
-function Stage({ api, id: startId, groups, onExit }: { api: ApiClient; id: string; groups: SheetGroup[]; onExit: () => void }) {
+ *  filtered and sorted, or through a setlist (`setlistName`; `at` is where `id` is in it, since a
+ *  setlist may hold one song twice); Esc leaves. `from` is the address open before the stage
+ *  (default `id`): leaving opens the song paged to when it differs. */
+function Stage({
+  api,
+  id: startId,
+  from,
+  groups,
+  at: startAt,
+  setlistName,
+  onExit,
+}: {
+  api: ApiClient;
+  id: string;
+  from?: string;
+  groups: SheetGroup[];
+  at?: number;
+  setlistName?: string;
+  onExit: () => void;
+}) {
   const { t, i18n } = useTranslation();
   // paging stays inside the stage: a new address would be taken over by the desktop shell
   const [id, setId] = useState(startId);
+  const [at, setAt] = useState(startAt);
+  const opened = from ?? startId;
   const [sheet, setSheet] = useState<SheetDetail | null>(null);
   const [error, setError] = useState("");
   const [hideTabs, setHideTabsState] = useState(() => remembered(TABS_KEY) !== "0");
+  // default on: a repeat written out once saves lines when a song has to fit one screen
+  const [collapse, setCollapseState] = useState(() => remembered(COLLAPSE_KEY) !== "0");
   const [fit, setFit] = useState<Fit | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const setHideTabs = (on: boolean) => {
     setHideTabsState(on);
     remember(TABS_KEY, on ? "1" : "0");
+  };
+  const setCollapse = (on: boolean) => {
+    setCollapseState(on);
+    remember(COLLAPSE_KEY, on ? "1" : "0");
   };
 
   useEffect(() => {
@@ -667,21 +771,24 @@ function Stage({ api, id: startId, groups, onExit }: { api: ApiClient; id: strin
     );
   }, [api, id, t, i18n]);
 
-  const prev = neighbour(groups, id, -1);
-  const next = neighbour(groups, id, 1);
-  const go = (to: string | null) => {
-    if (to) setId(to);
+  const here = positionOf(groups, id, at);
+  const prev = neighbour(groups, id, -1, at);
+  const next = neighbour(groups, id, 1, at);
+  const go = (to: string | null, step: number) => {
+    if (!to) return;
+    setId(to);
+    setAt(here + step);
   };
   const leave = useCallback(() => {
     onExit();
-    if (id !== startId) window.location.hash = sheetsHref(id);
-  }, [onExit, id, startId]);
+    if (id !== opened) window.location.hash = sheetsHref(id);
+  }, [onExit, id, opened]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") leave();
-      else if (e.key === "ArrowRight" || e.key === "PageDown") go(next);
-      else if (e.key === "ArrowLeft" || e.key === "PageUp") go(prev);
+      else if (e.key === "ArrowRight" || e.key === "PageDown") go(next, 1);
+      else if (e.key === "ArrowLeft" || e.key === "PageUp") go(prev, -1);
       else return;
       e.preventDefault();
     };
@@ -695,16 +802,16 @@ function Stage({ api, id: startId, groups, onExit }: { api: ApiClient; id: strin
     if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => undefined);
   }, []);
 
-  const sections = useMemo(
-    () => (sheet ? (hideTabs ? withoutTabs(sheet.view.sections) : sheet.view.sections) : []),
-    [sheet, hideTabs],
-  );
+  const items = useMemo(() => {
+    const sections = sheet ? (hideTabs ? withoutTabs(sheet.view.sections) : sheet.view.sections) : [];
+    return collapse ? collapseRepeats(sections) : asWritten(sections);
+  }, [sheet, hideTabs, collapse]);
 
   // fit: columns and the largest font at which nothing spills into an extra column
   useLayoutEffect(() => {
     const b = box.current;
     const c = body.current;
-    if (!b || !c || sections.length === 0) return;
+    if (!b || !c || items.length === 0) return;
     const measure = () => {
       const height = b.clientHeight;
       c.style.height = `${height}px`;
@@ -722,12 +829,17 @@ function Stage({ api, id: startId, groups, onExit }: { api: ApiClient; id: strin
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
     ro?.observe(b);
     return () => ro?.disconnect();
-  }, [sections]);
+  }, [items]);
 
   const v = sheet?.view;
   return (
     <div className="sheet-stage" data-testid="sheet-stage">
       <header className="sheet-stage-head">
+        {setlistName && here >= 0 && (
+          <span className="sheet-stage-set" data-testid="sheet-stage-set">
+            {t("sheets.setlists.position", { name: setlistName, n: here + 1, total: groups.length })}
+          </span>
+        )}
         {v ? (
           <>
             <strong>{v.title}</strong>
@@ -744,14 +856,17 @@ function Stage({ api, id: startId, groups, onExit }: { api: ApiClient; id: strin
           <span className="muted">{error || t("sheets.loading")}</span>
         )}
         <div className="sheet-stage-tools">
-          <button type="button" onClick={() => go(prev)} disabled={!prev} aria-label={t("sheets.stage.prev")} title={t("sheets.stage.prev")}>
+          <button type="button" onClick={() => go(prev, -1)} disabled={!prev} aria-label={t("sheets.stage.prev")} title={t("sheets.stage.prev")}>
             ←
           </button>
-          <button type="button" onClick={() => go(next)} disabled={!next} aria-label={t("sheets.stage.next")} title={t("sheets.stage.next")}>
+          <button type="button" onClick={() => go(next, 1)} disabled={!next} aria-label={t("sheets.stage.next")} title={t("sheets.stage.next")}>
             →
           </button>
           <button type="button" aria-pressed={hideTabs} onClick={() => setHideTabs(!hideTabs)}>
             {t("sheets.stage.hideTabs")}
+          </button>
+          <button type="button" aria-pressed={collapse} onClick={() => setCollapse(!collapse)}>
+            {t("sheets.collapse")}
           </button>
           <button type="button" onClick={leave}>
             {t("sheets.stage.exit")}
@@ -760,7 +875,7 @@ function Stage({ api, id: startId, groups, onExit }: { api: ApiClient; id: strin
       </header>
       <div ref={box} className={`sheet-stage-box${fit && !fit.fits ? " is-scroll" : ""}`}>
         <div ref={body} className="sheet-stage-body">
-          {v && <Body sections={sections} />}
+          {v && <Body items={items} />}
         </div>
       </div>
     </div>
