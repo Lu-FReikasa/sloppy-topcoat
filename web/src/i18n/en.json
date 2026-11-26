@@ -4409,6 +4409,8 @@
         "landscape": "Landscape"
       },
       "preparing": "Preparing the pages …",
+      "waiting": "The print dialog is open. Close this when you have printed or saved the PDF.",
+      "close": "Close",
       "start": "Print"
     }
   },

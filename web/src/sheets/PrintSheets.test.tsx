@@ -91,10 +91,18 @@ describe("print layout", () => {
   });
 });
 
+/** window.print as desktop browsers run it: the dialog holds the call, afterprint fires before it returns. */
+function desktopPrint(during: () => void = () => undefined) {
+  return vi.spyOn(window, "print").mockImplementation(() => {
+    during();
+    window.dispatchEvent(new Event("afterprint"));
+  });
+}
+
 describe("PrintDialog", () => {
   it("prints the picked songs in the chosen order, one per page, and cleans up after the print", async () => {
     const titles: (string | null | undefined)[][] = [];
-    const print = vi.spyOn(window, "print").mockImplementation(() => {
+    const print = desktopPrint(() => {
       // what the print dialog sees: only the pages, the rest of the page is hidden by class
       expect(document.body.classList.contains(PRINTING_CLASS)).toBe(true);
       titles.push(pageTitles());
@@ -123,7 +131,7 @@ describe("PrintDialog", () => {
 
   it("leaves tab lines out when asked and keeps them otherwise", async () => {
     let bodies: string[] = [];
-    vi.spyOn(window, "print").mockImplementation(() => {
+    desktopPrint(() => {
       bodies = screen.getAllByTestId("sheet-print-page").map((p) => p.textContent ?? "");
     });
     const { api } = client({ "GET /api/sheets/s1": detail("s1", "First Song") });
@@ -144,13 +152,53 @@ describe("PrintDialog", () => {
   });
 
   it("removes the pages and the print class once printed", async () => {
-    vi.spyOn(window, "print").mockImplementation(() => undefined);
+    desktopPrint();
     const { api } = client({ "GET /api/sheets/s1": detail("s1", "First Song") });
     const onClose = vi.fn();
     const { rerender } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} hideTabs={false} onClose={onClose} />);
     fireEvent.click(screen.getByTestId("sheet-print-start"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     // the parent closes the dialog: nothing of the songs stays in the page
+    rerender(<></>);
+    expect(screen.queryByTestId("sheet-print")).toBeNull();
+    expect(document.body.classList.contains(PRINTING_CLASS)).toBe(false);
+  });
+
+  it("keeps the pages where print() returns before the print is done (phones, tablets)", async () => {
+    const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
+    const { api } = client({ "GET /api/sheets/s1": detail("s1", "First Song") });
+    const onClose = vi.fn();
+    const { rerender } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} hideTabs={false} onClose={onClose} />);
+    fireEvent.click(screen.getByTestId("sheet-print-start"));
+    await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+    // the print is laid out after the call: the pages and the class are still there
+    await waitFor(() => expect((screen.getByTestId("sheet-print-start") as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.getAllByTestId("sheet-print-page")).toHaveLength(1);
+    expect(document.body.classList.contains(PRINTING_CLASS)).toBe(true);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("status").textContent).toMatch(/print dialog is open|Druckdialog ist offen/);
+
+    // afterprint ends it like on the desktop
+    window.dispatchEvent(new Event("afterprint"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    rerender(<></>);
+    expect(screen.queryByTestId("sheet-print")).toBeNull();
+    expect(document.body.classList.contains(PRINTING_CLASS)).toBe(false);
+  });
+
+  it("lets the person close the dialog and print again when no afterprint comes", async () => {
+    const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
+    const { api } = client({ "GET /api/sheets/s1": detail("s1", "First Song") });
+    const onClose = vi.fn();
+    const { rerender } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} hideTabs={false} onClose={onClose} />);
+    fireEvent.click(screen.getByTestId("sheet-print-start"));
+    await waitFor(() => expect((screen.getByTestId("sheet-print-start") as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByTestId("sheet-print-start"));
+    await waitFor(() => expect(print).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect((screen.getByTestId("sheet-print-start") as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.getAllByTestId("sheet-print-page")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: /^(Close|Schließen)$/ }));
+    expect(onClose).toHaveBeenCalled();
     rerender(<></>);
     expect(screen.queryByTestId("sheet-print")).toBeNull();
     expect(document.body.classList.contains(PRINTING_CLASS)).toBe(false);
@@ -193,7 +241,7 @@ describe("Sheets page printing", () => {
   });
 
   it("prints the open sheet as it is shown: instrument and transposition", async () => {
-    vi.spyOn(window, "print").mockImplementation(() => undefined);
+    desktopPrint();
     const { api, calls } = client({
       "GET /api/sheets": { sheets: [summary("s1", "First Song")] },
       "GET /api/sheets/research": { jobs: [] },

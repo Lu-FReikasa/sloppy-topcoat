@@ -104,7 +104,11 @@
     display: none !important;
   }
 
-  body.sheets-printing {
+  /* white paper also around the pages (the @page margin shows the root's ground), even where the
+     shell page paints the root dark (:root:has(.shell-page)) and background graphics are printed */
+  :root:has(body.sheets-printing),
+  :root:has(body.sheets-printing) body {
+    color-scheme: light;
     background: #fff;
   }
 

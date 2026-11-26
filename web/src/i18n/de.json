@@ -4409,6 +4409,8 @@
         "landscape": "Querformat"
       },
       "preparing": "Die Seiten werden vorbereitet …",
+      "waiting": "Der Druckdialog ist offen. Schließe dieses Fenster, wenn du gedruckt oder das PDF gesichert hast.",
+      "close": "Schließen",
       "start": "Drucken"
     }
   },

@@ -47,6 +47,10 @@ export function PrintDialog({ api, songs, view = {}, hideTabs, onClose }: Dialog
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sheets, setSheets] = useState<SheetDetail[] | null>(null);
+  // print() returned before the print was done (phones and tablets): the pages stay until afterprint
+  // or until the person closes this dialog
+  const [waiting, setWaiting] = useState(false);
+  const [run, setRun] = useState(0);
   const chosen = order.filter((s) => picked.has(s.id));
 
   const toggle = (id: string) =>
@@ -59,9 +63,12 @@ export function PrintDialog({ api, songs, view = {}, hideTabs, onClose }: Dialog
 
   const start = async (): Promise<void> => {
     setBusy(true);
+    setWaiting(false);
     setError("");
     try {
-      setSheets(await Promise.all(chosen.map((s) => api.sheet(s.id, view))));
+      const loaded = await Promise.all(chosen.map((s) => api.sheet(s.id, view)));
+      setRun((n) => n + 1);
+      setSheets(loaded);
     } catch (e: unknown) {
       setBusy(false);
       setError(describeError(toActionError(e), t, i18n));
@@ -71,7 +78,13 @@ export function PrintDialog({ api, songs, view = {}, hideTabs, onClose }: Dialog
   const printed = () => {
     setSheets(null);
     setBusy(false);
+    setWaiting(false);
     onClose();
+  };
+
+  const returned = () => {
+    setBusy(false);
+    setWaiting(true);
   };
 
   return (
@@ -137,34 +150,49 @@ export function PrintDialog({ api, songs, view = {}, hideTabs, onClose }: Dialog
             {error}
           </p>
         )}
-        {busy && (
+        {(busy || waiting) && (
           <p className="muted small" role="status">
-            {t("sheets.print.preparing")}
+            {t(busy ? "sheets.print.preparing" : "sheets.print.waiting")}
           </p>
         )}
         <div className="dialog-actions">
           <button type="button" className="link-button" onClick={onClose} disabled={busy}>
-            {t("sheets.cancel")}
+            {t(waiting ? "sheets.print.close" : "sheets.cancel")}
           </button>
           <button type="button" onClick={() => void start()} disabled={busy || chosen.length === 0} data-testid="sheet-print-start">
             {t("sheets.print.start")}
           </button>
         </div>
       </div>
-      {sheets && <PrintPages sheets={sheets} options={options} onDone={printed} />}
+      {sheets && <PrintPages key={run} sheets={sheets} options={options} onDone={printed} onReturned={returned} />}
     </Dialog>
   );
 }
 
 /** The pages to print, outside the desktop (a portal on <body>): laid out off screen at the
- *  paper's size, fitted song by song, then printed. They go away once the print dialog closes. */
-export function PrintPages({ sheets, options, onDone }: { sheets: SheetDetail[]; options: PrintOptions; onDone: () => void }): ReactElement {
+ *  paper's size, fitted song by song, then printed. They go away once the print dialog closes
+ *  (afterprint). Where print() returns before that (phones and tablets lay the pages out after the
+ *  call), they stay until afterprint or until the dialog that holds them closes. */
+export function PrintPages({
+  sheets,
+  options,
+  onDone,
+  onReturned,
+}: {
+  sheets: SheetDetail[];
+  options: PrintOptions;
+  onDone: () => void;
+  /** print() returned without afterprint: the pages are still wanted. */
+  onReturned?: () => void;
+}): ReactElement {
   const { t } = useTranslation();
   const root = useRef<HTMLDivElement>(null);
   // the print runs once; a new callback from a parent's render does not start it again
   const done = useRef(onDone);
+  const back = useRef(onReturned);
   useLayoutEffect(() => {
     done.current = onDone;
+    back.current = onReturned;
   });
   const box = pageBox(options.paper, options.orientation);
 
@@ -204,12 +232,16 @@ export function PrintPages({ sheets, options, onDone }: { sheets: SheetDetail[];
       done.current();
     };
     window.addEventListener("afterprint", finish);
-    // most browsers hold here until the dialog closes; afterprint covers the ones that do not
+    // desktop browsers hold here until the dialog closes and fire afterprint before returning;
+    // others return at once and lay the pages out later, so the pages must outlive the call
     const frame = window.requestAnimationFrame(() => {
       try {
         window.print();
       } finally {
-        finish();
+        if (!finished) {
+          if (back.current) back.current();
+          else finish();
+        }
       }
     });
     return () => {
