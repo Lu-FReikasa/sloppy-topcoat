@@ -35,6 +35,9 @@ CLOSE_UNAUTHORIZED = 4401
 AUTH_TIMEOUT = 10.0
 MAX_TEXT_FRAME = 64 * 1024
 MAX_QUEUED = 64  # speak requests waiting (sentences of the answers being written)
+# recordings being turned into text at once: push to talk has one, a quick second press may add
+# one more; each holds up to 2.5 MB and a node call, so a client cannot start an unbounded number
+MAX_TRANSCRIBING = 2
 ID_MAX = 64
 
 
@@ -157,6 +160,9 @@ class VoiceSession:
         self.utterance = None
         if u.too_long:
             return await self.error(rid, "too_long", "the recording is too long")
+        if len(self.transcribing) >= MAX_TRANSCRIBING:
+            u.pcm.clear()
+            return await self.error(rid, "busy", "earlier recordings are still being read")
         task = asyncio.create_task(self._transcribe(u))
         self.transcribing[u.id] = task
 
