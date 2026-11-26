@@ -43,6 +43,9 @@
     --app-dev: #3fb67a;
     --app-project: #9aa1ad;
     --app-admin: #e0a040;
+    /* error text: the light theme's red is 3.3:1 on the dark ground; this one is 6.5:1 on --bg and
+       5.8:1 on --surface (#69). The looks set their own --bad. */
+    --bad: #f87171;
     color-scheme: dark;
   }
 }
