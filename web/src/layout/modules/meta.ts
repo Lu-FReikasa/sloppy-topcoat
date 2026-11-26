@@ -64,6 +64,8 @@ export const MODULES: readonly ModuleMeta[] = [
   page("page.scheduling", "header.scheduling", "scheduling", { admin: true }),
   { id: "page.applications", titleKey: "applications.title", kind: "page", admin: true },
   { id: "page.task_kinds", titleKey: "taskKinds.title", kind: "page", admin: true },
+  // the registry of data plug-ins (D105): a tab of the applications
+  { id: "page.plugins", titleKey: "plugins.title", kind: "page", admin: true },
   page("page.releases", "header.releases", "releases", { admin: true }),
   page("page.params", "header.params", "params", { admin: true }),
   page("page.programs", "header.programs", "programs", { admin: true }),

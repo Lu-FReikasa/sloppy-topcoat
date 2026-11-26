@@ -4,6 +4,7 @@ import { UnauthorizedError, type ApiClient } from "../api/client";
 import { describeError, toActionError } from "../errors";
 import { formatDateTime, formatInt } from "../format";
 import { capabilityDescription } from "../i18n/shipped";
+import { oneLine } from "../summaries";
 import { capabilityStatus, inputTemplate, outputText, parseInput, toggleGrant } from "../tools";
 import type {
   GrantRow,
@@ -82,7 +83,9 @@ export function ToolsSection({ api, node }: Props) {
               {caps.offered.map((c) => (
                 <tr key={c.name}>
                   <td className="model-name">{c.name}</td>
-                  <td>{capabilityDescription(c, t)}</td>
+                  <td>
+                    <OneLine text={capabilityDescription(c, t)} />
+                  </td>
                   <td>{t(`tools.status.${capabilityStatus(c, caps.enabled, caps.usable)}`)}</td>
                 </tr>
               ))}
@@ -94,6 +97,18 @@ export function ToolsSection({ api, node }: Props) {
       <RecentCalls calls={calls} locale={i18n.language} />
       <Grants api={api} node={node} caps={caps} />
     </>
+  );
+}
+
+/** A description in one line; when that leaves something out, the line opens the whole text. */
+function OneLine({ text }: { text: string }) {
+  const { line, folded } = oneLine(text);
+  if (!folded) return <>{text}</>;
+  return (
+    <details className="one-line">
+      <summary>{line}</summary>
+      <p>{text}</p>
+    </details>
   );
 }
 

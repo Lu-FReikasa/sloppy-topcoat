@@ -12,7 +12,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from topcoat_hub import memory_scope
+from topcoat_hub import memory_scope, plugin_registry
 from topcoat_hub.auth import CurrentUser
 from topcoat_hub.ui.access import effective_agent, resolve_access
 from topcoat_hub.ui.store import TemplateStore
@@ -31,7 +31,9 @@ async def ceiling(db: AsyncSession, user: CurrentUser, application: str | None) 
     access = await resolve_access(db, user.uuid, user.role)
     if template is None or not access.workspace_visible(template):
         return dict(NOTHING)
-    scope = effective_agent(template.agent, access)["tool_scope"]
+    # the plug-in of the program may have narrowed its ceiling (D105), never widened it
+    agent = await plugin_registry.program_agent(db, template)
+    scope = effective_agent(agent, access)["tool_scope"]
     if scope is None:
         return {"nodes": None, "groups": None, "internet": None}
     return {

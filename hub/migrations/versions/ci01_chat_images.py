@@ -15,7 +15,7 @@ from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision: str = "ci01_chat_images"
-down_revision: str | None = "ib01_inbox_without_marks"
+down_revision: str | None = "pl01_plugin_registry"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

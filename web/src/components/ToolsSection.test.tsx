@@ -71,6 +71,29 @@ function setup(routes: Record<string, unknown> = {}) {
 }
 
 describe("ToolsSection", () => {
+  it("shows a long description in one line and folds the whole text behind it", async () => {
+    const inspect = {
+      name: "docker.inspect",
+      description: "Status details of one container",
+      read_only: true,
+      input_schema: {},
+    };
+    setup({ "GET /api/nodes/n1/capabilities": { ...caps, offered: [...caps.offered, inspect] } });
+    const table = await screen.findByRole("table");
+    const row = within(table)
+      .getAllByRole("row")
+      .find((r) => r.textContent?.includes("docker.inspect"))!;
+    const details = row.querySelector("details")!;
+    expect(details.open).toBe(false);
+    expect(details.querySelector("summary")?.textContent).toBe("Zustandsdetails eines Containers");
+    expect(details.textContent).toContain("Nie seine Umgebungsvariablen.");
+    // a short one stays plain text
+    const logs = within(table)
+      .getAllByRole("row")
+      .find((r) => r.textContent?.includes("docker.logs"))!;
+    expect(logs.querySelector("details")).toBeNull();
+  });
+
   it("lists the capabilities with their state for the user", async () => {
     setup();
     const table = await screen.findByRole("table");

@@ -39,6 +39,7 @@ import { BenchPanel } from "../../scheduling/BenchPanel";
 import { MeasurementsPanel } from "../../scheduling/MeasurementsPanel";
 import { ApplicationsPage } from "../../scheduling/ApplicationsPage";
 import { TaskKindsPage } from "../../scheduling/TaskKindsPage";
+import { PluginsPage } from "../../plugins/PluginsPage";
 import { ModelSwitchesPanel } from "../../scheduling/ModelSwitchesPanel";
 import { QualityPanel } from "../../scheduling/QualityPanel";
 import { PoolsPanel } from "../../scheduling/PoolsPanel";
@@ -202,6 +203,11 @@ export function renderModule(
               render: () => <TaskKindsPage api={api} />,
             },
             {
+              key: "plugins",
+              module: "page.plugins",
+              render: () => <PluginsPage api={api} />,
+            },
+            {
               key: "rights",
               module: "layout.workspaces",
               labelKey: "layout.tab.rights",
@@ -212,6 +218,8 @@ export function renderModule(
       );
     case "page.task_kinds":
       return <TaskKindsPage api={api} />;
+    case "page.plugins":
+      return <PluginsPage api={api} />;
     case "page.handovers":
       return (
         <HandoversPage
