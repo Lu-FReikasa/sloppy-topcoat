@@ -14,7 +14,7 @@ const READS: Record<string, readonly Field[]> = {
   "page.tasks": ["tick"],
   "page.library": ["tick"],
   "page.overview": ["nodes", "nodesLoaded", "nodesError", "isAdmin"],
-  "page.node": ["detail", "dispatch", "epoch"],
+  "page.node": ["dispatch"],
   "page.models": ["nodes", "nodesLoaded", "nodesError", "refreshNodes"],
   "page.model": ["nodes", "nodesLoaded", "nodesError", "refreshNodes"],
   "page.workshop": ["nodes"],
@@ -27,6 +27,7 @@ const READS: Record<string, readonly Field[]> = {
   "page.theme-workshop": [],
   "page.applications": [],
   "page.task_kinds": [],
+  "page.plugins": [],
   "page.chat": [],
   "page.chat.research": [],
   "page.chat.dev": [],
@@ -63,8 +64,6 @@ const ALL = Object.keys({
   refreshNodes: 0,
   tick: 0,
   inboxTick: 0,
-  epoch: 0,
-  detail: 0,
   dispatch: 0,
 } satisfies Record<Field, 0>) as Field[];
 

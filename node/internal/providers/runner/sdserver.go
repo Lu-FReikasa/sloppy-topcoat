@@ -91,6 +91,10 @@ type SDServer struct {
 	opts SDServerOptions
 	log  *slog.Logger
 
+	// loadMu runs one LoadImage at a time from the stop of the old server to the record of the
+	// new one: two loads at once would each start a server and the first would be left running
+	// unrecorded (an orphaned sd-server).
+	loadMu  sync.Mutex
 	mu      sync.Mutex
 	running *sdInstance
 }
@@ -206,6 +210,8 @@ func (s *SDServer) LoadImage(ctx context.Context, name string) (LoadedImageModel
 	if !found {
 		return LoadedImageModel{}, fmt.Errorf("%w: %s", ErrUnknownModel, name)
 	}
+	s.loadMu.Lock()
+	defer s.loadMu.Unlock()
 	s.mu.Lock()
 	if s.running != nil && s.running.lm.Name == name {
 		lm := s.running.lm
@@ -345,5 +351,5 @@ func (s *SDServer) Close(ctx context.Context) {
 
 var _ ImageRunner = (*SDServer)(nil)
 
-// ensure the image model dir exists so a person can drop files in (best effort)
+// EnsureDir creates the image model dir so a person can drop files in (best effort).
 func (s *SDServer) EnsureDir() { _ = os.MkdirAll(s.modelDir(), 0o750) }

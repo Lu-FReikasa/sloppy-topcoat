@@ -39,6 +39,13 @@ interface Props {
   tile?: TileInfo;
   /** The window is on its way out (closed or minimised): the theme's leaving plays. */
   closing?: boolean;
+  /** The nest layout: the program is drawn scaled down (smaller than its minimum size). Its content
+   *  takes no input then; a click on it zooms to where it has its full size (`onZoom`). */
+  scaled?: boolean;
+  /** The nest layout: the program lies outside the framed part (off the stage, still running). It
+   *  takes no input and no focus. */
+  unframed?: boolean;
+  onZoom?: () => void;
 }
 
 /** Where a tiled window stands (Desktop.tsx): written to the element for the drag handler. */
@@ -52,7 +59,7 @@ export interface TileInfo {
 }
 
 /** The handlers of one program's window, made once per program (Desktop.tsx). */
-export type WindowHandlers = Pick<Props, "onFocus" | "onView" | "onMinimise" | "onMaximise" | "onClose" | "onSettings"> & {
+export type WindowHandlers = Pick<Props, "onFocus" | "onView" | "onMinimise" | "onMaximise" | "onClose" | "onSettings" | "onZoom"> & {
   free: NonNullable<Props["free"]>;
 };
 
@@ -76,6 +83,9 @@ function ProgramWindowView({
   free,
   tile,
   closing = false,
+  scaled = false,
+  unframed = false,
+  onZoom,
 }: Props) {
   const { t } = useTranslation();
   const self = useRef<HTMLElement>(null);
@@ -110,7 +120,7 @@ function ProgramWindowView({
   return (
     <section
       ref={self}
-      className={`dt-program${focused ? " dt-focused" : ""}${maximised ? " dt-maxi" : ""}${closing ? " dt-closing" : ""}`}
+      className={`dt-program${focused ? " dt-focused" : ""}${maximised ? " dt-maxi" : ""}${closing ? " dt-closing" : ""}${scaled ? " dt-scaled" : ""}${unframed ? " dt-unframed" : ""}`}
       style={{
         ...style,
         ["--pg-hue" as string]: String(programHue(program.key)),
@@ -127,6 +137,14 @@ function ProgramWindowView({
       data-paper={programPaper(program.key)}
       onPointerDownCapture={focused ? undefined : onFocus}
       onFocusCapture={focused ? undefined : onFocus}
+      inert={unframed || undefined}
+      onClick={
+        scaled && onZoom
+          ? (e) => {
+              if (!(e.target as HTMLElement).closest("button")) onZoom();
+            }
+          : undefined
+      }
     >
       {chrome.titlebar === "top" && (
         <header
@@ -197,7 +215,7 @@ function ProgramWindowView({
         (tile ? (tile.split ? [tile.split === "v" ? ("e" as const) : ("s" as const)] : []) : GRIPS).map((g) => (
           <span key={g} className={`dt-grip dt-grip-${g}`} aria-hidden="true" onPointerDown={(e) => free.onGrab(e, g)} />
         ))}
-      <div className="dt-program-body">
+      <div className="dt-program-body" inert={scaled || undefined}>
         {views.length > 1 && (
           <nav className="dt-nav" aria-label={t("desktop.views", { program: title })}>
             {views.map((id) => (
@@ -245,7 +263,7 @@ const sameView = (a: ProgramView, b: ProgramView) =>
   a === b || (a.module === b.module && JSON.stringify(a.props) === JSON.stringify(b.props));
 
 // `--talk-share`: the room the window gives Clipper's folded-out talk (talkPlace.ts)
-const STYLE_KEYS = ["left", "top", "width", "height", "zIndex", "--talk-share"] as const;
+const STYLE_KEYS = ["left", "top", "width", "height", "zIndex", "--talk-share", "scale"] as const;
 
 /** Draws again only for what this window shows (redraw.ts); the handlers are stable per program
  *  (Desktop.tsx), so they are compared as they are. */
@@ -256,6 +274,9 @@ export function samePropsForWindow(a: Props, b: Props): boolean {
     a.focused === b.focused &&
     a.maximised === b.maximised &&
     !!a.closing === !!b.closing &&
+    !!a.scaled === !!b.scaled &&
+    !!a.unframed === !!b.unframed &&
+    a.onZoom === b.onZoom &&
     a.modules === b.modules &&
     a.chrome === b.chrome &&
     STYLE_KEYS.every((k) => (a.style as Record<string, unknown>)[k] === (b.style as Record<string, unknown>)[k]) &&

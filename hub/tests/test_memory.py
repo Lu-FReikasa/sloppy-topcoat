@@ -1,6 +1,7 @@
 """Memory (E2-02, D19): extraction after a turn, recall into the prompt, merge, versions with
 reasons, undo, secret filter, idle consolidation with a fake model."""
 
+import asyncio
 import json
 import re
 import uuid
@@ -29,6 +30,28 @@ def note(text: str, **kw: Any) -> dict[str, Any]:
     return {"text": text, "confidence": 0.9, "inferred": False, "secret": False, **kw}
 
 
+_RESIDENCE = re.compile(r"^(?:\d+\. )?(?:Lebt|Wohnt|lebt|wohnt) in (\w+)", re.MULTILINE)
+
+
+def with_contradicts(notes: list[dict[str, Any]], prompt: str) -> list[dict[str, Any]]:
+    """What the extraction prompt asks of the model (D124: no slots in the hub): a new note about
+    where the user lives names the listed existing notes that say another place
+    (``contradicts``). A note that names its own numbers keeps them."""
+    listed = prompt.split("User message:", 1)[0]
+    existing = {
+        int(m.group(1)): m.group(2)
+        for m in re.finditer(r"^(\d+)\. (?:Lebt|Wohnt|lebt|wohnt) in (\w+)", listed, re.MULTILINE)
+    }
+    out = []
+    for n in notes:
+        place = _RESIDENCE.match(n.get("text", ""))
+        if place and "contradicts" not in n:
+            others = [k for k, v in existing.items() if v != place.group(1)]
+            n = {**n, "contradicts": others} if others else n
+        out.append(n)
+    return out
+
+
 def model(
     extraction: dict[str, list[dict[str, Any]]] | None = None,
     consolidation: Callable[[dict[str, int]], dict[str, Any]] | None = None,
@@ -44,7 +67,7 @@ def model(
             message = _user_part(user)  # not the "Existing notes" before it, not the reply
             for keyword, notes in (extraction or {}).items():
                 if keyword in message:
-                    return json.dumps({"memories": notes})
+                    return json.dumps({"memories": with_contradicts(notes, user)})
             return json.dumps({"memories": []})
         if system.startswith(CONSOLIDATION_PREFIX) and consolidation:
             numbers = {
@@ -70,15 +93,21 @@ def chat_once(client: TestClient, text: str, conv: str | None = None) -> list[An
 
 
 def run_consolidation(client: TestClient) -> dict[str, Any]:
+    """Start a consolidation run and return it once it has finished. The run starts in the
+    background after the 202: wait for *this* run, never the one before it, and return the row
+    that was seen finished (a second look could find the next run still running, #118)."""
+    before = {r["id"] for r in client.get("/api/memory", headers=AUTH).json()["runs"]}
     r = client.post("/api/memory/consolidate", headers=AUTH)
     assert r.status_code == 202, r.text
+    seen: list[dict[str, Any]] = []
 
     def finished() -> None:
-        body = client.get("/api/memory", headers=AUTH).json()
-        assert not body["running"] and body["runs"] and body["runs"][0]["status"] != "running"
+        runs = client.get("/api/memory", headers=AUTH).json()["runs"]
+        assert runs and runs[0]["id"] not in before and runs[0]["status"] != "running"
+        seen.append(runs[0])
 
     eventually(finished)
-    return client.get("/api/memory", headers=AUTH).json()["runs"][0]
+    return seen[-1]
 
 
 def setup_node(client: TestClient, connect: Any, **kw: Any) -> FakeNode:
@@ -295,9 +324,13 @@ def test_a_disputed_note_is_marked_in_the_prompt_and_unrelated_chat_recalls_noth
 # --- edit, undo, revert, delete ----------------------------------------------------------------
 
 
-def _remember(client: TestClient, node: FakeNode, text: str, trigger: str) -> dict[str, Any]:
+def _remember(
+    client: TestClient, node: FakeNode, text: str, trigger: str, message: str | None = None
+) -> dict[str, Any]:
+    """Remember ``text``. A ``message`` about the person (``Ich wohne in …``) recalls their notes,
+    so the model sees the ones it may contradict; the default message recalls nothing."""
     node.answer_fn = model({trigger: [note(text)]})
-    chat_once(client, f"{trigger} steht hier, das ist eine Information für dich.")
+    chat_once(client, message or f"{trigger} steht hier, das ist eine Information für dich.")
     return next(i for i in memory_items(client) if i["text"] == text)
 
 
@@ -417,11 +450,11 @@ def test_search_and_filters(client: TestClient, connect) -> None:
 def test_two_conflicting_statements_become_a_disputed_pair_with_one_question(
     client: TestClient, connect
 ) -> None:
-    """Where the user lives has one value: a second, plain statement is not decided — both
-    notes are marked at once and the user gets ONE question (D19 extended)."""
+    """A second, plain statement that the model says contradicts a note is not decided (without
+    the hub's own settling) — both notes are marked at once and the user gets ONE question."""
     node = setup_node(client, connect)
-    berlin = _remember(client, node, "Wohnt in Berlin", "Berlin")
-    hamburg = _remember(client, node, "Wohnt in Hamburg", "Hamburg")
+    berlin = _remember(client, node, "Wohnt in Berlin", "Berlin", "Ich wohne in Berlin.")
+    hamburg = _remember(client, node, "Wohnt in Hamburg", "Hamburg", "Ich wohne in Hamburg.")
     assert berlin["status"] == "active" and hamburg["status"] == "disputed"  # listed before
     notes = _states(client)
     b, h = notes["Wohnt in Berlin"], notes["Wohnt in Hamburg"]
@@ -432,7 +465,7 @@ def test_two_conflicting_statements_become_a_disputed_pair_with_one_question(
     assert history[1]["reason"] == "remembered from conversation"  # nothing was lost
 
     [question] = client.get("/api/memory/questions", headers=AUTH).json()
-    assert question["topic"] == "residence" and question["origin"] == "chat"
+    assert question["topic"] == "" and question["origin"] == "chat"  # no slots (D124)
     assert [c["text"] for c in question["candidates"]] == ["Wohnt in Berlin", "Wohnt in Hamburg"]
 
     # A tidy-up run looks at it again, finds no evidence that settles it and keeps the one
@@ -512,8 +545,8 @@ def test_reverting_a_disputed_note_ends_the_dispute_for_its_partner(
     client: TestClient, connect
 ) -> None:
     node = setup_node(client, connect)
-    _remember(client, node, "Wohnt in Berlin", "Berlin")
-    _remember(client, node, "Wohnt in Hamburg", "Hamburg")
+    _remember(client, node, "Wohnt in Berlin", "Berlin", "Ich wohne in Berlin.")
+    _remember(client, node, "Wohnt in Hamburg", "Hamburg", "Ich wohne in Hamburg.")
     items = {i["text"]: i for i in memory_items(client)}
     r = client.post(
         f"/api/memory/{items['Wohnt in Berlin']['id']}/revert", headers=AUTH, json={"version": 1}
@@ -647,6 +680,26 @@ def test_the_scheduler_only_runs_when_idle(client: TestClient, connect) -> None:
     assert tick() == 1
     assert client.get("/api/memory", headers=AUTH).json()["runs"][0]["trigger"] == "scheduled"
     assert tick() == 0  # nothing left to check
+
+
+def test_the_consolidation_helper_returns_its_own_run_even_when_it_starts_late(
+    client: TestClient, connect: Any, monkeypatch: Any
+) -> None:
+    """#118: the run starts in the background after the 202; the helper must not hand back the
+    run before it (or the next one, still running and without stats)."""
+    setup_node(client, connect)
+    first = run_consolidation(client)
+    memory = client.app.state.memory
+    consolidate = memory.consolidate
+
+    async def late(user_id: uuid.UUID, trigger: str) -> Any:
+        await asyncio.sleep(0.5)
+        return await consolidate(user_id, trigger)
+
+    monkeypatch.setattr(memory, "consolidate", late)
+    second = run_consolidation(client)
+    assert second["id"] != first["id"] and second["status"] != "running"
+    assert "resolved" in second["stats"]
 
 
 def test_switching_the_embedder_re_embeds_the_old_notes_during_consolidation(
@@ -824,9 +877,11 @@ def test_a_correction_that_copies_another_notes_fact_is_a_conflict(
 
 
 def test_a_restated_fact_is_a_confirmation_not_a_second_note(client: TestClient, connect) -> None:
+    """The same note again confirms it. (Another wording of it is no longer matched by slot
+    words, D124: the consolidation merges such duplicates.)"""
     node = setup_node(client, connect)
     _remember(client, node, "Hund heißt Bello", "Bello")
-    node.answer_fn = model({"Rufname": [note("Mein Hund heißt Bello")]})
+    node.answer_fn = model({"Rufname": [note("Hund heißt Bello")]})
     events = chat_once(client, "Der Rufname meines Hundes ist Bello, wie gesagt.")
     assert events[-1][1]["remembered"] == [] and events[-1][1]["confirmed"]
     [only] = memory_items(client)
@@ -942,24 +997,24 @@ def test_a_plain_contradiction_is_disputed_at_once_with_one_question(
 def test_a_statement_that_says_it_replaces_a_note_corrects_it_at_once(
     client: TestClient, connect
 ) -> None:
+    """D124: the person's latest statement wins over their earlier one (the hub settles it, as
+    live by default); no cue word is needed and none is read."""
+    client.app.state.settings.memory_auto_settle = True
     node = setup_node(client, connect)
     hamburg = _remember(client, node, "Wohnt in Hamburg", "Hamburg")
     node.answer_fn = extraction_seeing_existing("Berlin", "Wohnt in Berlin", "Wohnt in Hamburg")
-    events = chat_once(client, "Ich wohne jetzt in Berlin, ich bin umgezogen.")
-    mem = events[-1][1]
-    [fix] = mem["corrected"]
-    assert fix["text"] == "Wohnt in Berlin"
-    assert fix["replaced"] == [{"id": hamburg["id"], "text": "Wohnt in Hamburg"}]
-    assert mem["remembered"] == [] and mem["questions"] == 0
+    events = chat_once(client, "Ich wohne in Berlin.")
+    assert events[-1][1]["questions"] == 0
     assert [i["text"] for i in memory_items(client, status="active")] == ["Wohnt in Berlin"]
     [gone] = memory_items(client, status="superseded")
     assert gone["text"] == "Wohnt in Hamburg"
     old = client.get(f"/api/memory/{hamburg['id']}", headers=AUTH).json()
-    assert old["versions"][0]["actor"] == "chat" and old["versions"][0]["source"]
-
-    # Undo brings the replaced note back and removes the correcting one.
-    assert client.post(f"/api/memory/{fix['id']}/undo", headers=AUTH).status_code == 200
-    assert [i["text"] for i in memory_items(client, status="active")] == ["Wohnt in Hamburg"]
+    assert (
+        old["versions"][0]["actor"] == "chat" and "the latest word" in old["versions"][0]["reason"]
+    )
+    # the decision is a version: reverting it brings the old note back
+    r = client.post(f"/api/memory/{hamburg['id']}/revert", headers=AUTH, json={"version": 1})
+    assert r.status_code == 200 and r.json()["status"] == "active"
 
 
 def test_a_claimed_contradiction_between_paraphrases_or_unknown_numbers_is_ignored(
@@ -1180,21 +1235,28 @@ def test_without_a_trustworthy_answer_the_old_question_stays(client: TestClient,
     assert asked["question"] is None and len(asked["candidates"]) == 2
 
 
-def test_a_wording_difference_never_overrides_notes_that_clash_by_their_kind(
+def test_a_same_verdict_never_merges_notes_that_name_other_numbers(
     client: TestClient, connect
 ) -> None:
+    """D124: no slot decides any more what cannot both be true; the model's verdict stands, but a
+    note whose numbers the kept one lacks is never merged away (live 2026-11-21: agent limits
+    10 000 / 16 384)."""
     node = setup_node(client, connect)
-    _remember(client, node, "Lebt in Hamburg", "Hamburg")
-    _remember(client, node, "Lebt in Berlin", "Berlin")
+    _remember(client, node, "Das Agent-Limit ist 10000 Tokens", "Limit")
+    _remember(client, node, "Das Agent-Limit ist 16384 Tokens", "Grenze")
     node.answer_fn = with_compare(
         model(
             consolidation=lambda n: {
                 "conflict": [
-                    {"a": n["Lebt in Hamburg"], "b": n["Lebt in Berlin"], "reason": "homes"}
+                    {
+                        "a": n["Das Agent-Limit ist 10000 Tokens"],
+                        "b": n["Das Agent-Limit ist 16384 Tokens"],
+                        "reason": "limits",
+                    }
                 ]
             }
         ),
-        {"relation": "same", "keep": 2},  # a model that wrongly calls two homes the same
+        {"relation": "same", "keep": 2},  # a model that wrongly calls two limits the same
     )
     run_consolidation(client)
     assert {i["status"] for i in memory_items(client)} == {"disputed"}

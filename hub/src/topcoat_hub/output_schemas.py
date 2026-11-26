@@ -18,7 +18,7 @@ from typing import Any
 
 from topcoat_hub.config import REPO_ROOT
 
-NAMES = ("plan_v2", "verdict", "check", "investigate", "area")
+NAMES = ("plan_v2", "verdict", "check", "investigate", "area", "decompose")
 # the image sets TOPCOAT_PROTO_ROOT; main.py sets the configured root again
 _PROTO: list[Path] = [Path(os.environ.get("TOPCOAT_PROTO_ROOT") or REPO_ROOT / "proto")]
 

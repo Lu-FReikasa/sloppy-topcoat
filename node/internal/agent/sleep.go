@@ -90,7 +90,10 @@ func (a *Agent) sleepCheck() time.Duration {
 }
 
 // sleepLoop puts the machine to sleep after config.power.sleep_after_idle_seconds of idleness:
-// nothing loaded, no work, and nobody at the machine for that long.
+// no model used, no work, and nobody at the machine for that long. A loaded model does not keep
+// the machine awake by itself (plan step 1.7): a house model is a resident and stays loaded
+// for good, so "nothing loaded" never came. Models are unloaded before the sleep and the
+// residents load again after the wake.
 func (a *Agent) sleepLoop(ctx context.Context) {
 	var idleSince time.Time
 	for {
@@ -109,13 +112,20 @@ func (a *Agent) sleepLoop(ctx context.Context) {
 			continue
 		}
 		after := cfg.EffectivePower().SleepAfterIdle
-		if after <= 0 || !a.isIdle(cfg) || a.busyReason() != "" || a.userIsHere(ctx, cfg, after) {
+		lastUse, quiet := a.quietSince(ctx)
+		if after <= 0 || !quiet || a.busyReason() != "" || a.userIsHere(ctx, cfg, after) {
 			idleSince = time.Time{}
 			continue
 		}
 		now := a.opts.Now()
 		if idleSince.IsZero() {
 			idleSince = now
+			if !lastUse.IsZero() && lastUse.Before(now) {
+				idleSince = lastUse // a model unused for a while: count from its last use
+			}
+		}
+		if lastUse.After(idleSince) {
+			idleSince = lastUse // used again meanwhile: the idle time starts anew
 		}
 		if now.Sub(idleSince) < after {
 			continue
@@ -125,6 +135,37 @@ func (a *Agent) sleepLoop(ctx context.Context) {
 		a.sleepNow(ctx, 2*time.Second)
 		idleSince = time.Time{} // after waking up the clock starts again
 	}
+}
+
+// quietSince reports whether the node may count as idle for sleeping (not paused, nothing loading,
+// no benchmark) and the last use of a loaded model (zero: nothing loaded).
+func (a *Agent) quietSince(ctx context.Context) (time.Time, bool) {
+	if a.isPaused() || a.selfActivity() {
+		return time.Time{}, false
+	}
+	_, _, r := a.config()
+	if r == nil {
+		return time.Time{}, false
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	loaded, err := r.Loaded(ctx)
+	if err != nil {
+		return time.Time{}, false
+	}
+	var last time.Time
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for _, l := range loaded {
+		used, ok := a.lastUsed[l.Name]
+		if !ok {
+			used = a.opts.Now() // not seen by the idle watcher yet: counts as just used
+		}
+		if used.After(last) {
+			last = used
+		}
+	}
+	return last, true
 }
 
 // userIsHere is true when keyboard or mouse input is younger than d (an unknown input counts as

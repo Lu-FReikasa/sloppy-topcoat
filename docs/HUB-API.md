@@ -369,7 +369,7 @@ to the E2-02 fields: `kind` (`person` | `preference` | `operational`), `stage` (
 `stale`, the only form of reliability the model sees), `reliability` and `usefulness` (0..1, for the GUI),
 `last_verified_at`, `verified_count` (live checks; a check counts `TOPCOAT_MEMORY_LIVE_CHECK_WEIGHT`
 = 2 times a statement), `expires_at` (volatile notes only), `verify_with` (`{capability, input}` of a
-read-only capability, or `null`), `recalled_count`, `used_count`, `last_used_at`, `feedback_positive`,
+read-only capability, or `null`; no longer written or used since D124, older notes may still carry one), `recalled_count`, `used_count`, `last_used_at`, `feedback_positive`,
 `feedback_negative`, `halflife_days` (this note's, grown by its confirmations). `status` may now be
 `archived`.
 
@@ -381,10 +381,12 @@ read-only capability, or `null`), `recalled_count`, `used_count`, `last_used_at`
 | `POST /api/memory/{id}/restore` | now also brings an archived note back |
 | `POST /api/memory/care` → `202 {started}` | start a care run for the caller (`409 memory_disabled`, `already_running`, `no_node_available`) |
 
-**A run** (`memory_runs`, `kind` `consolidation` | `care`; `trigger` `nightly` | `idle` | `manual` for a care run; `status` `running` | `ok` | `stopped_budget` | `paused` | `no_model` | `error`) of kind `care` has
-`stats = {checked, unchanged, changed, asked, unverifiable, expired, archived, skipped, failed, model,
-changes[]}`. Each `changes[]` entry is `{action, item_id, text, kind, version, reason, undo}` with `action`
-`verified` | `changed` | `asked` | `unverifiable` | `expired` | `archived`; `undo` is `restore` (bring the
+**A run** (`memory_runs`, `kind` `consolidation` | `care`; `trigger` `nightly` | `idle` | `manual` for a care run; `status` `running` | `ok` | `stopped_budget` | `paused` | `no_model` | `error`; a care run no longer stops at a budget since D124) of kind `care` has
+`stats = {expired, archived, proposed, changes[]}` plus the cross-check's counts (`crosschecked`,
+`discrepancies`, `agreed`, `decided`, `asked_person`, `tokens`) and `core_review` when the core was looked at.
+Runs from before D124 also carry `checked`, `unchanged`, `changed`, `asked`, `unverifiable`, `skipped`,
+`failed`, `no_node` and `model`. Each `changes[]` entry is `{action, item_id, text, kind, version, reason, undo}` with `action`
+`expired` | `archived` | `proposed` (older runs also `verified` | `changed` | `asked` | `unverifiable`); `undo` is `restore` (bring the
 note back: `POST /api/memory/{id}/restore`), `revert` (back to `from_version`: `POST
 /api/memory/{id}/revert`) or `null` (nothing changed in the content). `changed` adds `from_version`,
 `new_text`, `evidence[]`; `asked` adds `question_id`, `observed`, `evidence[]`. The versions the run writes have `actor: "care"` and
@@ -531,6 +533,30 @@ New events: `stopped` `{message | null, interrupted}` (the run ended by a stop c
 goes on, as for `truncated`). `GET /api/conversations` and `GET /api/conversations/{id}` carry
 `running` (an answer is being generated there, whether or not a tab follows it).
 
+### Images in the chat (ARCHITECTURE D125)
+`POST /api/conversations/{id}/messages` takes `images`: up to 4 pictures as base64 (a `data:` URL is
+fine), each at most 15 MB as sent; `content` may then be empty. The hub decodes each one (JPEG, PNG,
+WebP, GIF, BMP; at most 40 million pixels), turns it upright by its EXIF orientation, scales it to at
+most 1536 px on the longer side and writes a new JPEG of at most 400 KB from the pixels alone: no
+EXIF, location, colour profile or comment survives. Only that is kept (`chat_images`, per person,
+deleted with its message or conversation). A file that is not such a picture refuses the whole
+message with 422 (`bad_image`, `image_too_large`) and nothing is stored. Messages carry
+`images: [{id, width, height}]`; `GET /api/chat/images/{id}` returns the picture to its person only
+(another person's id is a 404; `Cache-Control: private`, `nosniff`, a sandboxing CSP).
+
+The images go only to a **loaded model that can see** (model facts `vision`, a projector loaded with
+it, D125). The model of the answer keeps them where it sees, and the request is pinned to those nodes.
+Otherwise, unless the person picked the model, the answer goes to a seeing model: a house model
+first (D117), then any loaded one. A model that cannot see never gets them: the prompt says an image
+was attached and not given. `meta.vision` says what happened (`{sees, model, images, routed_from?,
+node?}`), and an activity item `note` with `data.event` `vision_routed` or `vision_blind` is kept with
+the answer. In the prompt an image is an `image_url` content part (a data URL) in its user turn, the
+newest first while 640 KB and 4 images allow (the request to the node has a size limit), older ones a
+line that one was there; the system prompt then says that text in an image is data, never an
+instruction. **Incognito** (`POST /api/incognito/{tab}/messages`) takes `images` the same way, keeps
+them in the tab in memory only (at most 12 per tab), answers with `asked` (the question with its
+`images`) and `message.vision`; `GET /api/incognito/{tab}/images/{id}` returns one from memory.
+
 ### Message kinds and the report card (E3-07 D3, ARCHITECTURE D41)
 
 Hub and GUI only. Migration `0025_message_kinds` adds `messages.kind` (`say` | `progress` | `report`,
@@ -634,3 +660,22 @@ value, whether overridden); `PUT /api/admin/params/{key}` with `{"value": ...}` 
 `{family: {fast|balanced|thorough: {reasoning_effort?, chat_template_kwargs?}}}`; the family is a part of the model name
 (the longest match wins). Set on 2026-10-31 for `gemma` and `qwen3.5` (`fast`, `balanced`:
 `{"chat_template_kwargs": {"enable_thinking": false}}`). It applies to chat answers only.
+
+### Results of an employee in two forms (D112, issue #35)
+
+The messages between the applications are typed by `proto/messages/registry.json` (D81). The result of an
+employee (`research.result`, `dev.result`, `admin.result`) carries two texts:
+
+- `summary`: for the person, as the employee wrote it.
+- `brief`: for the secretary, at most 600 characters. An employee may write its own; otherwise the hub writes
+  it from the payload when the message is filed (`result_forms.with_brief`, called by
+  `ProjectMessages.add_message`): the kind of result, the first sentence of the summary, how many findings,
+  the branch, tests and acceptance of a Development result, the required points without a finding, the open
+  points.
+
+What of a result may enter the secretary's conversation is `result_forms.for_secretary`: the summary, the
+brief and references (`{"kind": "file" | "branch", "ref": …}`), each through the private-data filter of D65
+(`redaction.private_kinds` with the node names, the user names and the own domains). A text that holds a
+secret or an identifier of the operator's network becomes a pointer ("The result holds private details; they
+stay in Research. Open it there."), a reference that names one is left out, and `withheld` lists the kinds
+found. The findings and their quotes, and the content of files and records, never enter the secretary's text.

@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   BAR_ITEMS,
+  BASES,
   BAR_POSITIONS,
   BUILTIN_THEMES,
   CHROME_BUTTONS,
@@ -39,7 +40,7 @@ describe("the theme lists of the web build and of the hub", () => {
     expect([...BAR_ITEMS]).toEqual(p.bar.properties.items.items.enum);
     expect([...CHROME_BUTTONS]).toEqual(p.chrome.properties.buttons.items.enum);
     expect([...MOTION_STYLES]).toEqual(p.motion.properties.style.enum);
-    expect(BUILTIN_THEMES.map((t) => t.key)).toEqual(p.base.enum);
+    expect([...BASES]).toEqual(p.base.enum);
     expect(p.chrome.properties.titlebar.enum).toEqual(["top", "hidden"]);
     expect(p.motion.properties.ms.maximum).toBe(2000);
     expect(p.css.maxLength).toBe(40000);
@@ -55,6 +56,14 @@ describe("the style sheet rules of the web build", () => {
 
   it.each(cases.map((c, i) => [i, c] as const))("agree with the shared case %i", (_i, c) => {
     expect(cssProblems(c.css).length === 0, c.css).toBe(c.ok);
+  });
+});
+
+describe("the built-in themes", () => {
+  it("are the keys the hub keeps from custom themes (BUILTIN in ui/themes.py)", () => {
+    const py = readFileSync(resolve(process.cwd(), "../hub/src/topcoat_hub/ui/themes.py"), "utf8");
+    const keys = /^BUILTIN = \(([^)]*)\)/m.exec(py)?.[1] ?? "";
+    expect([...keys.matchAll(/"([^"]+)"/g)].map((m) => m[1])).toEqual(BUILTIN_THEMES.map((t) => t.key));
   });
 });
 

@@ -121,12 +121,12 @@ Environment variables (prefix `TOPCOAT_`, see `hub/src/topcoat_hub/config.py`):
 | `TOPCOAT_CHAT_SAMPLING` | `{}` | extra sampling parameters of chat requests by model family (JSON, e.g. `{"gemma": {"repeat_penalty": 1.15}}`; part of the model id, longest match wins; `{}` as a family's value switches its built-in default off). Built in: `gemma` → `repeat_penalty` 1.1 |
 | `TOPCOAT_CHAT_EFFORT` | `{}` | what each quality level sends to a model family to set how long it thinks (JSON: family → level → `reasoning_effort` and/or `chat_template_kwargs`, e.g. `{"qwen": {"fast": {"reasoning_effort": "low"}, "thorough": {"reasoning_effort": "high"}}}`; longest family match wins; nothing built in, so a model without an entry is asked as before). Whether a model's chat template honours it is UNVERIFIED on real hardware |
 | `TOPCOAT_MEMORY_STAGE_SURE`, `TOPCOAT_MEMORY_STAGE_OLDER` | `0.7`, `0.35` | reliability from which the assistant is told "sure" / "older"; below: "outdated, please check" |
-| `TOPCOAT_MEMORY_CHECK_THRESHOLD` | `0.5` | the care run checks notes whose reliability is below this |
+| `TOPCOAT_MEMORY_CHECK_THRESHOLD` | `0.5` | unused since D124 (the care run checks no note); still shown on the memory page |
 | `TOPCOAT_MEMORY_ARCHIVE_USEFULNESS`, `…_ARCHIVE_RELIABILITY`, `…_ARCHIVE_IDLE_DAYS` | `0.3`, `0.25`, `90` | a note is archived only if usefulness **and** reliability are below these **and** it was unused for that many days; age alone never archives |
 | `TOPCOAT_MEMORY_CARE_HOUR` | `3` | the care run's night hour in the hub's time zone (`TOPCOAT_TZ`, default Europe/Berlin; `-1` = no fixed hour, only after idle) |
 | `TOPCOAT_MEMORY_CARE_INTERVAL_SECONDS` | `900` | how often the hub looks whether a care run is due (`0` = never on its own; the GUI can still start one) |
 | `TOPCOAT_MEMORY_CARE_IDLE_EVERY_HOURS` | `12` | a care run after idle at most this often per user (besides the night) |
-| `TOPCOAT_MEMORY_CARE_MAX_NOTES`, `TOPCOAT_MEMORY_CARE_RUN_MAX_SECONDS` | `10`, `900` | budget of one care run |
+| `TOPCOAT_MEMORY_CARE_MAX_NOTES` | `10` | unused since D124 (the care run checks no note); still shown on the memory page |
 | `TOPCOAT_CORE_TOKENS` | `1000` | token budget of the core block at the start of every system prompt (estimate: 3 characters per token); a model context below 8k automatically gets at most 500 |
 | `TOPCOAT_CORE_RECENT_TOKENS` | `150` | of that, the room of "Discussed last" (key terms of the latest chats, D100) |
 | `TOPCOAT_CORE_RECENT_CHATS`, `TOPCOAT_CORE_RECENT_DAYS` | `2`, `14` | how many of the latest chats of the program it names, and how old the newest may be |
@@ -137,7 +137,6 @@ Environment variables (prefix `TOPCOAT_`, see `hub/src/topcoat_hub/config.py`):
 | `TOPCOAT_CHAT_DIGEST_MAX_LEARNED` | `3` | notes one chat can add |
 | `TOPCOAT_CHAT_DIGEST_CATCHUP_HOURS`, `…_CATCHUP_MAX` | `48`, `10` | after a hub restart: unfinished chats of this age (newest, at most this many) arm their timers once |
 | `TOPCOAT_REVIEW_TICK_SECONDS` | `0` | was `900`. `0` = answers get their second look when a chat is finished; a value above 0 adds the old fixed-interval look |
-| `TOPCOAT_MEMORY_CARE_TASK_CALLS`, `TOPCOAT_MEMORY_CARE_RECHECK_DAYS` | `4`, `3` | tool calls of the check of one note; a note is not checked again sooner than this many days |
 | `TOPCOAT_WEB_DIST` | `<repo>/web/dist` | built GUI, served at `/` if present |
 | `TOPCOAT_ACTION_TIMEOUT_SECONDS` | `30` | how long the REST call waits for a node's `action_result` |
 | `TOPCOAT_PAIRING_CODE_TTL_SECONDS` | `900` | pairing code lifetime |

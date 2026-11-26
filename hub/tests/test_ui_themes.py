@@ -57,6 +57,8 @@ def test_a_theme_is_checked_against_the_schema() -> None:
     ):
         assert part in text, part
     assert any("built-in" in p for p in themes.theme_problems({**WALL, "key": "terminal"}))
+    # Terminal Nest (#16) is a built-in theme: its key is not free for a custom one
+    assert any("built-in" in p for p in themes.theme_problems({**WALL, "key": "terminal-nest"}))
     assert any("@import" in p for p in themes.theme_problems({**WALL, "css": "@import 'x';"}))
 
 
@@ -78,6 +80,29 @@ def test_an_admin_makes_changes_and_deletes_a_theme_and_everybody_sees_it(
     assert client.delete("/api/ui/themes/wall", headers=AUTH).status_code == 204
     assert client.delete("/api/ui/themes/wall", headers=AUTH).status_code == 404
     assert client.get("/api/ui/themes", headers=AUTH).json() == []
+
+
+def test_a_nest_theme_can_be_created_and_saved(client: TestClient) -> None:
+    """The zooming layout of nested splits (#12) is a layout kind like the others: checked, stored
+    and offered; its classes are known to the style sheet check."""
+    nest = {
+        **WALL,
+        "key": "burrow",
+        "layout": {"kind": "nest"},
+        "motion": {"style": "zoom", "ms": 140},
+        "css": ".dt-program.dt-scaled { opacity: 0.9; }\n.dt-unframed { filter: blur(1px); }",
+    }
+    assert themes.theme_problems(nest) == []
+    assert themes.theme_lint(nest) == []
+    check = client.post("/api/ui/themes/check", headers=AUTH, json=nest)
+    assert check.status_code == 200 and check.json()["problems"] == []
+    r = client.put("/api/ui/themes/burrow", headers=AUTH, json=nest)
+    assert r.status_code == 201 and r.json()["layout"] == {"kind": "nest"}
+    boot = client.get("/api/ui/bootstrap", headers=AUTH).json()
+    assert [t["layout"]["kind"] for t in boot["themes"]] == ["nest"]
+    # a kind the desktop does not know is still refused
+    wrong = themes.theme_problems({**nest, "layout": {"kind": "nests"}})
+    assert any("layout.kind" in p for p in wrong)
 
 
 def test_a_bad_theme_is_refused_with_its_problems(client: TestClient) -> None:
