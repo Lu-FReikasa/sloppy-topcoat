@@ -11,11 +11,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -314,11 +314,21 @@ func demux(b []byte) string {
 	return out.String()
 }
 
-// openUp lets an unprivileged user write in the copy of the worktree.
+// openUp lets an unprivileged user write in the copy of the worktree. It works inside an os.Root,
+// so no path can lead out of dir, and leaves symbolic links alone (copyWorktree copies none; a
+// chmod through one would change its target).
 func openUp(dir string) error {
-	return filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	return fs.WalkDir(root.FS(), ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if d.Type()&fs.ModeSymlink != 0 {
+			return nil
 		}
 		mode := os.FileMode(0o666)
 		if d.IsDir() {
@@ -326,6 +336,6 @@ func openUp(dir string) error {
 		} else if info, err := d.Info(); err == nil && info.Mode()&0o111 != 0 {
 			mode = 0o777
 		}
-		return os.Chmod(p, mode)
+		return root.Chmod(p, mode)
 	})
 }

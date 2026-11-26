@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
 import type { StreamStatus } from "../api/sse";
@@ -6,7 +6,7 @@ import { APPLICATIONS } from "../chat/applications";
 import { LanguageSwitch } from "../components/LanguageSwitch";
 import { CommandPalette, type PaletteEntry } from "../desktop/CommandPalette";
 import { navViews, programInfo, programTitle, viewTitle } from "../desktop/programs";
-import { programFor, viewFor, type ProgramView } from "../desktop/state";
+import { programFor, startKey, viewFor, type ProgramView } from "../desktop/state";
 import { allThemes, resolveTheme, safeCss } from "../desktop/theme";
 import type { Language } from "../i18n";
 import { PersonaPrompt } from "../instructions/PersonaPrompt";
@@ -19,6 +19,7 @@ import { workspaceHref } from "../route";
 import { LookContext, type LookControls } from "../settings/lookContext";
 import { SETTINGS } from "../settings/registry";
 import { setShellChoice } from "./shell";
+import { ShellFailure, ShellLoading } from "../components/ShellPage";
 
 interface Props {
   api: ApiClient;
@@ -47,6 +48,11 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
   const [sideOpen, setSideOpen] = useState(false);
   const [intentTick, setIntentTick] = useState(0);
   const [unread, setUnread] = useState<{ n: number; urgent: boolean }>({ n: 0, urgent: false });
+  // the address that opened the view was not known: a note above it, until the person moves on
+  const [moved, setMoved] = useState(false);
+  const burgerRef = useRef<HTMLButtonElement>(null);
+  const meRef = useRef<HTMLDivElement>(null);
+  const meButtonRef = useRef<HTMLButtonElement>(null);
 
   const programs = ui.workspaces;
   const offered = ui.boot?.modules;
@@ -64,14 +70,15 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
         ? routeKey
         : (ui.prefs?.desktop?.focus && programs.some((p) => p.key === ui.prefs?.desktop?.focus)
             ? ui.prefs.desktop.focus
-            : (programs[0]?.key ?? null));
+            : startKey(programs));
   const shownInfo = infos.find((p) => p.key === shownKey);
   const view: ProgramView | null = shownKey
     ? (views[shownKey] ?? (shownInfo ? { module: shownInfo.first, props: {} } : null))
     : null;
 
-  const open = useCallback((key: string, v?: ProgramView) => {
+  const open = useCallback((key: string, v?: ProgramView, note = false) => {
     setCurrent(key);
+    setMoved(note);
     if (v) setViews((all) => ({ ...all, [key]: v }));
     setSideOpen(false);
   }, []);
@@ -94,6 +101,7 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
     return () => window.removeEventListener(INTENT_EVENT, onIntent);
   }, []);
   const ready = ui.status === "ready";
+  const opening = useRef(false);
   useEffect(() => {
     if (!ready) return;
     const intent = takeIntent();
@@ -110,7 +118,15 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
       key = direct ?? programFor(infos, v.module, shownKey);
     }
     // shown after this render, as the desktop's preferences arrive after it
-    if (key) queueMicrotask(() => open(key, v));
+    const note = intent.moved === true;
+    if (!key) return;
+    opening.current = true;
+    queueMicrotask(() => {
+      opening.current = false;
+      open(key, v, note);
+      // the address names the program it opens in (the effect below left it alone meanwhile)
+      if (window.location.hash !== workspaceHref(key)) window.location.replace(workspaceHref(key));
+    });
     // only a new intent opens something
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, intentTick, infos, routeKey]);
@@ -120,10 +136,15 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
   const [seenRoute, setSeenRoute] = useState(routeKey);
   if (routeKey !== seenRoute) {
     setSeenRoute(routeKey);
-    if (routeKey && routeKey !== current && programs.some((p) => p.key === routeKey)) setCurrent(routeKey);
+    if (routeKey && routeKey !== current && programs.some((p) => p.key === routeKey)) {
+      setCurrent(routeKey);
+      setMoved(false);
+    }
   }
   useEffect(() => {
-    if (!ready || !shownKey || shownKey === routeKey) return;
+    // a view asked for is about to open: writing the program shown until then would be read back
+    // as an address brought in and open that program again (a deep link at load was lost, #76)
+    if (!ready || !shownKey || shownKey === routeKey || opening.current) return;
     window.location.replace(workspaceHref(shownKey));
   }, [ready, shownKey, routeKey]);
 
@@ -137,6 +158,35 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // the drawer and the user menu close on Escape and on a tap outside; the focus goes back to the
+  // button that opened them, unless the tap gave it to something else
+  const closeSide = useCallback(() => {
+    setSideOpen(false);
+    burgerRef.current?.focus();
+  }, []);
+  useEffect(() => {
+    if (!menu && !sideOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (menu) {
+        setMenu(false);
+        meButtonRef.current?.focus();
+      } else closeSide();
+    };
+    const onClick = (e: MouseEvent) => {
+      if (!menu || meRef.current?.contains(e.target as Node)) return;
+      setMenu(false);
+      const at = document.activeElement;
+      if (!at || at === document.body || meRef.current?.contains(at)) meButtonRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("click", onClick);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("click", onClick);
+    };
+  }, [menu, sideOpen, closeSide]);
 
   const openSettings = useCallback(
     (props: ProgramView["props"] = {}) => open("settings", { module: "page.settings", props }),
@@ -174,19 +224,8 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
     return out;
   }, [programs, modules, hasSettings, t, open, openSettings, onLogout]);
 
-  if (ui.status === "loading" && !ui.boot) {
-    return <p className="muted dt-note dt-root">{t("layout.loading")}</p>;
-  }
-  if (!ui.boot) {
-    return (
-      <div className="dt-root dt-note" role="alert">
-        <p className="bad">{t("layout.loadFailed", { error: ui.error ?? "" })}</p>
-        <button type="button" onClick={() => void ui.reload()}>
-          {t("layout.retry")}
-        </button>
-      </div>
-    );
-  }
+  if (ui.status === "loading" && !ui.boot) return <ShellLoading />;
+  if (!ui.boot) return <ShellFailure unreachable={ui.unreachable} detail={ui.error} onRetry={ui.reload} />;
 
   const customThemes = ui.boot.themes ?? [];
   const theme = resolveTheme(ui.prefs?.look, customThemes);
@@ -255,6 +294,7 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
         <header className="ws-top">
           {narrow && (
             <button
+              ref={burgerRef}
               type="button"
               className="ws-burger"
               aria-expanded={sideOpen}
@@ -265,16 +305,35 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
             </button>
           )}
           <span className="ws-logo">topcoat</span>
-          <button type="button" className="ws-search" onClick={() => setPalette(true)}>
-            ⌕ {t("desktop.paletteSearch")} <kbd>Ctrl+K</kbd>
+          <button
+            type="button"
+            className="ws-search"
+            aria-label={t("desktop.paletteSearch")}
+            onClick={() => setPalette(true)}
+          >
+            <span className="ws-search-label">
+              <span className="ws-search-icon" aria-hidden="true">
+                ⌕
+              </span>{" "}
+              <span className="ws-search-text">{t("desktop.paletteSearch")}</span>
+            </span>
+            <kbd aria-hidden="true">Ctrl+K</kbd>
           </button>
           <span className={`conn conn-${status}`} role="status">
             <span className="conn-dot" aria-hidden="true" />
             <span className="conn-text">{t(`connection.${status}`)}</span>
           </span>
-          <div className="ws-me">
-            <button type="button" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
-              {ctx.me?.name ?? t("desktop.me")} ▾
+          <div className="ws-me" ref={meRef}>
+            <button
+              ref={meButtonRef}
+              type="button"
+              className="ws-me-button"
+              aria-haspopup="menu"
+              aria-expanded={menu}
+              onClick={() => setMenu((m) => !m)}
+            >
+              <span className="ws-me-name">{ctx.me?.name ?? t("desktop.me")}</span>
+              <span aria-hidden="true">▾</span>
             </button>
             {menu && (
               <div className="dt-me-menu ws-me-menu" role="menu" aria-label={t("desktop.me")}>
@@ -308,6 +367,7 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
         )}
         <PersonaPrompt api={api} quiet />
         <div className="ws-body">
+          {narrow && sideOpen && <div className="ws-backdrop" aria-hidden="true" onClick={closeSide} />}
           <nav
             className={`ws-side${narrow && !sideOpen ? " ws-side-closed" : ""}`}
             aria-label={t("webShell.navigation")}
@@ -353,6 +413,11 @@ export function WebShell({ api, ctx, routeKey, uiTick, status, onSaveLanguage, o
                     </button>
                   )}
                 </div>
+                {moved && (
+                  <p className="ws-moved" role="status">
+                    {t("webShell.moved")}
+                  </p>
+                )}
                 <ModuleView
                   key={`${shown.key}:${view.module}:${JSON.stringify(view.props)}`}
                   win={{ id: `${shown.key}:${view.module}`, module: view.module, docked: false, props: view.props }}

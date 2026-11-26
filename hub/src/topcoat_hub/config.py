@@ -72,7 +72,9 @@ class Settings(BaseSettings):
     # a direct model transfer (E2-07) that reports no progress for this long fails with "timeout"
     model_transfer_timeout_seconds: float = 15 * 60.0
     heartbeat_interval_seconds: int = 10
-    sse_keepalive_seconds: float = 15.0
+    # the GUI counts the hub as lost after 5 s without a byte on its stream (web/src/api/sse.ts,
+    # LOST_AFTER_MS), so a quiet stream must send a comment well within that
+    sse_keepalive_seconds: float = 2.0
 
     # Model gateway (/v1, E1-05).
     # Which node and model do which work is decided by the table of applications of the node
@@ -177,9 +179,6 @@ class Settings(BaseSettings):
     resume_stuck_enabled: bool = True
     resume_stuck_hours: float = 72.0  # how long a task that stopped for lack of a node waits
     resume_stuck_max: int = 5  # tasks continued per person and arrival
-    # the regular re-check of pinned answers (recheck.py): an answer that was handed back is
-    # asked for again, compared, and marked still correct or outdated
-    recheck_enabled: bool = True
     # Gründlich: a small model on the checking node looks at each tool step while the run goes on
     # (step_check.py, the plan section 7); the chat's answer is still checked before it is shown
     step_check_enabled: bool = False  # off unless an admin switches it on (PRG-00 R5)
@@ -189,8 +188,6 @@ class Settings(BaseSettings):
     # a finished hand-over's file (the request, the report with its sources) goes into the
     # person's knowledge base, in the private source "Akten"
     handover_to_knowledge: bool = True
-    recheck_interval_hours: float = 24.0
-    recheck_max: int = 5  # pinned answers re-checked per round
     resume_stuck_attempts: int = 3  # a task is started this many times at most this way
     agent_max_turns: int = 30  # model calls per run
     agent_max_tool_calls: int = 20
@@ -282,9 +279,13 @@ class Settings(BaseSettings):
     agent_tools_wait_seconds: float = 60.0  # after a restart the tool nodes reconnect first
     # a chat check is offered only the tool groups its question names (shorter tool definitions)
     agent_auto_tool_groups: bool = True
-    # Wake-on-LAN (E2-05 E): the LAN's broadcast address the magic packet goes to, and the port
+    # Wake-on-LAN (E2-05 E): the broadcast address(es, comma-separated: the directed broadcast of
+    # each LAN when the hub sits in another subnet) the magic packet goes to, and the port
     wol_broadcast: str = "255.255.255.255"
     wol_port: int = 9
+    # a request whose model only a sleeping node has as its house model wakes that node and waits
+    # this long for it to connect (1.7, E2); 0 = never wake on demand
+    wake_timeout_seconds: float = 240.0
     # A request that waits in a node's queue counts one place better for every this many seconds
     # (0 = off), so background work cannot starve behind a steady stream of chat requests.
     gateway_queue_aging_seconds: float = 0.0
@@ -355,7 +356,7 @@ class Settings(BaseSettings):
     # stages the model sees (never numbers): reliability >= sure: sure, >= older: older, else stale
     memory_stage_sure: float = 0.7
     memory_stage_older: float = 0.35
-    # a note below this reliability is checked by the care run
+    # unused since D124 (the care run checks no note); still shown in the GUI's care settings
     memory_check_threshold: float = 0.5
     # a note is archived only if usefulness AND reliability are below these AND it has not been
     # used for this many days (age alone never archives)
@@ -366,16 +367,8 @@ class Settings(BaseSettings):
     # been idle; the tick looks this often (0 = never on its own, the GUI can still start a run).
     memory_care_hour: int = 3
     memory_care_interval_seconds: float = 900.0
-    # budget of one run, and the tool calls of the check of one note
+    # unused since D124 (the care run checks no note); still shown in the GUI's care settings
     memory_care_max_notes: int = 10
-    memory_care_run_max_seconds: float = 3600.0
-    # one check of the care: the time of one model turn and of the whole task. A big model on a
-    # slow node (the laptop) reads a prompt for minutes and nobody waits for the answer.
-    memory_care_model_timeout_seconds: float = 900.0
-    memory_care_task_seconds: float = 1800.0
-    memory_care_task_calls: int = 4
-    # a note is not checked again sooner than this many days
-    memory_care_recheck_days: float = 3.0
     # idle care runs (besides the night) at most this often per user
     memory_care_idle_every_hours: float = 12.0
 

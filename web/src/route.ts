@@ -30,7 +30,10 @@ export type Route =
   | { view: "sheets"; id?: string }
   | { view: "handovers"; id?: string }
   | { view: "node"; id: string }
-  | { view: "w"; key?: string };
+  | { view: "research" }
+  | { view: "w"; key?: string }
+  /** An address nobody knows (a typo, a page that was removed): Start, with a note. */
+  | { view: "unknown" };
 
 /** `#/admin/…` is the admin area. Its pages still answer on their old addresses (bookmarks),
  *  see :func:`adminHash`. */
@@ -45,6 +48,7 @@ export function parseRoute(hash: string): Route {
   }
   const ws = /^\/w(?:\/([a-z0-9][a-z0-9-]*))?\/?$/.exec(path);
   if (ws) return ws[1] ? { view: "w", key: ws[1] } : { view: "w" };
+  if (/^\/?$/.test(path)) return { view: "start" };
   if (/^\/talk\/?$/.test(path)) return { view: "talk" };
   if (/^\/more\/?$/.test(path)) return { view: "more" };
   if (/^\/archive\/?$/.test(path)) return { view: "archive" };
@@ -69,6 +73,7 @@ export function parseRoute(hash: string): Route {
   if (/^\/memory\/?$/.test(path)) return { view: "memory" };
   if (/^\/instructions\/?$/.test(path)) return { view: "instructions" };
   if (/^\/knowledge\/?$/.test(path)) return { view: "knowledge" };
+  if (/^\/research\/?$/.test(path)) return { view: "research" };
   if (/^\/project\/?$/.test(path)) return { view: "project" };
   if (/^\/inventory\/?$/.test(path)) return { view: "inventory" };
   if (/^\/releases\/?$/.test(path)) return { view: "releases" };
@@ -133,10 +138,10 @@ export function parseRoute(hash: string): Route {
     try {
       return { view: "node", id: decodeURIComponent(raw) };
     } catch {
-      return { view: "start" };
+      return { view: "overview" };
     }
   }
-  return { view: "start" };
+  return { view: "unknown" };
 }
 
 export function nodeHref(id: string): string {

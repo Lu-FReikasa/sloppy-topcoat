@@ -3,6 +3,7 @@
 // answer is the clamped version and replaces it.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ApiClient } from "../api/client";
+import { hubUnreachable } from "../errors";
 import type { UiBootstrap, UiPrefs, Workspace } from "./types";
 
 export type UiStatus = "loading" | "ready" | "error";
@@ -13,6 +14,8 @@ export const LAZY_MS = 800;
 export interface UiHandle {
   status: UiStatus;
   error: string | null;
+  /** The last load failed because the hub did not answer (errors.ts, hubUnreachable). */
+  unreachable: boolean;
   boot: UiBootstrap | null;
   /** The programs the person is offered, in order. */
   workspaces: Workspace[];
@@ -35,6 +38,7 @@ export function useUi(api: ApiClient, tick = 0): UiHandle {
   const [boot, setBoot] = useState<UiBootstrap | null>(null);
   const [status, setStatus] = useState<UiStatus>("loading");
   const [error, setError] = useState<string | null>(null);
+  const [unreachable, setUnreachable] = useState(false);
   // changes of the preferences on their way to the hub: while one is, the hub's echo on the stream
   // must not bring an older state back; of several answers only the last one sent counts
   const writing = useRef(0);
@@ -55,10 +59,12 @@ export function useUi(api: ApiClient, tick = 0): UiHandle {
     setBoot(b);
     setStatus("ready");
     setError(null);
+    setUnreachable(false);
   }, []);
 
   const fail = useCallback((err: unknown) => {
     setError(describe(err));
+    setUnreachable(hubUnreachable(err));
     setStatus((s) => (s === "ready" ? "ready" : "error"));
   }, []);
 
@@ -139,6 +145,7 @@ export function useUi(api: ApiClient, tick = 0): UiHandle {
   return {
     status,
     error,
+    unreachable,
     boot,
     workspaces: boot?.workspaces ?? [],
     prefs: boot?.prefs ?? null,

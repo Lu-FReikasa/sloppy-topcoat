@@ -86,7 +86,12 @@ export class SseParser {
   }
 }
 
-export type StreamStatus = "connecting" | "live" | "reconnecting";
+/** `lost`: the stream broke or went quiet; it reconnects on its own and turns `live` again. */
+export type StreamStatus = "connecting" | "live" | "lost";
+
+/** How long the stream may stay without a byte before the hub counts as lost. The hub sends a
+ *  keepalive comment every 2 s (`sse_keepalive_seconds`), so two missed ones are tolerated. */
+export const LOST_AFTER_MS = 5000;
 
 export interface StreamOptions {
   url: string;
@@ -100,7 +105,8 @@ export interface StreamOptions {
   fetchImpl?: typeof fetch;
   initialBackoffMs?: number;
   maxBackoffMs?: number;
-  /** Reconnect when no bytes (not even keepalive comments) arrive for this long. */
+  /** Reconnect (and report `lost`) when no bytes, not even keepalive comments, arrive for this
+   *  long; a connection attempt that hangs this long counts the same. Default LOST_AFTER_MS. */
   idleTimeoutMs?: number;
   /** Injectable for tests. */
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
@@ -131,8 +137,16 @@ export function connectStream(opts: StreamOptions): () => void {
   const stop = new AbortController();
   const initial = opts.initialBackoffMs ?? 1000;
   const max = opts.maxBackoffMs ?? 30000;
-  const idleMs = opts.idleTimeoutMs ?? 60000;
+  const idleMs = opts.idleTimeoutMs ?? LOST_AFTER_MS;
   const sleep = opts.sleep ?? defaultSleep;
+
+  // report a status only when it changes: every failed attempt while the hub is away is one `lost`
+  let last: StreamStatus | null = null;
+  const report = (status: StreamStatus) => {
+    if (status === last) return;
+    last = status;
+    opts.onStatus?.(status);
+  };
 
   const run = async () => {
     let attempt = 0;
@@ -162,7 +176,7 @@ export function connectStream(opts: StreamOptions): () => void {
         }
         if (!res.ok || !res.body) throw new Error(`stream HTTP ${res.status}`);
         attempt = 0;
-        opts.onStatus?.("live");
+        report("live");
         opts.onOpen?.();
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -182,7 +196,7 @@ export function connectStream(opts: StreamOptions): () => void {
         stop.signal.removeEventListener("abort", abortConn);
       }
       if (stop.signal.aborted) return;
-      opts.onStatus?.("reconnecting");
+      report("lost");
       await sleep(backoffDelay(attempt, initial, max), stop.signal);
       attempt += 1;
     }

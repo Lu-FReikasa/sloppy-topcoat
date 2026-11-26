@@ -120,7 +120,7 @@ func windowsFormRefused(p string) error {
 		return inputErr("UNC and device paths are not accepted")
 	}
 	if len(norm) < 3 || norm[1] != ':' || norm[2] != '\\' ||
-		!((norm[0] >= 'a' && norm[0] <= 'z') || (norm[0] >= 'A' && norm[0] <= 'Z')) {
+		!isDriveLetter(norm[0]) {
 		return inputErr("the path must be absolute and start with a drive letter such as C:\\")
 	}
 	rest := norm[3:]
@@ -183,4 +183,9 @@ func resolvedShortName(segs []string) bool {
 		}
 	}
 	return false
+}
+
+// isDriveLetter reports whether c is an ASCII letter, the only drive names Windows knows.
+func isDriveLetter(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }

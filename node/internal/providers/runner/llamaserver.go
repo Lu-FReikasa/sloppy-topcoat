@@ -76,6 +76,8 @@ type LlamaServerOptions struct {
 	// ModelBackends overrides backend and GPU offload per model name (E2-05). Every backend
 	// named here is installed next to the default one.
 	ModelBackends map[string]ModelBackend
+	// Projectors is runner.projectors: the vision projector per model name ("none" = none).
+	Projectors map[string]string
 	// SysInfo gives the free RAM for the memory guard (nil = no check).
 	SysInfo sysinfo.Provider
 	// GuardMode is refuse (default), warn or off; GuardReserveMB the RAM that must stay
@@ -132,6 +134,8 @@ type modelFile struct {
 	Path string
 	Size int64
 	Own  bool // inside <data dir>/models (deletable)
+	// Projector is the path of the vision projector loaded with the model (projector.go); "" = none.
+	Projector string
 }
 
 // NewLlamaServer creates the runner and starts installing the runtime.
@@ -385,6 +389,8 @@ var (
 func (l *LlamaServer) scan() []modelFile {
 	seen := map[string]bool{}
 	var out []modelFile
+	projectors := map[string][]string{} // directory -> projector file names in it
+	subfolder := map[string]bool{}      // directory -> below a scanned root
 	add := func(dir string, own bool) {
 		root := filepath.Clean(dir)
 		_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -398,6 +404,12 @@ func (l *LlamaServer) scan() []modelFile {
 				if rel, _ := filepath.Rel(root, p); rel != "." && strings.Count(rel, string(filepath.Separator))+1 > maxScanDepth {
 					return filepath.SkipDir
 				}
+				return nil
+			}
+			if isProjector(d.Name()) {
+				pdir := filepath.Dir(p)
+				projectors[pdir] = append(projectors[pdir], d.Name())
+				subfolder[pdir] = pdir != root
 				return nil
 			}
 			name, ok := modelName(d.Name())
@@ -418,6 +430,10 @@ func (l *LlamaServer) scan() []modelFile {
 		if strings.TrimSpace(d) != "" {
 			add(d, false)
 		}
+	}
+	for i := range out {
+		dir := filepath.Dir(out[i].Path)
+		out[i].Projector = projectorFor(out[i].Name, dir, projectors[dir], l.opts.Projectors[out[i].Name], subfolder[dir])
 	}
 	return out
 }
@@ -455,7 +471,7 @@ func (l *LlamaServer) ListModels(context.Context) ([]Model, error) {
 	files := l.scan()
 	out := make([]Model, 0, len(files))
 	for _, f := range files {
-		out = append(out, Model{Name: f.Name, SizeBytes: f.Size, Format: "gguf", Own: f.Own, GGUF: headerOf(f.Path)})
+		out = append(out, Model{Name: f.Name, SizeBytes: f.Size, Format: "gguf", Own: f.Own, GGUF: headerOf(f.Path), Projector: baseOrEmpty(f.Projector)})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
@@ -949,6 +965,11 @@ func (l *LlamaServer) launch(ctx context.Context, inst llamacpp.Installation, m 
 	defer removeFile(keyFile)        // read at start; the server keeps the key in memory
 	meta, _ := gguf.ReadFile(m.Path) // unreadable: served as a chat model, as before
 	args := l.serverArgs(m.Path, name, port, ctxLen, slots, jinja, meta.IsEmbedding(), plan, keyFile)
+	if m.Projector != "" && !meta.IsEmbedding() {
+		// UNVERIFIED on real hardware: a vision model with its projector (D125); the projector's
+		// memory is not in the fit estimate, --fit on leaves room for it on the GPU
+		args = append(args, "--mmproj", m.Projector)
+	}
 	ring := &ringBuffer{max: 64 << 10}
 	var out io.Writer = ring
 	logFile := l.openLog(name)

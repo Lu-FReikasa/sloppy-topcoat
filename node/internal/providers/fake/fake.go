@@ -68,6 +68,8 @@ type ProfileModel struct {
 	Format    string `json:"format"`
 	// VRAMMB is the VRAM the model occupies when loaded.
 	VRAMMB int64 `json:"vram_mb"`
+	// Projector is the vision projector file the runner would load with the model (D125).
+	Projector string `json:"projector,omitempty"`
 }
 
 // DefaultProfile is a 16 GB AMD GPU, 32 GB RAM and three models of different sizes.
@@ -173,7 +175,7 @@ type World struct {
 	// top of the profile's ram_used_mb.
 	others       []Other
 	ramForeignMB int64
-	// cpuPercent is the CPU utilisation the fake system reports (zero = cannot be measured).
+	// cpuPercent is the CPU utilization the fake system reports (zero = cannot be measured).
 	cpuPercent float64
 	// DownloadStep / BenchDelay slow down simulated downloads and benchmark
 	// runs so the GUI can show progress (tests set them to 0).
@@ -266,7 +268,7 @@ func (w *World) SetOther(idx int, o Other) error {
 	return nil
 }
 
-// SetCPU sets the CPU utilisation (percent) the fake system reports; zero means the system cannot
+// SetCPU sets the CPU utilization (percent) the fake system reports; zero means the system cannot
 // measure it (the default).
 func (w *World) SetCPU(percent float64) {
 	w.mu.Lock()
@@ -437,7 +439,7 @@ func (f fakeRunner) ListModels(context.Context) ([]runner.Model, error) {
 	}
 	out := make([]runner.Model, 0, len(f.w.profile.Models))
 	for _, m := range f.w.profile.Models {
-		out = append(out, runner.Model{Name: m.Name, SizeBytes: m.SizeBytes, Format: m.Format, Own: true})
+		out = append(out, runner.Model{Name: m.Name, SizeBytes: m.SizeBytes, Format: m.Format, Own: true, Projector: m.Projector})
 	}
 	if f.w.ModelsDir != "" {
 		files, _ := filepath.Glob(filepath.Join(f.w.ModelsDir, "*.gguf"))

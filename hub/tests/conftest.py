@@ -82,7 +82,7 @@ def clean_db(migrated_db: str) -> Iterator[str]:
                 "knowledge_chunks, knowledge_files, "
                 "knowledge_sources, memory_proposals, prompt_snapshots, personas, api_keys, "
                 "dev_repos, setting_changes, "
-                "ui_templates, ui_themes, inbox_items, handovers, "
+                "ui_templates, ui_themes, inbox_items, handovers, plugins, plugin_changes, "
                 "project_events, project_node_versions, project_views, project_labels, "
                 "project_change_sets, project_changes, project_templates, "
                 "project_nodes, "
@@ -129,6 +129,7 @@ def settings(clean_db: str, tmp_path: Path) -> Settings:
         project_reminder_tick_seconds=0,  # the tests of 04h call the tick with a fake clock
         memory_note_wait_seconds=5.0,
         review_after_answer=False,  # on only in the tests of the second look right after an answer
+        wake_timeout_seconds=0,  # no waking on demand; test_wake_on_demand.py switches it on
     )
 
 

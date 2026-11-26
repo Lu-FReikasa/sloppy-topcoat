@@ -194,7 +194,7 @@ The programs (Chat, Research, Development, Administration, Projects), their righ
 | [D65](decisions/D65.md) | Hand-over between applications | Amended |
 | [D72](decisions/D72.md) | The chat model may propose a hand-over | Current |
 | [D63](decisions/D63.md) | The incognito folder | Current |
-| [D111](decisions/D111.md) | The inbox has no marks, no board and no re-check | Decided, not built |
+| [D111](decisions/D111.md) | The inbox has no marks, no board and no re-check | Current |
 | [D68](decisions/D68.md) | Marks and the regular re-check | Replaced |
 
 ### Chat and answers
@@ -281,7 +281,7 @@ Seeing images in the chat, making images locally, and talking to Topcoat.
 
 | # | Decision | Status |
 |---|---|---|
-| [D125](decisions/D125.md) | The chat sees images the person gives it | Decided, not built |
+| [D125](decisions/D125.md) | The chat sees images the person gives it | Current |
 | [D126](decisions/D126.md) | Images are made locally by a second runner on a node | Decided, not built |
 | [D127](decisions/D127.md) | Voice: a live conversation with an agent | Decided, not built |
 

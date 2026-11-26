@@ -12,7 +12,7 @@ see docs/INSTALL-NODE.md "Energy".
 import asyncio
 import re
 import socket
-from typing import Protocol
+from typing import Any, Protocol
 
 MAC_RE = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$")
 
@@ -42,3 +42,48 @@ class UdpWakeSender:
                 sock.sendto(packet, (broadcast, port))
 
         await asyncio.get_running_loop().run_in_executor(None, _send)
+
+
+def wake_addresses(inventory: dict | None) -> list[str]:
+    """The MAC addresses to wake a node by, from its last inventory: every wired interface
+    (wireless ones only if there is no other; Wake-on-LAN over Wi-Fi rarely works)."""
+    interfaces = ((inventory or {}).get("hardware") or {}).get("network") or []
+    wired = [i for i in interfaces if i.get("kind") != "wifi"] or interfaces
+    return [i["mac"] for i in wired if isinstance(i.get("mac"), str)]
+
+
+def broadcasts(setting: str) -> list[str]:
+    """``TOPCOAT_WOL_BROADCAST`` may name several addresses (comma-separated), e.g. the directed
+    broadcast of each LAN a node sits in when the hub is in another subnet."""
+    return [b.strip() for b in setting.split(",") if b.strip()] or ["255.255.255.255"]
+
+
+async def send_to(sender: WakeSender, macs: list[str], setting: str, port: int) -> int:
+    """Send the packet for every address to every broadcast; returns the number of packets."""
+    sent = 0
+    for mac in macs:
+        for broadcast in broadcasts(setting):
+            await sender.send(mac, broadcast, port)
+            sent += 1
+    return sent
+
+
+def demand_waker(sessionmaker: Any, service: Any, sender: WakeSender, settings: Any) -> Any:
+    """The gateway's waker (plan step 1.7): sends the packets for a node from its last inventory
+    and records ``wake_sent`` with the reason ``demand``. Returns the number of packets (0: the
+    hub knows no address of the node)."""
+
+    async def wake(node_id: Any, model: str) -> int:
+        from topcoat_hub.models import NodeInventory
+
+        async with sessionmaker() as db:
+            inventory = await db.get(NodeInventory, node_id)
+            macs = wake_addresses(inventory.inventory if inventory else None)
+        if not macs:
+            return 0
+        sent = await send_to(sender, macs, settings.wol_broadcast, settings.wol_port)
+        data = {"reason": "demand", "model": model, "addresses": len(macs)}
+        await service.record_event(node_id, "wake_sent", data)
+        return sent
+
+    return wake

@@ -355,7 +355,27 @@ export interface ChatMessage {
   report?: ReportCard | null;
   /** E7-01: what the hub did to produce this answer, in order (thoughts, calls, checks …). */
   activity?: ActivityItem[];
+  /** D125: the images the person sent with this message. */
+  images?: ChatImageRef[];
   created_at: string | null;
+}
+
+/** An image of a message (D125): the hub's id and size; `src` is set while only this browser has
+ *  it (the preview of a message the hub has not confirmed yet). */
+export interface ChatImageRef {
+  id: string;
+  width: number;
+  height: number;
+  src?: string;
+}
+
+/** What happened to the images of an answer (D125): who looked, or that nobody could. */
+export interface VisionOutcome {
+  sees: boolean;
+  model: string;
+  images: number;
+  routed_from?: string;
+  node?: string;
 }
 
 /** One thing the hub did for an answer (`activity.py`): plain data, the browser words it. */
@@ -1843,7 +1863,10 @@ export interface ConversationThread {
 
 // --- the inbox (docs/PLATFORM.md, 3.7) ------------------------------------------------------------
 
-export type InboxView = "inbox" | "board" | "filed";
+/** Where an item stands in the list (D111): it waits for a decision, something went wrong, or it
+ *  is a result. */
+export const INBOX_GROUPS = ["decide", "errors", "results"] as const;
+export type InboxGroup = (typeof INBOX_GROUPS)[number];
 
 /** Something that happened and wants to be read. `ref` says which window shows the matter. */
 export interface InboxItem {
@@ -1857,26 +1880,9 @@ export interface InboxItem {
   /** Urgent and not yet settled: reading it does not put it away. */
   unresolved: boolean;
   read: boolean;
-  pinned: boolean;
-  filed: boolean;
+  group: InboxGroup;
   created_at: string | null;
   read_at: string | null;
-  resolved_at: string | null;
-}
-
-export const MARK_KINDS = ["comment", "postit", "sticker", "highlight"] as const;
-export type MarkKind = (typeof MARK_KINDS)[number];
-
-/** A mark on an item (docs/PLATFORM.md, 3.7): data on the item, never a change of its text. */
-export interface ItemMark {
-  id: string;
-  item_id: string;
-  /** "person", an application key, or "recheck". */
-  author: string;
-  kind: MarkKind;
-  text: string;
-  line: number | null;
-  created_at: string | null;
   resolved_at: string | null;
 }
 
@@ -1964,6 +1970,9 @@ export interface MemoryTagTree {
 export interface IncognitoMessage {
   role: "user" | "assistant";
   content: string;
+  /** D125: images of a question, and what happened to them in its answer. */
+  images?: ChatImageRef[];
+  vision?: VisionOutcome;
 }
 
 /** A conversation that lives in the memory of the hub only. */

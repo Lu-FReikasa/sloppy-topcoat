@@ -38,8 +38,10 @@ type Updater struct {
 	Timeout time.Duration
 }
 
+// Name implements capability.Capability.
 func (u *Updater) Name() string { return Name }
 
+// InputSchema implements capability.Capability.
 func (u *Updater) InputSchema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{` +
 		`"image":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._/:-]{0,199}$"},` +
@@ -47,6 +49,7 @@ func (u *Updater) InputSchema() json.RawMessage {
 		`"dry_run":{"type":"boolean"}},"required":["image","digest"],"additionalProperties":false}`)
 }
 
+// Info implements capability.Capability.
 func (u *Updater) Info() capability.Info {
 	return capability.Info{
 		Description: "Roll the hub out to an image that is already on this host: checks the image's digest, then runs the update script (revision check, dump, health check, way back).",

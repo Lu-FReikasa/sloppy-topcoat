@@ -58,6 +58,9 @@ type RunnerConfig struct {
 	// the engine cannot read).
 	Jinja      *bool           `json:"jinja,omitempty"`
 	ModelJinja map[string]bool `json:"model_jinja,omitempty"`
+	// Projectors names the vision projector (mmproj) of a model: a file name in the model's own
+	// directory, or "none" for no projector. It wins over the runner's own matching (D125).
+	Projectors map[string]string `json:"projectors,omitempty"`
 	// ModelBackends sets backend and GPU offload per model (E2-05, D27): a 7B on Vulkan and a
 	// 30B on the CPU side by side. Absent = the node's backend and llama.cpp's own fit.
 	ModelBackends map[string]ModelBackend `json:"model_backends,omitempty"`
@@ -476,7 +479,7 @@ type WorkshopRunner struct {
 	IdleSeconds int `json:"idle_seconds,omitempty"`
 }
 
-// Template names a repository's test command comes from (never free text).
+// WorkshopTemplates are the template names a repository's test command comes from (never free text).
 var WorkshopTemplates = []string{"make-check", "npm-test", "go-test", "pytest"}
 
 // WorkshopBuildNode is the image/network key of repo.build_node (E6-01 S3). It is not a test
@@ -944,6 +947,11 @@ func (c *NodeConfig) Validate() error {
 			return fmt.Errorf("config: runner.model_jinja needs model names")
 		}
 	}
+	for m, f := range c.Runner.Projectors {
+		if strings.TrimSpace(m) == "" || !ValidProjector(f) {
+			return fmt.Errorf("config: runner.projectors[%q] must be a .gguf file name or \"none\"", m)
+		}
+	}
 	if n := c.Runner.NParallel; n < 0 || n > MaxParallel {
 		return fmt.Errorf("config: runner.n_parallel must be 1..%d", MaxParallel)
 	}
@@ -1214,3 +1222,12 @@ var (
 	workshopImageRe   = regexp.MustCompile(`^[a-z0-9][a-z0-9._/:@-]{0,255}$`)
 	workshopNetworkRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`)
 )
+
+// ValidProjector reports whether f may name a projector in runner.projectors: "none" or a plain
+// .gguf file name (no directory, so it can only point into the model's own directory).
+func ValidProjector(f string) bool {
+	if f == "none" {
+		return true
+	}
+	return f != "" && !strings.ContainsAny(f, "/\\") && f != ".gguf" && strings.EqualFold(path.Ext(f), ".gguf")
+}

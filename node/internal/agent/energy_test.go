@@ -17,12 +17,22 @@ func sleepConfig(power string) string {
 
 func energySetup(t *testing.T, cfg string, mods ...func(*Options)) (*harness, *hubConn) {
 	t.Helper()
+	return energySetupWorld(t, cfg, nil, mods...)
+}
+
+// energySetupWorld is energySetup with prepare run on the fake world before the node starts, so
+// the world is in that state when the config arrives.
+func energySetupWorld(t *testing.T, cfg string, prepare func(*fake.World), mods ...func(*Options)) (*harness, *hubConn) {
+	t.Helper()
 	hub := newFakeHub(t)
 	h := newHarness(t, hub.srv.URL, t.TempDir(), fake.DefaultProfile(), append(mods, func(o *Options) {
 		o.SleepCheck = 20 * time.Millisecond
 		o.SleepDelay = 30 * time.Millisecond
 	})...)
 	h.world.StreamDelay = 20 * time.Millisecond
+	if prepare != nil {
+		prepare(h.world)
+	}
 	h.start(t)
 	hc := hub.accept(t)
 	hc.handshake(t, cfg)
@@ -37,6 +47,37 @@ func waitSlept(t *testing.T, h *harness, n int) {
 			t.Fatalf("the machine did not go to sleep (%d)", h.world.Slept())
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// staysAwake watches the node for d and fails if it decides to sleep. It looks for the sleeping
+// event, which the node sends when it decides; Slept only counts once the delay before the
+// machine goes down has passed, which is longer than d.
+func staysAwake(t *testing.T, h *harness, hc *hubConn, d time.Duration, why string) {
+	t.Helper()
+	isSleeping := func(env protocol.Envelope) (map[string]any, bool) {
+		var ev protocol.Event
+		ok := env.Type == protocol.TypeEvent && env.DecodeBody(&ev) == nil && ev.Kind == protocol.EventSleeping
+		return ev.Data, ok
+	}
+	for _, env := range hc.stash { // what an earlier action() set aside
+		if data, ok := isSleeping(env); ok {
+			t.Fatalf("the node decided to sleep %s: %v", why, data)
+		}
+	}
+	deadline := time.After(d)
+	for {
+		select {
+		case env := <-hc.msgs:
+			if data, ok := isSleeping(env); ok {
+				t.Fatalf("the node decided to sleep %s: %v", why, data)
+			}
+		case <-deadline:
+			if n := h.world.Slept(); n != 0 {
+				t.Fatalf("the machine slept %s (%d)", why, n)
+			}
+			return
+		}
 	}
 }
 
@@ -115,20 +156,44 @@ func TestTheMachineSleepsByItselfAfterTheIdleTime(t *testing.T) {
 	waitSlept(t, h, 1)
 }
 
-func TestTheMachineDoesNotSleepWhileSomeoneIsThereOrAModelIsLoaded(t *testing.T) {
-	h, hc := energySetup(t, sleepConfig(`{"sleep_after_idle_seconds":1}`))
-	h.world.SetInputIdle(0, true) // someone types
-	time.Sleep(1500 * time.Millisecond)
-	if h.world.Slept() != 0 {
-		t.Fatal("slept while somebody was at the machine")
+func TestTheMachineDoesNotSleepWhileSomeoneIsThere(t *testing.T) {
+	// Someone is at the machine before the node gets its config. Set only after the handshake,
+	// the input would still be unknown (= nobody there) while the config is applied, and a
+	// handshake slower than the idle time (a busy CI runner) would already count as idle (#72).
+	h, hc := energySetupWorld(t, sleepConfig(`{"sleep_after_idle_seconds":1}`), func(w *fake.World) {
+		w.SetInputIdle(0, true) // someone types
+	})
+	staysAwake(t, h, hc, 1500*time.Millisecond, "while somebody was at the machine")
+
+	// When the person leaves, the machine sleeps: the check above was not vacuous.
+	h.world.SetInputIdle(time.Hour, true)
+	if d := hc.waitEvent(t, protocol.EventSleeping); d["reason"] != "idle" {
+		t.Fatalf("%v", d)
 	}
+	waitSlept(t, h, 1)
+}
+
+// A loaded model keeps the machine awake only while it is used (plan step 1.7): a house model is
+// a resident that is never unloaded for idleness, so "nothing loaded" would never come.
+func TestALoadedResidentUnusedForTheIdleTimeLetsTheMachineSleep(t *testing.T) {
+	cfg := strings.Replace(sleepConfig(`{"sleep_after_idle_seconds":2}`), `"capabilities":[]`,
+		`"residents":[{"model":"fake-llm-3b-q8","priority":50,"auto_reload":true}],"capabilities":[]`, 1)
+	h, hc := energySetup(t, cfg)
 	h.world.SetInputIdle(time.Hour, true)
 	if res := hc.action(t, "models.load", `{"model":"fake-llm-3b-q8"}`); !res.OK {
 		t.Fatalf("load: %+v", res.Error)
 	}
-	time.Sleep(1500 * time.Millisecond)
+	time.Sleep(1200 * time.Millisecond) // just loaded = just used: not yet
 	if h.world.Slept() != 0 {
-		t.Fatal("slept with a model loaded")
+		t.Fatal("slept right after a load")
+	}
+	d := hc.waitEvent(t, protocol.EventSleeping)
+	if d["reason"] != "idle" {
+		t.Fatalf("%v", d)
+	}
+	waitSlept(t, h, 1)
+	if loaded, _ := h.world.Runner().Loaded(t.Context()); len(loaded) != 0 {
+		t.Fatalf("models must be unloaded before the sleep: %v", loaded)
 	}
 }
 

@@ -62,11 +62,9 @@ import type {
   InboxItem,
   InboxListing,
   Handover,
-  ItemMark,
-  MarkKind,
   IncognitoMessage,
+  VisionOutcome,
   IncognitoTab,
-  InboxView,
   MemorySortSuggestion,
   MemoryTagTree,
   MemoryReport,
@@ -1160,13 +1158,40 @@ export class ApiClient {
     signal: AbortSignal,
     tools: ToolsMode = "auto",
     track?: StreamTrack,
+    images: string[] = [],
   ): AsyncGenerator<ChatEvent> {
     return this.chatStream(
       `/api/conversations/${encodeURIComponent(id)}/messages`,
-      { content, tools },
+      images.length ? { content, tools, images } : { content, tools },
       signal,
       track,
     );
+  }
+
+  /** An image sent with a chat message (D125), loaded with the token as an object URL; the
+   *  caller revokes it. */
+  chatImage(id: string): Promise<string> {
+    return this.imageBlob(`/api/chat/images/${encodeURIComponent(id)}`);
+  }
+
+  /** An image of an incognito tab, from the hub's memory. */
+  incognitoImage(tab: string, id: string): Promise<string> {
+    return this.imageBlob(
+      `/api/incognito/${encodeURIComponent(tab)}/images/${encodeURIComponent(id)}`,
+    );
+  }
+
+  private async imageBlob(path: string): Promise<string> {
+    const doFetch = this.fetchImpl ?? globalThis.fetch;
+    const res = await doFetch(`${this.baseUrl}${path}`, {
+      headers: { Authorization: `Bearer ${this.token}` },
+    });
+    if (res.status === 401) {
+      this.onUnauthorized?.();
+      throw new UnauthorizedError();
+    }
+    if (!res.ok) throw new ApiError(res.status, "not_found", "the image could not be loaded");
+    return URL.createObjectURL(await res.blob());
   }
 
   /** E3-07: follow an answer from the event `offset` on (0 = from its start, as a reload does).
@@ -1268,8 +1293,16 @@ export class ApiClient {
     return this.request("PATCH", `/api/incognito/${encodeURIComponent(id)}`, { internet });
   }
 
-  sendIncognito(id: string, content: string): Promise<{ message: IncognitoMessage; tab: IncognitoTab }> {
-    return this.request("POST", `/api/incognito/${encodeURIComponent(id)}/messages`, { content });
+  sendIncognito(
+    id: string,
+    content: string,
+    images: string[] = [],
+  ): Promise<{ message: IncognitoMessage; asked?: IncognitoMessage; tab: IncognitoTab }> {
+    return this.request(
+      "POST",
+      `/api/incognito/${encodeURIComponent(id)}/messages`,
+      images.length ? { content, images } : { content },
+    );
   }
 
   deleteIncognitoTab(id: string): Promise<void> {
@@ -1783,10 +1816,10 @@ export class ApiClient {
 
   // --- the inbox (docs/PLATFORM.md, 3.7) -----------------------------------------------------------
 
-  inbox(view: InboxView = "inbox", application?: string): Promise<InboxListing> {
-    const q = new URLSearchParams({ view });
-    if (application) q.set("application", application);
-    return this.request<InboxListing>("GET", `/api/inbox?${q.toString()}`);
+  /** Unread items and urgent ones that are not settled, in their groups (D111). */
+  inbox(application?: string): Promise<InboxListing> {
+    const q = application ? `?application=${encodeURIComponent(application)}` : "";
+    return this.request<InboxListing>("GET", `/api/inbox${q}`);
   }
 
   inboxCounts(): Promise<InboxCounts> {
@@ -1820,39 +1853,14 @@ export class ApiClient {
     return this.request<{ stopped: boolean }>("POST", `/api/research/runs/${encodeURIComponent(id)}/stop`);
   }
 
-  /** Everything read and filed (of one application, if named); what waits for an action stays. */
-  readAllInbox(application?: string): Promise<{ filed: number }> {
+  /** Everything read (of one application, if named); what waits for an action stays. */
+  readAllInbox(application?: string): Promise<{ read: number }> {
     const q = application ? `?application=${encodeURIComponent(application)}` : "";
-    return this.request<{ filed: number }>("POST", `/api/inbox/read-all${q}`);
-  }
-
-  pinInboxItem(id: string, pinned: boolean): Promise<InboxItem> {
-    return this.request<InboxItem>("POST", `/api/inbox/${encodeURIComponent(id)}/pin`, { pinned });
+    return this.request<{ read: number }>("POST", `/api/inbox/read-all${q}`);
   }
 
   resolveInboxItem(id: string): Promise<InboxItem> {
     return this.request<InboxItem>("POST", `/api/inbox/${encodeURIComponent(id)}/resolve`);
-  }
-
-  itemMarks(id: string): Promise<{ marks: ItemMark[] }> {
-    return this.request("GET", `/api/inbox/${encodeURIComponent(id)}/marks`);
-  }
-
-  addItemMark(id: string, kind: MarkKind, text: string, line?: number): Promise<ItemMark> {
-    return this.request("POST", `/api/inbox/${encodeURIComponent(id)}/marks`, {
-      kind,
-      text,
-      ...(line === undefined ? {} : { line }),
-    });
-  }
-
-  resolveItemMark(id: string, resolved: boolean): Promise<ItemMark> {
-    const q = resolved ? "" : "?resolved=false";
-    return this.request("POST", `/api/inbox/marks/${encodeURIComponent(id)}/resolve${q}`);
-  }
-
-  deleteItemMark(id: string): Promise<void> {
-    return this.request<void>("DELETE", `/api/inbox/marks/${encodeURIComponent(id)}`);
   }
 
   deleteInboxItem(id: string): Promise<void> {
@@ -2732,6 +2740,42 @@ export class ApiClient {
     return this.request("GET", `/api/ui/workspaces/${encodeURIComponent(key)}/agent${query}`);
   }
 
+  /** The registry of data plug-ins (D105, admin in the GUI only). */
+  plugins(): Promise<{ plugins: import("../plugins/types").PluginRow[] }> {
+    return this.request("GET", "/api/plugins");
+  }
+
+  plugin(key: string): Promise<import("../plugins/types").PluginDetail> {
+    return this.request("GET", `/api/plugins/${encodeURIComponent(key)}`);
+  }
+
+  pluginDiff(key: string, a: string, b: string): Promise<{ a: string; b: string; lines: string[] }> {
+    const q = new URLSearchParams({ a, b }).toString();
+    return this.request("GET", `/api/plugins/${encodeURIComponent(key)}/diff?${q}`);
+  }
+
+  /** Install a new plug-in. */
+  installPlugin(manifest: unknown): Promise<import("../plugins/types").PluginRow> {
+    return this.request("POST", "/api/plugins", manifest);
+  }
+
+  /** A new version of an installed plug-in. */
+  updatePlugin(key: string, manifest: unknown): Promise<import("../plugins/types").PluginRow> {
+    return this.request("POST", `/api/plugins/${encodeURIComponent(key)}/versions`, manifest);
+  }
+
+  rollbackPlugin(key: string, version: string): Promise<import("../plugins/types").PluginRow> {
+    return this.request("POST", `/api/plugins/${encodeURIComponent(key)}/rollback`, { version });
+  }
+
+  setPluginEnabled(key: string, enabled: boolean): Promise<import("../plugins/types").PluginRow> {
+    return this.request("PUT", `/api/plugins/${encodeURIComponent(key)}/enabled`, { enabled });
+  }
+
+  removePlugin(key: string): Promise<{ removed: string }> {
+    return this.request("DELETE", `/api/plugins/${encodeURIComponent(key)}`);
+  }
+
   uiTemplates(): Promise<{ templates: UiTemplateView[] }> {
     return this.request("GET", "/api/ui/templates");
   }
@@ -2860,6 +2904,8 @@ export type ChatEvent =
       check_max_calls?: number;
       /** The question may be about the user's servers: answered plainly, a check is offered. */
       check_offer?: boolean;
+      /** D125: what happened to the images of this answer. */
+      vision?: VisionOutcome;
     }
   | { type: "delta"; text: string }
   /** The model called the check function: what was shown so far was a lead-in, drop it. */
