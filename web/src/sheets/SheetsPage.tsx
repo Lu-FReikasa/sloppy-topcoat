@@ -278,20 +278,23 @@ export function SheetsPage({ api, id }: Props) {
           {list !== null && list.length === 0 && <p className="muted">{t("sheets.empty")}</p>}
           {list && list.length > 0 && (
             <div className="sheets-library-body">
-              <SheetTable
-                list={list}
-                groups={groups}
-                search={search}
-                onOpen={() => setSide(false)}
-                filter={{ query, setQuery, artist, setArtist, sort, setSort }}
-              />
+              {/* the print link stays with the table: on a phone the setlists stand below it */}
+              <div className="sheets-library-main">
+                <SheetTable
+                  list={list}
+                  groups={groups}
+                  search={search}
+                  onOpen={() => setSide(false)}
+                  filter={{ query, setQuery, artist, setArtist, sort, setSort }}
+                />
+                {groups.length > 0 && (
+                  <button type="button" className="link-button small" onClick={() => setPrintSongs(songsOf(groups))} data-testid="sheets-print-list">
+                    {t("sheets.print.list")}
+                  </button>
+                )}
+              </div>
               <aside className="sheets-library-side">{setlists}</aside>
             </div>
-          )}
-          {groups.length > 0 && (
-            <button type="button" className="link-button small" onClick={() => setPrintSongs(songsOf(groups))} data-testid="sheets-print-list">
-              {t("sheets.print.list")}
-            </button>
           )}
         </div>
       )}

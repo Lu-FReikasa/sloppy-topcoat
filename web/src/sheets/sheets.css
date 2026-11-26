@@ -32,6 +32,10 @@
   align-items: start;
 }
 
+.sheets-library-main {
+  min-width: 0;
+}
+
 @container (min-width: 900px) {
   .sheets-library-body {
     grid-template-columns: minmax(0, 1fr) 20rem;
