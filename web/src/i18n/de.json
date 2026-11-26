@@ -4288,8 +4288,7 @@
   "sheets": {
     "title": "Sheets",
     "list": "Deine Sheets",
-    "empty": "Noch keine Sheets. Starte eine Recherche oder füge ein Sheet ein.",
-    "pick": "Wähle links ein Sheet oder starte eine Recherche zu einem Song.",
+    "empty": "Noch keine Sheets. Recherchiere einen Song oder füge ein Sheet ein, mit „Neues Sheet …“.",
     "loading": "Lädt …",
     "capoN": "Kapo {{n}}",
     "key": "Tonart",
@@ -4373,7 +4372,8 @@
       "search": "Songs suchen",
       "artist": "Interpret",
       "allArtists": "Alle Interpreten",
-      "none": "Kein Sheet passt."
+      "none": "Kein Sheet passt.",
+      "keys": "/ oder Strg+F: suchen · Enter: ersten Song öffnen"
     },
     "sort": {
       "label": "Sortierung",
@@ -4411,7 +4411,15 @@
       "down": "Nach unten",
       "remove": "Aus der Setliste entfernen",
       "missing": "Sheet gelöscht",
-      "position": "{{name}} · {{n}} von {{total}}"
+      "position": "{{name}} · {{n}} von {{total}}",
+      "side": "Setlist"
+    },
+    "back": "Zurück zur Liste",
+    "close": "Schließen",
+    "versions": "Versionen",
+    "new": {
+      "open": "Neues Sheet …",
+      "title": "Neues Sheet"
     }
   },
   "images": {

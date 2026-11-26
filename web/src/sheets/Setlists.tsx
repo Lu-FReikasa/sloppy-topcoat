@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
+import { sheetsHref } from "../route";
 import { groupSheets } from "./group";
 import { moveItem, resolveSetlist } from "./setlist";
 import type { Setlist, SetlistItem, SheetSummary } from "./types";
@@ -28,15 +29,18 @@ interface Props {
   list: SheetSummary[];
   /** The open sheet, which "add" puts into the setlist. */
   openId?: string;
+  /** A song of the setlist is opened in the normal view (the setlist then stays beside it). */
+  onOpen: () => void;
   /** Play the setlist on the stage, from the item at this index. */
   onPlay: (setlist: Setlist, from: number) => void;
   onError: (e: unknown) => void;
 }
 
 /** The person's setlists: pick one, create, rename, delete; add the open sheet (that version or
- *  always the newest of its song), reorder by drag or Alt+↑/↓, play it on the stage. Every change
+ *  always the newest of its song), reorder by drag or Alt+↑/↓, open a song (the setlist then stays
+ *  beside it), play it on the stage from the start or from a song. Every change
  *  is saved at once; a refused one reloads the setlists from the hub. */
-export function Setlists({ api, list, openId, onPlay, onError }: Props) {
+export function Setlists({ api, list, openId, onOpen, onPlay, onError }: Props) {
   const { t } = useTranslation();
   const [setlists, setSetlists] = useState<Setlist[] | null>(null);
   const [selected, setSelectedState] = useState(rememberedSetlist);
@@ -129,6 +133,7 @@ export function Setlists({ api, list, openId, onPlay, onError }: Props) {
           openId={openId}
           onChange={(patch) => void change(current, patch)}
           onDelete={() => void remove(current)}
+          onOpen={onOpen}
           onPlay={(from) => onPlay(current, from)}
         />
       )}
@@ -164,6 +169,7 @@ function SetlistEditor({
   openId,
   onChange,
   onDelete,
+  onOpen,
   onPlay,
 }: {
   setlist: Setlist;
@@ -171,6 +177,7 @@ function SetlistEditor({
   openId?: string;
   onChange: (patch: { name?: string; items?: SetlistItem[] }) => void;
   onDelete: () => void;
+  onOpen: () => void;
   onPlay: (from: number) => void;
 }) {
   const { t } = useTranslation();
@@ -271,9 +278,9 @@ function SetlistEditor({
                 <span className="setlist-n">{i + 1}</span>
                 <span className="setlist-song">
                   {e.sheet ? (
-                    <button type="button" className="setlist-title" onClick={() => onPlay(i)} title={t("sheets.setlists.playFrom")}>
+                    <a className="setlist-title" href={sheetsHref(e.sheet.id)} onClick={onOpen} aria-current={e.sheet.id === openId ? "page" : undefined}>
                       {e.sheet.title}
-                    </button>
+                    </a>
                   ) : (
                     <span className="muted">{t("sheets.setlists.missing")}</span>
                   )}
@@ -284,13 +291,16 @@ function SetlistEditor({
                   )}
                 </span>
                 <span className="setlist-tools">
-                  <button type="button" onClick={() => move(i, i - 1)} disabled={i === 0} aria-label={t("sheets.setlists.up")} title={t("sheets.setlists.up")}>
+                  <button type="button" onClick={() => onPlay(i)} disabled={!e.sheet} aria-label={t("sheets.setlists.playFrom")} title={t("sheets.setlists.playFrom")}>
+                    ▶
+                  </button>
+                  <button type="button" onClick={() => move(i, i - 1)} disabled={i === 0} className="setlist-edit" aria-label={t("sheets.setlists.up")} title={t("sheets.setlists.up")}>
                     ↑
                   </button>
-                  <button type="button" onClick={() => move(i, i + 1)} disabled={i === items.length - 1} aria-label={t("sheets.setlists.down")} title={t("sheets.setlists.down")}>
+                  <button type="button" onClick={() => move(i, i + 1)} disabled={i === items.length - 1} className="setlist-edit" aria-label={t("sheets.setlists.down")} title={t("sheets.setlists.down")}>
                     ↓
                   </button>
-                  <button type="button" onClick={() => onChange({ items: drop(i) })} aria-label={t("sheets.setlists.remove")} title={t("sheets.setlists.remove")}>
+                  <button type="button" onClick={() => onChange({ items: drop(i) })} className="setlist-edit" aria-label={t("sheets.setlists.remove")} title={t("sheets.setlists.remove")}>
                     ×
                   </button>
                 </span>

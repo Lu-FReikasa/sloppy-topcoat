@@ -4288,8 +4288,7 @@
   "sheets": {
     "title": "Sheets",
     "list": "Your sheets",
-    "empty": "No sheets yet. Start a research or paste a sheet.",
-    "pick": "Pick a sheet on the left, or start a research for a song.",
+    "empty": "No sheets yet. Research a song or paste a sheet with “New sheet …”.",
     "loading": "Loading …",
     "capoN": "Capo {{n}}",
     "key": "Key",
@@ -4373,7 +4372,8 @@
       "search": "Search songs",
       "artist": "Artist",
       "allArtists": "All artists",
-      "none": "No sheet matches."
+      "none": "No sheet matches.",
+      "keys": "/ or Ctrl+F: search · Enter: open the first song"
     },
     "sort": {
       "label": "Sort",
@@ -4411,7 +4411,15 @@
       "down": "Move down",
       "remove": "Remove from the setlist",
       "missing": "Sheet deleted",
-      "position": "{{name}} · {{n}} of {{total}}"
+      "position": "{{name}} · {{n}} of {{total}}",
+      "side": "Setlist"
+    },
+    "back": "Back to the list",
+    "close": "Close",
+    "versions": "Versions",
+    "new": {
+      "open": "New sheet …",
+      "title": "New sheet"
     }
   },
   "images": {
