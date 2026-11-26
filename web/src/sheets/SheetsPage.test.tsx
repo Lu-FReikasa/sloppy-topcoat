@@ -443,6 +443,38 @@ describe("Sheets", () => {
     }
   });
 
+  it("leaves the keys to another window in front of the stage's window", async () => {
+    const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song" };
+    const { api } = client({
+      "GET /api/sheets": { sheets: [SUMMARY, zebra] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/setlists": { setlists: [] },
+      "GET /api/sheets/s1": detail(true, ["G", "D"]),
+    });
+    // the desktop's windows: the Sheets window and another one in front of it
+    const sheetsWin = document.body.appendChild(document.createElement("div"));
+    sheetsWin.className = "dt-program dt-focused";
+    const other = document.body.appendChild(document.createElement("textarea"));
+    try {
+      window.sessionStorage.clear();
+      window.location.hash = "#/sheets/s1";
+      render(<SheetsPage api={api} id="s1" />, { container: sheetsWin.appendChild(document.createElement("div")) });
+      fireEvent.click(await screen.findByTestId("sheet-stage-open"));
+      await screen.findByTestId("sheet-stage");
+      sheetsWin.classList.remove("dt-focused");
+      const arrow = fireEvent.keyDown(other, { key: "ArrowRight" });
+      fireEvent.keyDown(other, { key: "Escape" });
+      expect(arrow).toBe(true); // not prevented: the caret in the other window's field moves
+      expect(screen.queryByTestId("sheet-stage")).not.toBeNull();
+      sheetsWin.classList.add("dt-focused");
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(screen.queryByTestId("sheet-stage")).toBeNull();
+    } finally {
+      sheetsWin.remove();
+      other.remove();
+    }
+  });
+
   it("plays in setlist order on the stage, from a song picked in the title view", async () => {
     const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song" };
     const gig: Setlist = { id: "L1", name: "Gig", items: [{ sheet_id: "s9", newest: false }, { sheet_id: "s1", newest: false }], updated_at: null, created_at: null };

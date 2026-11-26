@@ -890,6 +890,7 @@ function Stage({
   // default on: a repeat written out once saves lines when a song has to fit one screen
   const [collapse, setCollapseState] = useState(() => remembered(COLLAPSE_KEY) !== "0");
   const [fit, setFit] = useState<Fit | null>(null);
+  const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const setHideTabs = (on: boolean) => {
@@ -926,8 +927,9 @@ function Stage({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // a dialog over the stage (the desktop's command palette) keeps its keys
-      if (e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
+      // a dialog over the stage (the desktop's command palette) keeps its keys, and so does another
+      // window brought in front of this one (its text field's arrows, its own Esc)
+      if (e.defaultPrevented || !inFront(root.current)) return;
       if (e.key === "Escape") leave();
       else if (e.key === "ArrowRight" || e.key === "PageDown") go(next, 1);
       else if (e.key === "ArrowLeft" || e.key === "PageUp") go(prev, -1);
@@ -977,7 +979,7 @@ function Stage({
 
   const v = sheet?.view;
   return (
-    <div className="sheet-stage" data-testid="sheet-stage">
+    <div ref={root} className="sheet-stage" data-testid="sheet-stage">
       <header className="sheet-stage-head">
         {setlistName && here >= 0 && (
           <span className="sheet-stage-set" data-testid="sheet-stage-set">
