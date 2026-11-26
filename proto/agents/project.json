@@ -31,17 +31,23 @@
   "tasks": [
     {
       "de": "Aufgaben anlegen, umschreiben oder verschieben (als Änderungssatz)",
+      "en": "Create, rewrite or move tasks (as a change set)",
       "example_de": "Schreib Aufgabe 3.1.1 klarer.",
+      "example_en": "Rewrite task 3.1.1 more clearly.",
       "output": "changeset"
     },
     {
       "de": "Einen Plan in Aufgaben zerlegen",
+      "en": "Break a plan down into tasks",
       "example_de": "Plane die Wiki-Prüfung als Aufgaben.",
+      "example_en": "Plan the wiki review as tasks.",
       "output": "changeset"
     },
     {
       "de": "Den Stand der Projekte zusammenfassen",
+      "en": "Summarise the state of the projects",
       "example_de": "Was ist diese Woche offen?",
+      "example_en": "What is open this week?",
       "output": "text"
     }
   ],
@@ -68,9 +74,18 @@
       "etwas löschen (nur archivieren)",
       "eine Freigabe selbst erteilen, ausweiten oder einen Klick von dir vorwegnehmen"
     ],
+    "never_en": [
+      "write code or change files outside Projects",
+      "delete anything (only archive)",
+      "grant or widen an approval without you, or act ahead of your click"
+    ],
     "needs_click_de": [
       "jeden Änderungssatz an deinen Projekten",
       "das Starten von Aufgaben"
+    ],
+    "needs_click_en": [
+      "every change set to your projects",
+      "starting tasks"
     ]
   },
   "outputs": [
@@ -79,11 +94,13 @@
   "talks_to": [
     {
       "to": "research",
-      "for_de": "Recherche-Aufgaben"
+      "for_de": "Recherche-Aufgaben",
+      "for_en": "research tasks"
     },
     {
       "to": "dev",
-      "for_de": "Code-Aufgaben und Issues"
+      "for_de": "Code-Aufgaben und Issues",
+      "for_en": "code tasks and issues"
     }
   ],
   "model_role": "general",

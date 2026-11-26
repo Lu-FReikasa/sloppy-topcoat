@@ -110,7 +110,25 @@ def test_the_cut_order_is_profile_then_household_then_examples_then_rules_never_
     assert full.cut == [] and not full.examples_dropped
 
 
-def test_pinned_comes_first_then_reliability_times_usefulness() -> None:
+def test_use_counts_do_not_move_a_note_in_the_core() -> None:
+    """D124: recalled and used counts and the feedback are no ranking input."""
+    plain = item("plain", created_at=NOW - timedelta(days=3))
+    counted = item(
+        "counted",
+        created_at=NOW - timedelta(days=3),
+        recalled_count=40,
+        used_count=30,
+        feedback_positive=5,
+        last_used_at=NOW,
+    )
+    order = core_rules.ranked([counted, plain], NOW, memory_care.DEFAULT)
+    assert order == core_rules.ranked([plain, counted], NOW, memory_care.DEFAULT)
+    assert core_rules._score(plain, NOW, memory_care.DEFAULT) == core_rules._score(
+        counted, NOW, memory_care.DEFAULT
+    )
+
+
+def test_pinned_comes_first_then_reliability() -> None:
     fresh = item("fresh", created_at=NOW - timedelta(days=1), confirmed_count=3)
     stale = item("stale", created_at=NOW - timedelta(days=900))
     pinned = item("pinned but stale", core=True, created_at=NOW - timedelta(days=900))

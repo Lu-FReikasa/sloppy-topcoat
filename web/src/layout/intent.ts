@@ -10,6 +10,8 @@ export interface OpenIntent {
   /** Open the module in this program (its key) instead of the one that fits: a chat of the
    *  development program, while the chat program is in front. */
   program?: string;
+  /** The address that asked was not known: the view says the page moved or does not exist. */
+  moved?: boolean;
 }
 
 let pending: OpenIntent | null = null;

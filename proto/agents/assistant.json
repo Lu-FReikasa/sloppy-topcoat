@@ -13,17 +13,23 @@
   "tasks": [
     {
       "de": "Fragen beantworten und erklären",
+      "en": "Answer questions and explain",
       "example_de": "Was ist ein Reverse Proxy?",
+      "example_en": "What is a reverse proxy?",
       "output": "text"
     },
     {
       "de": "Arbeit an die passende Anwendung weitergeben",
+      "en": "Hand work to the right application",
       "example_de": "Recherchiere die besten lokalen Bildmodelle.",
+      "example_en": "Research the best local image models.",
       "output": "text"
     },
     {
       "de": "Den Zustand der Rechner nennen, wie der Hub ihn kennt",
+      "en": "Report the state of the machines as the hub knows it",
       "example_de": "Wie geht es den Rechnern?",
+      "example_en": "How are the machines doing?",
       "output": "text"
     }
   ],
@@ -50,27 +56,39 @@
       "Persönliches ohne dein Wort an eine andere Anwendung geben",
       "eine Freigabe selbst erteilen, ausweiten oder einen Klick von dir vorwegnehmen"
     ],
+    "never_en": [
+      "change anything on your machines",
+      "pass anything personal to another application without your word",
+      "grant or widen an approval without you, or act ahead of your click"
+    ],
     "needs_click_de": [
       "jede Änderung, die eine andere Anwendung vorbereitet"
+    ],
+    "needs_click_en": [
+      "every change that another application prepares"
     ]
   },
   "outputs": [],
   "talks_to": [
     {
       "to": "research",
-      "for_de": "Recherchen im Web"
+      "for_de": "Recherchen im Web",
+      "for_en": "web research"
     },
     {
       "to": "dev",
-      "for_de": "Code und Tests"
+      "for_de": "Code und Tests",
+      "for_en": "code and tests"
     },
     {
       "to": "admin",
-      "for_de": "den Zustand deiner Rechner"
+      "for_de": "den Zustand deiner Rechner",
+      "for_en": "the state of your machines"
     },
     {
       "to": "project",
-      "for_de": "Planung und Aufgaben"
+      "for_de": "Planung und Aufgaben",
+      "for_en": "planning and tasks"
     }
   ],
   "model_role": "general",

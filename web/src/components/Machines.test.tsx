@@ -148,7 +148,7 @@ describe("Overview by machine", () => {
     render(<Overview nodes={[host, tool]} loaded error={null} api={api} />);
     const row = await screen.findByTestId("machine-host");
     const vm = screen.getByTestId("machine-guest");
-    expect(within(row).getByRole("link", { name: /Host/ })).toBeTruthy();
+    expect(within(row).getByRole("link", { name: /node-host/ })).toBeTruthy();
     expect(within(vm).getByText("VM auf Host")).toBeTruthy();
     // the VM follows its host and is marked as indented
     const rows = screen.getAllByTestId(/^machine-(host|guest)$/);
@@ -183,6 +183,15 @@ describe("Overview by machine", () => {
     expect(within(chipD).getByText("Entwicklung")).toBeTruthy();
     expect(within(chipD).getByRole("link", { name: /dev-guest/ }).getAttribute("href")).toBe("#/admin/nodes/d");
     expect(within(chipT).getByText("Verfügbar")).toBeTruthy();
+  });
+
+  it("keeps the short machine name on screen and gives the full node name as tooltip and label (#77)", async () => {
+    const { api } = hub();
+    render(<Overview nodes={[host, tool]} loaded error={null} api={api} />);
+    const row = await screen.findByTestId("machine-host");
+    const link = within(row).getByRole("link", { name: "Details zu node-host anzeigen" });
+    expect(link.textContent).toBe("Host");
+    expect(link.getAttribute("title")).toBe("node-host");
   });
 
   it("applies the node filter to the rows", async () => {

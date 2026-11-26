@@ -13,8 +13,6 @@ const base = {
   refreshNodes: () => undefined,
   tick: 0,
   inboxTick: 0,
-  epoch: 0,
-  detail: null,
   dispatch: () => undefined,
 } as unknown as ModuleCtx;
 

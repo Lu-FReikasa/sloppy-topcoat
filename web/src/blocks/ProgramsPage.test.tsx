@@ -67,6 +67,8 @@ describe("ProgramsPage", () => {
     render(<ProgramsPage api={api} />);
     expect(await screen.findAllByTestId("block-agent")).toHaveLength(1);
     expect(screen.getAllByTestId("block-revise")).toHaveLength(1); // inside the loop
+    // the shipped program's title in the GUI's language, by its name (issue #11)
+    expect(screen.getByRole("button", { name: "Recherchebericht mit Überarbeitung" })).toBeTruthy();
     const saveAs = screen.getByLabelText("Speichern als") as HTMLInputElement;
     expect(saveAs.value).toBe("research_report_copy"); // a program that ships is not overwritten
     fireEvent.change(saveAs, { target: { value: "my_copy" } });

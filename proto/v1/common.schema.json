@@ -161,6 +161,11 @@
           "type": "boolean",
           "description": "true = the file is in the node's own <data dir>/models (the hub can move or delete it); false = in a configured model_dirs entry (read-only for the hub); absent = not reported"
         },
+        "projector": {
+          "type": "string",
+          "minLength": 1,
+          "description": "file name of the vision projector (mmproj) the node loads with this model (llama-server --mmproj, D125); absent = none, the model cannot see"
+        },
         "gguf": {
           "type": "object",
           "additionalProperties": false,

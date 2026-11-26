@@ -104,12 +104,13 @@ def recent_budget(total: int, configured: int = 150) -> int:
 
 
 def _score(item: Any, now: datetime, cfg: memory_care.CareConfig) -> float:
-    """Reliability x usefulness: how much a note deserves a place when there is not room for all."""
-    return memory_care.reliability(item, now, cfg) * (0.5 + memory_care.usefulness(item, now))
+    """Reliability: how much a note deserves a place when there is not room for all. How often a
+    note was recalled or used is no ranking input (D124: it measured the wording, not the note)."""
+    return memory_care.reliability(item, now, cfg)
 
 
 def ranked(items: Iterable[Any], now: datetime, cfg: memory_care.CareConfig) -> list[Any]:
-    """Pinned first, then by reliability x usefulness; a weak style hint after the others; ties by
+    """Pinned first, then by reliability; a weak style hint after the others; ties by
     age then id, so the order is the same every time."""
     return sorted(
         items,

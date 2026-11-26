@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
 import { describeError, toActionError } from "../errors";
+import { blockProgramTitle } from "../i18n/shipped";
 import type { BlockCatalogue, BlockProgramInfo, BlockRunView } from "../types";
 import { BlockEditor } from "./BlockEditor";
 import { checked, type Program } from "./edit";
@@ -317,7 +318,7 @@ export function ProgramsPage({ api }: { api: ApiClient }) {
                 aria-pressed={p.name === selected}
                 onClick={() => choose(p)}
               >
-                {p.title}
+                {blockProgramTitle(p, t)}
               </button>{" "}
               <span className="muted small">{p.builtin ? t("blocksPage.shipped") : t("blocksPage.mine")}</span>
             </li>

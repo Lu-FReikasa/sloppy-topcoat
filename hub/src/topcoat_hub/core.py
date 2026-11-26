@@ -231,10 +231,15 @@ class CoreService:
         return found if found is not None and found.status == "active" else None
 
     async def frame_of(
-        self, db: AsyncSession, conv: Conversation | None, with_self: bool = True
+        self,
+        db: AsyncSession,
+        conv: Conversation | None,
+        with_self: bool = True,
+        language: str = "en",
     ) -> str:
         """The frame of the conversation's program (D74): its tone and rules, as an admin set them
-        on the program; nothing for a conversation without one."""
+        on the program; nothing for a conversation without one. The self-description in it is in
+        the person's ``language``."""
         if conv is None:
             return ""
         application = conv.application or DEFAULT_APPLICATION
@@ -243,7 +248,7 @@ class CoreService:
         # who answers, from the program's contract (1.9): "what can you do" is answered in words;
         # in the system prompt, so the prefix stays the same for every turn of the conversation
         # (not with a small context: its room is for the conversation)
-        own = agent_contract.short(application) if with_self else ""
+        own = agent_contract.short(application, language) if with_self else ""
         if own:
             frame = f"{frame}\n- {agent_contract.SELF_HINT} {own}".strip("\n")
         return frame
@@ -350,7 +355,7 @@ class CoreService:
                 db, user_id, (conv.application or DEFAULT_APPLICATION) if conv is not None else None
             )
             m = await self._material(db, user_id, language, memory_enabled, persona, scope, conv)
-            m["frame"] = await self.frame_of(db, conv, _room_for_self(context_length))
+            m["frame"] = await self.frame_of(db, conv, _room_for_self(context_length), language)
             stamp = self._stamp(m, budget, language, memory_enabled)
             if conv is not None and conv.core_stamp == stamp and conv.core_text:
                 await db.commit()  # (the seeding of a new user, if there was any)
@@ -386,7 +391,7 @@ class CoreService:
                 db, user_id, (conv.application or DEFAULT_APPLICATION) if conv is not None else None
             )
             m = await self._material(db, user_id, language, memory_enabled, persona, scope, conv)
-            m["frame"] = await self.frame_of(db, conv, _room_for_self(context_length))
+            m["frame"] = await self.frame_of(db, conv, _room_for_self(context_length), language)
             block = self._build(m, budget, language)
             await db.commit()
             return block

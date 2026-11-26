@@ -68,6 +68,8 @@ type ProfileModel struct {
 	Format    string `json:"format"`
 	// VRAMMB is the VRAM the model occupies when loaded.
 	VRAMMB int64 `json:"vram_mb"`
+	// Projector is the vision projector file the runner would load with the model (D125).
+	Projector string `json:"projector,omitempty"`
 }
 
 // DefaultProfile is a 16 GB AMD GPU, 32 GB RAM and three models of different sizes.
@@ -437,7 +439,7 @@ func (f fakeRunner) ListModels(context.Context) ([]runner.Model, error) {
 	}
 	out := make([]runner.Model, 0, len(f.w.profile.Models))
 	for _, m := range f.w.profile.Models {
-		out = append(out, runner.Model{Name: m.Name, SizeBytes: m.SizeBytes, Format: m.Format, Own: true})
+		out = append(out, runner.Model{Name: m.Name, SizeBytes: m.SizeBytes, Format: m.Format, Own: true, Projector: m.Projector})
 	}
 	if f.w.ModelsDir != "" {
 		files, _ := filepath.Glob(filepath.Join(f.w.ModelsDir, "*.gguf"))

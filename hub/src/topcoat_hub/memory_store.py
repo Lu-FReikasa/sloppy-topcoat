@@ -196,7 +196,6 @@ class MemoryStore:
         existing: MemoryItem | None,
         texts: Sequence[str | None] = (),
         changes_content: bool = True,
-        sets_verify: bool = False,
     ) -> None:
         """Refuse a write the rules do not allow — here, in the store, so no prompt and no
         careless caller can get around it:
@@ -243,13 +242,6 @@ class MemoryStore:
             and actor not in MIRROR_ACTORS
         ):
             raise ProtectedWrite("a note mirrored from a note file changes only with the file")
-        if (
-            sets_verify
-            and existing is not None
-            and existing.source_type == "kb"
-            and actor != "care"
-        ):
-            raise ProtectedWrite("a way to check a mirrored note is set by the care run only")
         if instruction or scope != "user":
             for value in texts:
                 if value and (rule := memory_filter.check(value)):
@@ -359,7 +351,6 @@ class MemoryStore:
         actor: str,
         kind: str = "person",
         expires_at: datetime | None = None,
-        verify_with: dict[str, Any] | None = None,
         last_verified_at: datetime | None = None,
         core: bool = False,
         scope: str | None = None,
@@ -417,7 +408,6 @@ class MemoryStore:
             example=example,
             weak=bool(weak),
             expires_at=expires_at,
-            verify_with=verify_with,
             last_verified_at=last_verified_at,
             verified_count=1 if last_verified_at is not None else 0,
             user_id=self.user_id,
@@ -552,14 +542,11 @@ class MemoryStore:
         source: dict[str, Any] | None = None,
         kind: str | None = None,
         expires_at: datetime | None = _UNSET,
-        verify_with: dict[str, Any] | None = _UNSET,
-        verified_at: datetime | None = None,
         core: bool | None = None,
         example: str | None = _UNSET,
     ) -> MemoryItem | None:
         """Change an item and record the new version with its reason; None if it is not the
-        user's. Only the given fields change. ``verified_at``: a live check showed the (new)
-        content holds — counted, trust back to 1."""
+        user's. Only the given fields change."""
         item = await self.get(item_id)
         if item is None:
             return None
@@ -576,7 +563,6 @@ class MemoryStore:
             changes_content=any(
                 v is not None and v is not _UNSET for v in (text_, status, kind, core, example)
             ),
-            sets_verify=verify_with is not _UNSET,
         )
         if core is not None:
             item.core = core
@@ -588,13 +574,6 @@ class MemoryStore:
             item.kind = kind
         if expires_at is not _UNSET:
             item.expires_at = expires_at
-        if verify_with is not _UNSET:
-            item.verify_with = verify_with
-        if verified_at is not None:
-            item.last_verified_at = verified_at
-            item.verified_count = (item.verified_count or 0) + 1
-            item.trust = 1.0
-            item.care_checked_at = verified_at
         if text_ is not None:
             item.text = normalise_text(text_)
         if embedding is not _UNSET:
@@ -720,7 +699,7 @@ class MemoryStore:
     async def tagged(
         self, tag_ids: set[uuid.UUID], limit: int = 12
     ) -> list[tuple[MemoryItem, float]]:
-        """Live facts this reader may see that carry one of these tags, the most used first."""
+        """Live facts this reader may see that carry one of these tags, the newest first."""
         rows = await self.db.scalars(
             select(MemoryItem)
             .where(
@@ -733,7 +712,7 @@ class MemoryStore:
                     MemoryItemTag.tag_id.in_(list(tag_ids)),
                 ),
             )
-            .order_by(MemoryItem.used_count.desc(), MemoryItem.updated_at.desc())
+            .order_by(MemoryItem.updated_at.desc(), MemoryItem.id)
             .limit(limit)
         )
         return [(i, 1.0) for i in rows]
@@ -1028,43 +1007,7 @@ class MemoryStore:
             stmt = stmt.where(MemoryRun.kind == kind)
         return await self.db.scalar(stmt.limit(1))
 
-    # --- care (E3-05): checks, use, feedback, expiry ------------------------------------------
-
-    async def mark_care_checked(self, item_id: uuid.UUID, now: datetime) -> None:
-        await self.db.execute(
-            update(MemoryItem)
-            .where(MemoryItem.id == item_id, MemoryItem.user_id == self.user_id)
-            .values(care_checked_at=now)
-        )
-
-    async def lower_trust(
-        self, item_id: uuid.UUID, factor: float, floor: float, now: datetime
-    ) -> None:
-        """A check could not be made: trust the note less (never below ``floor``) and do not
-        look again right away."""
-        await self.db.execute(
-            update(MemoryItem)
-            .where(MemoryItem.id == item_id, MemoryItem.user_id == self.user_id)
-            .values(trust=func.greatest(MemoryItem.trust * factor, floor), care_checked_at=now)
-        )
-
-    async def verify(self, item_id: uuid.UUID, now: datetime) -> MemoryItem | None:
-        """A live check showed the note still holds: counted (twice as strong as a statement),
-        the clock restarts, trust is back to 1. No new version: nothing about the note changed."""
-        await self.db.execute(
-            update(MemoryItem)
-            .where(MemoryItem.id == item_id, MemoryItem.user_id == self.user_id)
-            .values(
-                last_verified_at=now,
-                verified_count=MemoryItem.verified_count + 1,
-                trust=1.0,
-                care_checked_at=now,
-            )
-        )
-        item = await self.get(item_id)
-        if item is not None:
-            await self.db.refresh(item)
-        return item
+    # --- care (E3-05): use, feedback, expiry ------------------------------------------------
 
     async def record_recalled(self, item_ids: Sequence[uuid.UUID]) -> None:
         """These notes went into a prompt."""

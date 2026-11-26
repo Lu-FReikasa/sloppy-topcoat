@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { overlayOf } from "../desktop/state";
 import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
@@ -19,11 +19,14 @@ import { ResearchOffer } from "../chat/ResearchOffer";
 import { ReportCardView } from "../chat/ReportCard";
 import { ReviewNote, useReviewLights, useReviews } from "../chat/ReviewNote";
 import { useChat } from "../chat/useChat";
+import { ImageAttachButton, ImageDraftStrip, MessageImages } from "../chat/ChatImages";
+import { imageFiles, useImageDraft, type DraftImage } from "../chat/images";
 import { useStickToBottom } from "../chat/useStickToBottom";
 import { dayKey, dayLabel } from "../chat/time";
 import { COMPOSE_EVENT, takeCompose } from "../desktop/compose";
 import { requestShow, showFromInput } from "../files/bus";
 import type {
+  ActivityItem,
   ChatMessage,
   ChatSettings,
   ChatToolsOverview,
@@ -38,9 +41,16 @@ import { EvidenceMark } from "./EvidenceMark";
 import { IdleArt } from "./IdleArt";
 import { Clipper, moodOf, useClipperActive } from "../persona/Clipper";
 import { MessageLine } from "./MessageLine";
+import { MIN_LINES, useGrowingTextarea } from "./growTextarea";
 
 /** What the user sees of the history: what was said, an emoji answer, the card of a request that
  *  was handed to the queue, and the result cards of checks (folded), not the run behind it. */
+/** An activity note on the images of an answer (D125): `vision_routed` or `vision_blind`. */
+export function isVisionNote(item: ActivityItem): boolean {
+  const event = item.data?.event;
+  return item.kind === "note" && typeof event === "string" && event.startsWith("vision_");
+}
+
 export function visibleMessages(messages: ChatMessage[]): ChatMessage[] {
   return messages.filter((m) => {
     if (m.kind === "report") return !!m.report;
@@ -140,6 +150,9 @@ export function TalkPage({
     undoNote,
   } = chat;
   const [draft, setDraft] = useState("");
+  // D125: images for the next message (pasted, dropped or chosen)
+  const pictures = useImageDraft();
+  const loadImage = useCallback((imageId: string) => api.chatImage(imageId), [api]);
   const [sections, setSections] = useState<ConversationSegments | null>(null);
   const [thread, setThread] = useState<ConversationThread | null>(null);
   // "new section" was asked: the next message goes into a new chat that continues this one
@@ -147,6 +160,8 @@ export function TalkPage({
   // the window shows the open chat only; the chats before it are one click away
   const [showEarlier, setShowEarlier] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
+  const room = useRef<HTMLElement>(null);
+  useGrowingTextarea(input, draft, room);
   const creating = useRef(false);
   // a text another window handed over ("Look at this in Development") goes into the draft
   useEffect(() => {
@@ -328,7 +343,7 @@ export function TalkPage({
 
   /** Where the next message goes: this chat, or (after a rest, or when a new section was asked
    *  for) a new chat that continues it. */
-  async function post(from: string, text: string) {
+  async function post(from: string, text: string, images: DraftImage[] = []) {
     let target = from;
     try {
       const next = await api.nextSection(from, wantBreak);
@@ -340,15 +355,17 @@ export function TalkPage({
       // the message still goes to this chat
     }
     setWantBreak(false);
-    send(target, text);
+    send(target, text, "auto", images);
   }
 
   function submit() {
     const text = draft.trim();
-    if (!detail || !text || running) return;
+    const images = pictures.images;
+    if (!detail || (!text && images.length === 0) || running) return;
     setDraft("");
+    pictures.clear();
     stick();
-    void post(detail.id, text);
+    void post(detail.id, text, images);
     input.current?.focus();
   }
 
@@ -365,7 +382,7 @@ export function TalkPage({
   const cutOff =
     lastAnswer?.status === "truncated" || lastAnswer?.status === "interrupted";
   return (
-    <section className="talk" aria-label={t("talk.label")}>
+    <section ref={room} className="talk" aria-label={t("talk.label")}>
       <div
         className="talk-stream"
         ref={ref}
@@ -437,7 +454,9 @@ export function TalkPage({
               )}
               {m.role === "assistant" &&
                 m.activity &&
-                m.activity.length > 0 && (
+                m.activity.some((a) => !isVisionNote(a)) && (
+                  // a chain that only says what happened to the images is no chain of steps:
+                  // the notice under the answer says it (D125)
                   <div className="talk-chain">
                     <ActivityTimeline
                       items={m.activity}
@@ -472,7 +491,12 @@ export function TalkPage({
                       )}
                     </>
                   ) : (
-                    m.content
+                    <>
+                      {m.images && m.images.length > 0 && (
+                        <MessageImages images={m.images} load={loadImage} />
+                      )}
+                      {m.content}
+                    </>
                   )}
                   {report?.report && (
                     // the check of this answer: at its end, folded, not a message of its own
@@ -495,7 +519,24 @@ export function TalkPage({
                 </div>
               )}
               {id && m.id > 0 && (
-                <MessageLine api={api} conversationId={id} message={m} />
+                <MessageLine api={api} conversationId={id} message={m}>
+                  {m.role === "assistant" &&
+                    m.status === "complete" &&
+                    (m.kind ?? "say") === "say" &&
+                    (reviews[m.id]?.reviewer_model ?? "hub") === "hub" && (
+                      // in the answer's footer, a small button: as a bar of its own it read as a
+                      // separator between messages (#77)
+                      <button
+                        type="button"
+                        className="talk-review-ask"
+                        disabled={asked.has(m.id)}
+                        onClick={() => reviewAnswer(m.id)}
+                        title={t("talk.reviewAskHint")}
+                      >
+                        {asked.has(m.id) ? t("talk.reviewAsked") : t("talk.reviewAsk")}
+                      </button>
+                    )}
+                </MessageLine>
               )}
               {m.role === "assistant" && notes?.[m.id] && id && (
                 <RememberedNotes
@@ -507,6 +548,13 @@ export function TalkPage({
                 <ReviewNote review={reviews[m.id]!} api={api} />
               )}
               {m.role === "assistant" &&
+                m.activity?.some((a) => a.data?.event === "vision_blind") && (
+                  // D125: the model of this answer could not see the images it was given
+                  <p className="talk-calm" role="status" data-testid="vision-blind">
+                    {t("images.blind")}
+                  </p>
+                )}
+              {m.role === "assistant" &&
                 (m.status === "error" || m.status === "interrupted") && (
                   <p className="talk-calm" role="status">
                     {t("talk.failed")}
@@ -515,22 +563,6 @@ export function TalkPage({
               {m.role === "assistant" && (
                 <EvidenceMark message={m} light={lights[m.id] ?? null} />
               )}
-              {m.role === "assistant" &&
-                api &&
-                m.id > 0 &&
-                m.status === "complete" &&
-                (m.kind ?? "say") === "say" &&
-                (reviews[m.id]?.reviewer_model ?? "hub") === "hub" && (
-                  <button
-                    type="button"
-                    className="talk-review-ask small"
-                    disabled={asked.has(m.id)}
-                    onClick={() => reviewAnswer(m.id)}
-                    title={t("talk.reviewAskHint")}
-                  >
-                    {asked.has(m.id) ? t("talk.reviewAsked") : t("talk.reviewAsk")}
-                  </button>
-                )}
             </div>
           );
         })}
@@ -564,7 +596,7 @@ export function TalkPage({
               </button>
             </p>
           )}
-        {running && chain.length > 0 && (
+        {running && chain.some((a) => !isVisionNote(a)) && (
           <div className="talk-chain" data-testid="talk-chain">
             <ActivityTimeline items={chain} live />
             {stream?.meta?.message_id && stream.check && !stream.check.done && (
@@ -717,21 +749,46 @@ export function TalkPage({
           seed={messages.length}
         />
       )}
+      <ImageDraftStrip
+        images={pictures.images}
+        problem={pictures.problem}
+        onRemove={pictures.remove}
+      />
       <form
         className="talk-composer"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
         }}
+        onDragOver={(e) => {
+          if (Array.from(e.dataTransfer.types).includes("Files")) e.preventDefault();
+        }}
+        onDrop={(e) => {
+          const files = imageFiles(e.dataTransfer);
+          if (files.length === 0) return;
+          e.preventDefault();
+          void pictures.add(files);
+        }}
       >
+        <ImageAttachButton
+          disabled={!detail}
+          onFiles={(files) => void pictures.add(files)}
+        />
         <textarea
           ref={input}
-          rows={1}
+          rows={MIN_LINES}
           value={draft}
           placeholder={t("talk.placeholder")}
           aria-label={t("talk.placeholder")}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKey}
+          onPaste={(e) => {
+            // a screenshot on the clipboard becomes an image of the message (D125)
+            const files = imageFiles(e.clipboardData);
+            if (files.length === 0) return;
+            e.preventDefault();
+            void pictures.add(files);
+          }}
         />
         {running ? (
           <button type="button" onClick={() => detail && stop(detail.id)}>
@@ -741,7 +798,7 @@ export function TalkPage({
           <button
             type="submit"
             className="primary"
-            disabled={!detail || draft.trim() === ""}
+            disabled={!detail || (draft.trim() === "" && pictures.images.length === 0)}
           >
             {t("talk.send")}
           </button>

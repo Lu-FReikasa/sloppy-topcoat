@@ -13,12 +13,16 @@
   "tasks": [
     {
       "de": "Den Zustand der Rechner und Dienste prüfen, mit Belegen",
+      "en": "Check the state of the machines and services, with evidence",
       "example_de": "Warum ist der Hub langsam?",
+      "example_en": "Why is the hub slow?",
       "output": "diagnosis"
     },
     {
       "de": "Eine Änderung als einen konkreten Vorschlag vorbereiten",
+      "en": "Prepare a change as one concrete proposal",
       "example_de": "Starte den hängenden Container neu.",
+      "example_en": "Restart the stuck container.",
       "output": "proposal"
     }
   ],
@@ -80,8 +84,16 @@
       "ohne deinen Klick etwas ändern",
       "eine Freigabe selbst erteilen, ausweiten oder einen Klick von dir vorwegnehmen"
     ],
+    "never_en": [
+      "open a shell or run arbitrary commands",
+      "change anything without your click",
+      "grant or widen an approval without you, or act ahead of your click"
+    ],
     "needs_click_de": [
       "jede Aktion, die an einem Rechner etwas ändert (zum Beispiel ein Neustart)"
+    ],
+    "needs_click_en": [
+      "every action that changes something on a machine (a restart, for example)"
     ]
   },
   "outputs": [
@@ -90,7 +102,8 @@
   "talks_to": [
     {
       "to": "project",
-      "for_de": "Befunde zu einer Aufgabe"
+      "for_de": "Befunde zu einer Aufgabe",
+      "for_en": "findings on a task"
     }
   ],
   "model_role": "general",

@@ -224,6 +224,10 @@ def is_context_full(text: str) -> bool:
 CUT = "cut"  # GatewayError.reason: the answer broke off on the node's side (see call_streamed)
 
 
+# how often a request that woke a node looks whether it has connected
+WAKE_POLL_SECONDS = 1.0
+
+
 class GatewayError(Exception):
     """An error answered to the client in OpenAI format."""
 
@@ -665,6 +669,10 @@ class Gateway:
         # "alt" (the old order, default) or "neu" (the profile of the work picks the first node,
         # choice.py); an admin switches it, see api/scheduling.py
         self.choice_mode: str = "alt"
+        # wakes a sleeping node (Wake-on-LAN; wake.demand_waker): (node id, model) -> packets
+        # sent. None = the hub never wakes a node on demand (tests, tools)
+        self.waker: Callable[[uuid.UUID, str], Awaitable[int]] | None = None
+        self._waking: dict[uuid.UUID, float] = {}  # node -> monotonic end of its wake wait
         # newest current score of the "answer" suite per model, from the bench (refreshed with
         # the proofs, so a new rating is used after the next load_proofs)
         self.answer_quality: dict[str, float] = {}
@@ -901,10 +909,15 @@ class Gateway:
                             for m in summary["models"]
                             if m.get("loaded") and m.get("context_length")
                         },
+                        # the header facts, plus the projector the node loads with the model
+                        # (D125): model_facts reads "can see" from it
                         gguf={
-                            m["name"]: m["gguf"]
+                            m["name"]: {
+                                **(m.get("gguf") if isinstance(m.get("gguf"), dict) else {}),
+                                **({"projector": m["projector"]} if m.get("projector") else {}),
+                            }
                             for m in summary["models"]
-                            if isinstance(m.get("gguf"), dict)
+                            if isinstance(m.get("gguf"), dict) or m.get("projector")
                         },
                         parallel={
                             m["name"]: max(1, int(m.get("n_parallel") or 1))
@@ -981,7 +994,86 @@ class Gateway:
             _IN_BACKGROUND_WORK.reset(token)
 
     async def candidates(self, model: str, pin: str | None) -> Route:
-        """Nodes that can answer for ``model``, best first. Raises GatewayError if none."""
+        """Nodes that can answer for ``model``, best first. Raises GatewayError if none.
+
+        When no connected node can serve and the model is the house model of a node that is
+        offline (asleep), that node is woken and the request waits for it (plan step 1.7, E2):
+        it shows as ``waking`` in the activity, and ends with ``wake_timeout`` when the node does
+        not come within ``wake_timeout_seconds``.
+        """
+        try:
+            return await self._candidates(model, pin)
+        except GatewayError as exc:
+            if exc.code != "model_unavailable" or self.waker is None:
+                raise
+            asleep = await self._sleeping_house_nodes(model, pin)
+            if not asleep:
+                raise
+            return await self._wake_and_wait(asleep, model, pin, exc)
+
+    async def _sleeping_house_nodes(self, model: str, pin: str | None) -> list[_NodeView]:
+        """Offline nodes whose house model is ``model`` (and that the pin allows)."""
+        wanted = set(pin.split(",")) if pin else None
+        return [
+            n
+            for n in await self._nodes()
+            if not self.sessions.is_connected(n.id)
+            and self._policy.house.get(n.name) == model
+            and (wanted is None or n.name in wanted)
+        ]
+
+    async def _wake_and_wait(
+        self, nodes: list[_NodeView], model: str, pin: str | None, first: GatewayError
+    ) -> Route:
+        timeout = self.settings.wake_timeout_seconds
+        if timeout <= 0 or self.waker is None:
+            raise first
+        now = time.monotonic()
+        woken: list[str] = []
+        for n in nodes:
+            if self._waking.get(n.id, 0.0) > now:
+                woken.append(n.name)  # another request woke it already: wait with it
+                continue
+            try:
+                sent = await self.waker(n.id, model)
+            except OSError as exc:
+                log.warning("waking %s failed: %s", n.name, exc)
+                continue
+            if sent:
+                self._waking[n.id] = now + timeout
+                woken.append(n.name)
+                log.info("woke %s for %s (%d packets)", n.name, model, sent)
+        if not woken:
+            raise first
+        keys = [self._track(name, model, "waking") for name in woken]
+        deadline = max(self._waking.get(n.id, now) for n in nodes)
+        try:
+            while True:
+                try:
+                    return await self._candidates(model, pin)
+                except GatewayError as exc:
+                    if exc.code != "model_unavailable" or time.monotonic() >= deadline:
+                        break
+                await asyncio.sleep(WAKE_POLL_SECONDS)
+        finally:
+            for key in keys:
+                self._busy.pop(key, None)
+        names = ", ".join(woken)
+        raise GatewayError(
+            503,
+            "wake_timeout",
+            f"{names} did not wake within {int(timeout)} s to serve {model!r} "
+            "(Wake-on-LAN sent; is the machine on standby with Wake-on-LAN enabled, and does the "
+            "packet reach its LAN?)",
+            retry_after=self.settings.gateway_retry_after_seconds,
+        )
+
+    def waking_until(self, node_id: uuid.UUID) -> float | None:
+        """The monotonic end of the wait for a node being woken (None: not being woken)."""
+        until = self._waking.get(node_id)
+        return until if until is not None and until > time.monotonic() else None
+
+    async def _candidates(self, model: str, pin: str | None) -> Route:
         nodes = await self._nodes()
         if pin is not None:
             # ``a,b``: the request may go to any of these nodes (a row of the table that names

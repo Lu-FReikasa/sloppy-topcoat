@@ -15,7 +15,7 @@
   padding: 0 0.4rem;
   border: 1px solid var(--app-color, var(--border));
   color: var(--app-color, var(--muted));
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   letter-spacing: 0.08em;
   line-height: 1.5;
   text-transform: uppercase;
@@ -35,6 +35,11 @@
 }
 .app-tag-project {
   --app-color: var(--app-project);
+}
+/* in the chosen filter the tag takes the button's text: an application colour on the accent fill
+   is unreadable (#75) */
+.inbox-tabs button.primary .app-tag {
+  --app-color: currentColor;
 }
 
 .inbox {
@@ -137,12 +142,15 @@
   min-height: 0;
   height: 100%;
 }
+/* the line of its own above the stream: the stream scrolls below its border, never under its links (#77) */
 .chat-window-bar {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.2rem 0.9rem;
-  padding: 0.1rem 0.4rem;
+  padding: 0.4rem 0.4rem 0.3rem;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
 }
 
 /* the picture of the empty chat window: quiet, monospaced, one colour */

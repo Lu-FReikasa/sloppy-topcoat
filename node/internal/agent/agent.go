@@ -625,7 +625,7 @@ func (a *Agent) inventory(ctx context.Context) (protocol.Envelope, error) {
 		if models, err := r.ListModels(ctx); err == nil {
 			for _, m := range models {
 				own := m.Own
-				inv.Models = append(inv.Models, protocol.Model{Name: m.Name, SizeBytes: nonNeg(m.SizeBytes), Format: m.Format, Own: &own, GGUF: protoGGUF(m.GGUF)})
+				inv.Models = append(inv.Models, protocol.Model{Name: m.Name, SizeBytes: nonNeg(m.SizeBytes), Format: m.Format, Own: &own, GGUF: protoGGUF(m.GGUF), Projector: m.Projector})
 			}
 		}
 		if dr, ok := r.(runner.DiskReporter); ok {

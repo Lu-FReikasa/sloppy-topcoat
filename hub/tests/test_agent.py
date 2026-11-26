@@ -276,6 +276,64 @@ def test_a_limit_ends_the_run_with_the_diagnosis_the_model_can_still_write(
     assert client.post(f"/api/agent/tasks/{t['id']}/continue", headers=AUTH).status_code == 200
 
 
+def hold_after_each_run(client: TestClient, monkeypatch) -> tuple[threading.Event, threading.Event]:
+    """Hold every run between the moment it wrote the task's end and the moment it leaves the
+    service, the window of #114. Returns (held, release)."""
+    held, release = threading.Event(), threading.Event()
+    loop = client.app.state.agents.loop
+    run = loop.run
+
+    async def run_then_hold(*args: Any) -> None:
+        await run(*args)
+        held.set()
+        while not release.is_set():  # noqa: ASYNC110 - set from the test's thread
+            await asyncio.sleep(0.01)
+
+    monkeypatch.setattr(loop, "run", run_then_hold)
+    return held, release
+
+
+def test_continue_right_after_a_cut_off_run_waits_for_its_last_lines(
+    client: TestClient, vm, monkeypatch
+) -> None:
+    held, release = hold_after_each_run(client, monkeypatch)
+    use(client, tool("vm-docker", "docker.ps"), finish("Cut short."), max_tool_calls=1)
+    tid = start(client).json()["id"]
+    assert held.wait(10)
+    t = task(client, tid)
+    assert t["status"] == "done" and t["stop_reason"] == "max_tool_calls"  # the end is written
+
+    use(client, finish("Continued."))
+    threading.Timer(0.3, release.set).start()  # the run leaves while /continue is waiting
+    r = client.post(f"/api/agent/tasks/{tid}/continue", headers=AUTH)
+    assert r.status_code == 200, r.text
+    eventually(lambda: _assert(task(client, tid)["summary"] == "Continued."))
+    assert task(client, tid)["runs"] == 2
+
+
+def test_a_task_that_is_still_running_cannot_continue(client: TestClient, vm, monkeypatch) -> None:
+    agents = client.app.state.agents
+    model = use(client, BLOCK)
+    tid = start(client).json()["id"]
+    eventually(lambda: _assert(len(model.calls) == 1))
+    r = client.post(f"/api/agent/tasks/{tid}/continue", headers=AUTH)
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "not_resumable"
+    model.released.set()
+    wait_for(client, tid, "done")
+
+    # a run that wrote a cut-off end but does not leave within the wait is still running
+    held, release = hold_after_each_run(client, monkeypatch)
+    monkeypatch.setattr(agents, "tail_wait_seconds", 0.2)
+    use(client, tool("vm-docker", "docker.ps"), finish("Cut short."), max_tool_calls=1)
+    tid = start(client).json()["id"]
+    assert held.wait(10)
+    r = client.post(f"/api/agent/tasks/{tid}/continue", headers=AUTH)
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "not_resumable"
+    release.set()
+    eventually(lambda: _assert(not agents._running))
+    assert task(client, tid)["runs"] == 1  # the refused /continue started nothing
+
+
 def test_a_model_that_ignores_the_limit_gets_a_plain_fallback_diagnosis(
     client: TestClient, vm
 ) -> None:

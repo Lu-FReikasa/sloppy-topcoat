@@ -14,10 +14,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from topcoat_hub import agent_contract
-from topcoat_hub import plugins as plugins_mod
+from topcoat_hub import agent_contract, plugin_registry
 from topcoat_hub.auth import CurrentUser, api_user, require_admin
-from topcoat_hub.models import UiGrant, UiProfile, UiTemplate
+from topcoat_hub.models import UiGrant, UiProfile, UiTemplate, User
 from topcoat_hub.ui import prefs as prefs_mod
 from topcoat_hub.ui import themes as themes_mod
 from topcoat_hub.ui.access import Access, effective_agent, resolve_access
@@ -109,27 +108,34 @@ async def bootstrap(request: Request, user: CurrentUser = Depends(api_user)) -> 
     }
 
 
-@router.get("/plugins")
-async def plugins_list(request: Request, user: CurrentUser = Depends(api_user)) -> dict[str, Any]:
-    """The plug-ins a person is offered (D105): for now the built-in programs as manifests."""
+async def _offered(request: Request, user: CurrentUser) -> tuple[list[dict[str, Any]], set[str]]:
+    """The manifests a person is offered and the programs they may open (D105)."""
     async with request.app.state.sessionmaker() as db:
         access = await resolve_access(db, user.uuid, user.role)
         templates = await TemplateStore(db).all()
-    shown = [template_view(t) for t in templates if access.workspace_visible(t)]
-    return {"plugins": [plugins_mod.manifest_of(p) for p in shown]}
+        active, registered = await plugin_registry.Registry(db).state()
+    visible = {t.key for t in templates if access.workspace_visible(t)}
+    manifests = plugin_registry.offered(
+        templates, visible, active, registered, user.role == "admin"
+    )
+    return manifests, visible
+
+
+@router.get("/plugins")
+async def plugins_list(request: Request, user: CurrentUser = Depends(api_user)) -> dict[str, Any]:
+    """The plug-ins a person is offered (D105): the version in force of every enabled plug-in
+    of a program they may see, and of the enabled plug-ins that are no program."""
+    manifests, _ = await _offered(request, user)
+    return {"plugins": manifests}
 
 
 @router.get("/commands")
 async def commands_list(request: Request, user: CurrentUser = Depends(api_user)) -> dict[str, Any]:
     """The one list of commands every menu reads (D105): the palette, a theme's menus, the
-    desktop client's selector and tray, the Windows command palette."""
-    async with request.app.state.sessionmaker() as db:
-        access = await resolve_access(db, user.uuid, user.role)
-        templates = await TemplateStore(db).all()
-    shown = [
-        plugins_mod.manifest_of(template_view(t)) for t in templates if access.workspace_visible(t)
-    ]
-    return {"commands": plugins_mod.commands(shown, user.role == "admin")}
+    desktop client's selector and tray, the Windows command palette. Follows the registry: a
+    change there shows here at once (event ``ui_plugins``)."""
+    manifests, visible = await _offered(request, user)
+    return {"commands": plugin_registry.commands(manifests, visible, user.role == "admin")}
 
 
 class PrefsBody(BaseModel):
@@ -224,18 +230,27 @@ async def prefs_defaults(_user: CurrentUser = Depends(api_user)) -> dict[str, An
 
 @router.get("/workspaces/{key}/agent")
 async def workspace_agent(
-    key: str, request: Request, user: CurrentUser = Depends(api_user)
+    key: str,
+    request: Request,
+    language: str | None = None,
+    user: CurrentUser = Depends(api_user),
 ) -> dict[str, Any]:
     """What a conversation started in this workspace begins with for this person: the tool scope
     (in the shape the chat API takes) narrowed by their profile, the answer path, the persona, the
-    model role. Nothing is applied here; the web passes it on when it starts a conversation."""
+    model role. Nothing is applied here; the web passes it on when it starts a conversation.
+
+    ``language`` (``de``/``en``) is the language the GUI shows; without it the contract is in the
+    person's stored language, else English."""
     async with request.app.state.sessionmaker() as db:
         template, access = await _visible(db, user, key)
+        if language not in agent_contract.LANGUAGES:
+            row = await db.get(User, user.uuid)
+            language = (row.language if row else None) or "en"
         return {
             "workspace": key,
-            **effective_agent(template.agent, access),
-            # what the employee of this program is for and may do, in German (1.9)
-            "contract": agent_contract.view(key),
+            **effective_agent(await plugin_registry.program_agent(db, template), access),
+            # what the employee of this program is for and may do, in the person's language (1.9)
+            "contract": agent_contract.view(key, language),
         }
 
 

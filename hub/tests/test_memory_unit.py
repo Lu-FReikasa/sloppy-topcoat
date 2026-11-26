@@ -20,17 +20,7 @@ from topcoat_hub.memory import (
     statements,
     supports,
 )
-from topcoat_hub.memory_clarify import (
-    Evidence,
-    clash,
-    conflict_groups,
-    has_correction,
-    has_retraction,
-    judge,
-    same_topic,
-    slot_of,
-    values_differ,
-)
+from topcoat_hub.memory_clarify import Evidence, conflict_groups, judge, values_differ
 from topcoat_hub.memory_store import keyword_query, normalise_text
 
 # --- secret filter ------------------------------------------------------------------------------
@@ -237,22 +227,15 @@ def test_questions_state_nothing() -> None:
 # --- the self-maintaining memory: slots, cues, judgement -----------------------------------------
 
 
-def test_slots_find_notes_about_the_same_thing_without_shared_words() -> None:
-    assert slot_of("Lebt in Musterstadt").name == "residence"  # type: ignore[union-attr]
-    assert slot_of("Wohnt in Hamburg").name == "residence"  # type: ignore[union-attr]
-    assert same_topic("Lebt in Musterstadt", "Wohnt in Hamburg")
-    assert slot_of("Arbeitet als Tischler").name == "work"  # type: ignore[union-attr]
-    assert slot_of("Hund heißt Bello").name == "pet"  # type: ignore[union-attr]  # not "name"
-    assert slot_of("Heißt Anna").name == "name"  # type: ignore[union-attr]
-    assert slot_of("Mag kurze Antworten") is None
+def test_there_are_no_slots_or_cue_words_any_more() -> None:
+    """D124: what contradicts is said by the model that reads the notes; the hub reads no slot
+    words ("wohnt", "arbeitet") and no cue words ("tatsächlich", "war nur ein Test")."""
+    for gone in ("slot_of", "clash", "same_topic", "has_correction", "has_retraction",
+                 "test_sentences", "cue_sentence", "CORRECTION_CUES", "SLOTS"):  # fmt: skip
+        assert not hasattr(memory_clarify, gone), gone
 
 
-def test_only_single_valued_slots_clash_and_a_refinement_is_no_conflict() -> None:
-    assert clash("Lebt in Musterstadt", "Lebt in Hamburg")
-    assert clash("Wohnt in Berlin", "Lebt in Hamburg")
-    assert not clash("Arbeitet als Tischler", "Arbeitet als Bäcker")  # both may be true
-    assert not clash("Wohnt in Hamburg", "Lebt in Hamburg an der Elbe")  # refinement
-    assert not clash("Wohnt in Hamburg", "Arbeitet in Berlin")  # other slot
+def test_values_differ_and_a_refinement_is_no_conflict() -> None:
     assert values_differ("Lebt in Berlin", "Lebt in Hamburg")
     assert not values_differ("Wohnt in Hamburg", "Lebt in Hamburg an der Elbe")
 
@@ -262,33 +245,21 @@ class N:
     text: str
     created_at: datetime
     id: uuid.UUID = field(default_factory=uuid.uuid4)
+    disputed_with: uuid.UUID | None = None
 
 
-def test_conflict_groups_connect_notes_that_clash() -> None:
+def test_conflict_groups_follow_the_dispute_links() -> None:
     t = datetime(2026, 9, 29, tzinfo=UTC)
     a = N("Lebt in Hamburg", t)
-    b = N("Lebt in Berlin", t + timedelta(days=1))
-    c = N("Lebt in Musterstadt", t + timedelta(days=2))
+    b = N("Lebt in Berlin", t + timedelta(days=1), disputed_with=a.id)
+    c = N("Lebt in Musterstadt", t + timedelta(days=2), disputed_with=b.id)
     other = N("Arbeitet als Tischler", t)
     groups = conflict_groups([c, other, a, b])
     assert [[n.text for n in g] for g in groups] == [
         ["Lebt in Hamburg", "Lebt in Berlin", "Lebt in Musterstadt"]  # oldest first
     ]
-    assert conflict_groups([a, other]) == []
-
-
-def test_correction_and_retraction_cues_read_statements_not_questions() -> None:
-    assert has_correction("ich wohne tatsächlich in Musterstadt")
-    assert has_correction("Ich wohne nicht mehr in Berlin.")
-    assert has_correction("I moved to Kiel.")
-    assert not has_correction("Ich wohne in Berlin, nur zur Info.")
-    assert not has_correction("Wohne ich jetzt in Berlin?")  # a question states nothing
-    assert has_retraction("die beiden anderen Städte waren zum testen")
-    assert has_retraction("Das mit Hamburg war falsch.")
-    assert has_retraction("Berlin war nur ein Test")
-    assert not has_retraction("Ich wohne in Berlin.")
-    found = memory_clarify.test_sentences("Ich wohne in Kiel. Hamburg war nur ein Test.")
-    assert [x.strip() for x in found] == ["Hamburg war nur ein Test."]
+    # two notes that only differ in their words are no group: nobody linked them
+    assert conflict_groups([N("Lebt in Hamburg", t), N("Lebt in Kiel", t)]) == []
 
 
 def test_followups_ask_about_the_last_answer() -> None:

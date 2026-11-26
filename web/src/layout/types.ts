@@ -25,9 +25,11 @@ export interface UiAgentDefaults {
   frame?: { tone: string; rules: string[] } | null;
 }
 
-/** The contract of a program's employee (hub agent_contract.py, plan step 1.9), in German. */
+/** The contract of a program's employee (hub agent_contract.py, plan step 1.9), in the
+ *  language it was asked for (the GUI's), else the person's stored one. */
 export interface AgentContractView {
   key: string;
+  language?: "de" | "en";
   title: string;
   purpose: string;
   tasks: { text: string; example: string }[];
