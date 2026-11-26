@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from topcoat_hub.config import REPO_ROOT
 from topcoat_hub.models import UiTheme
 
-BUILTIN = ("terminal", "leitstand", "schreibtisch")
+BUILTIN = ("terminal", "leitstand", "schreibtisch", "terminal-nest")
 MAX_CSS = 40_000
 MAX_THEMES = 50
 _DATA_IMAGE = re.compile(r"^data:image/(png|jpeg|gif|webp|svg\+xml)[;,]", re.I)

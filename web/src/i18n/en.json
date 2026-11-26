@@ -3121,7 +3121,8 @@
     "looks": {
       "terminal": "Terminal",
       "leitstand": "Control room",
-      "schreibtisch": "Desk"
+      "schreibtisch": "Desk",
+      "terminal-nest": "Terminal Nest"
     },
     "signal": {
       "amber": "something to read",

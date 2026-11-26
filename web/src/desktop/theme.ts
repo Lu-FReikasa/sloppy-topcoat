@@ -50,8 +50,35 @@ const STANDARD_CHROME: ThemeManifest["chrome"] = {
   titlebar: "top",
 };
 
-/** The three themes that come with the web build: the style sheets are `desktop.css`,
- *  `leitstand.css` and `schreibtisch.css`; the rest is data like any other theme's. */
+/** The built-in style sheets a theme can start from (`base`): `desktop.css`, `leitstand.css` and
+ *  `schreibtisch.css`. */
+export const BASES: readonly NonNullable<ThemeManifest["base"]>[] = ["terminal", "leitstand", "schreibtisch"];
+
+/** Terminal Nest (#16): the terminal in panes, like a terminal multiplexer. Its own look is a style
+ *  sheet like a custom theme's, within the same limits (`cssProblems`): one thin title line per
+ *  program, the taskbar as one line at the top, crisp one-pixel borders between the panes. */
+const TERMINAL_NEST_CSS = `--radius: 0;
+font-family: ui-monospace, "JetBrains Mono", "SFMono-Regular", "DejaVu Sans Mono", Consolas, monospace;
+.dt-stage { background: var(--border); }
+.dt-program { border: 0; box-shadow: none; outline: 1px solid var(--border); outline-offset: -1px; }
+.dt-program.dt-focused { outline-color: hsl(var(--pg-hue) 70% 60%); z-index: 1; }
+.dt-titlebar { min-height: 0; height: 1.35rem; padding: 0 0 0 0.6ch; gap: 1ch; font-size: 0.8rem; background: var(--bg); border-bottom: 1px solid var(--border); }
+.dt-focused .dt-titlebar { background: hsl(var(--pg-hue) 70% 60%); color: var(--accent-text); }
+.dt-focused .dt-title, .dt-focused .dt-code { color: var(--accent-text); }
+.dt-title { font-weight: 400; }
+.dt-lamp, .dt-titlebar .dt-icon { display: none; }
+.dt-titlebar-buttons button { min-width: 2.2ch; height: 1.35rem; padding: 0 0.4ch; border: 0; background: transparent; color: inherit; font-size: 0.8rem; }
+.dt-titlebar-buttons button:hover { background: var(--track); }
+.dt-taskbar { min-height: 0; height: 1.6rem; padding: 0; gap: 0; border-top: 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+.dt-taskbar button { min-height: 0; height: 1.6rem; border: 0; border-radius: 0; padding: 0 1ch; }
+.dt-task { width: auto; max-width: 14rem; border-bottom: 0; }
+.dt-task.dt-front, .dt-task.dt-front .dt-icon { background: hsl(var(--pg-hue) 70% 60%); color: var(--accent-text); }
+.dt-start { background: var(--accent); color: var(--accent-text); }
+.dt-program.dt-scaled .dt-titlebar { font-style: italic; }
+@media (prefers-reduced-motion: reduce) { .dt-program { animation: none; } }`;
+
+/** The themes that come with the web build: the first three are the style sheets above; the rest
+ *  is data like any other theme's. */
 export const BUILTIN_THEMES: readonly ThemeManifest[] = [
   {
     key: "terminal",
@@ -83,6 +110,16 @@ export const BUILTIN_THEMES: readonly ThemeManifest[] = [
     bar: { position: "bottom", items: STANDARD_BAR },
     chrome: STANDARD_CHROME,
     motion: { style: "fade", ms: 120 },
+  },
+  {
+    key: "terminal-nest",
+    name: "Terminal Nest",
+    base: "terminal",
+    layout: { kind: "nest" },
+    bar: { position: "top", items: ["start", "programs", "clock", "status", "me"] },
+    chrome: { buttons: ["minimise", "close"], titlebar: "top" },
+    motion: { style: "zoom", ms: 140, close: "fade" },
+    css: TERMINAL_NEST_CSS,
   },
 ];
 
@@ -179,7 +216,8 @@ export function themeProblems(value: unknown): string[] {
   const m = value as Record<string, unknown>;
   if (typeof m.key !== "string" || !KEY.test(m.key)) out.push("key: lower case letters, digits, '-'");
   if (typeof m.name !== "string" || m.name.trim() === "" || m.name.length > 60) out.push("name: 1 to 60 characters");
-  if (m.base !== undefined && !isBuiltin(String(m.base))) out.push("base: one of the built-in themes");
+  if (m.base !== undefined && !BASES.includes(m.base as NonNullable<ThemeManifest["base"]>))
+    out.push(`base: one of ${BASES.join(", ")}`);
   const layout = m.layout as { kind?: unknown } | undefined;
   if (!layout || !LAYOUT_KINDS.includes(layout.kind as LayoutKind))
     out.push(`layout.kind: one of ${LAYOUT_KINDS.join(", ")}`);
