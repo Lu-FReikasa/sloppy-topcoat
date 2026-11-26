@@ -579,11 +579,13 @@ export interface LargeTaskView {
   rollout: { ready: boolean };
 }
 
-/** What one step of a large task's run did (`POST …/large-task/tick`): sub-task ids. */
+/** What one step of a large task's run did (`POST …/large-task/tick`): sub-task ids (`s1`), and
+ *  in `stopped` the hub's reason (English, empty when nothing was held back) why nothing that
+ *  writes was started (hub vorhaben.Tick). */
 export interface LargeTaskTick {
   started: string[];
   replanned: string[];
   blocked: string[];
-  stopped: string[];
+  stopped: string;
   done: boolean;
 }

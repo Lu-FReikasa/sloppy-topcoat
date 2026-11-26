@@ -4470,7 +4470,7 @@
       "started": "Started: {{ids}}.",
       "replanned": "Replanned: {{ids}}.",
       "blocked": "Waiting for you: {{ids}}.",
-      "stopped": "Stopped: {{ids}}.",
+      "stopped": "Nothing that changes files was started: the workshop scope is not given.",
       "done": "Every sub-task is done.",
       "nothing": "Nothing to start right now."
     },
@@ -4478,7 +4478,7 @@
     "scopeMissing": "Not given: sub-tasks that change files do not start.",
     "scopeEnded": "Ended: sub-tasks that change files do not start.",
     "scopeActive": "Given until {{until}}.",
-    "scopeText": "Large task {{number}} “{{title}}”: in the workshop, on exactly the branch {{branch}}, the hub may apply the drafts of its sub-tasks (changes and new files), commit there, run tests, lint, type checks and builds, and take screenshots of the workshop build with test data, without a click per fix. Every try is checked and written to the record. Not covered: rolling out to the hub (stays a click), saving or activating themes or personas, other branches or repositories, main, push, merge, deploy, delete. For {{days}} days or until you revoke it.",
+    "scopeText": "Large task {{number}} “{{title}}”: in the workshop, on exactly the branch {{branch}}, the hub may apply the drafts of its sub-tasks (changes and new files), commit there, run tests, lint, type checks and builds, take screenshots of the workshop build with test data, and change theme and persona drafts, without a click per fix. Every try is checked (scope, content, paths, no secrets, a clean workshop, a stop after the same failure twice) and written to the record. Not covered: rolling out to the hub (stays a click), saving or activating themes or personas, other branches or repositories, topcoat/live and main, push, merge, deploy, delete. For {{days}} days or until you revoke it.",
     "scopeGive": "Give the workshop scope",
     "scopeRevoke": "Revoke the workshop scope",
     "scopeGiven": "Workshop scope given.",

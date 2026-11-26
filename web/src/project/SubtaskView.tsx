@@ -55,18 +55,22 @@ export function nextKey(text: string): string | null {
   return key ? `largeTask.next.${key}` : null;
 }
 
-function Notice({ notice }: { notice: LargeTaskNotice }) {
+function Notice({ notice, numberOf }: { notice: LargeTaskNotice; numberOf: Map<string, string> }) {
   const { t } = useTranslation();
   if (notice.kind === "filed") return <p role="status">{t("largeTask.filed", { count: notice.count })}</p>;
   if (notice.kind === "changeSet") return <p role="status">{t("largeTask.changeSet")}</p>;
   if (notice.kind === "scope") return <p role="status">{t("largeTask.scopeGiven")}</p>;
   if (notice.kind === "revoked") return <p role="status">{t("largeTask.scopeRevoked")}</p>;
   const { tick } = notice;
-  const parts = (["started", "replanned", "blocked", "stopped"] as const)
+  if (tick.done) return <p role="status">{t("largeTask.tick.done")}</p>;
+  // the hub names sub-tasks by their spec ids (`s1`); the person sees their numbers
+  const named = (ids: readonly string[]) => ids.map((id) => numberOf.get(id) ?? id).join(", ");
+  const parts = (["started", "replanned", "blocked"] as const)
     .filter((k) => tick[k].length > 0)
-    .map((k) => t(`largeTask.tick.${k}`, { ids: tick[k].join(", ") }));
-  const said = parts.length > 0 ? parts.join(" ") : t("largeTask.tick.nothing");
-  return <p role="status">{tick.done ? t("largeTask.tick.done") : said}</p>;
+    .map((k) => t(`largeTask.tick.${k}`, { ids: named(tick[k]) }));
+  // `stopped` is the hub's reason in words (today only: no active workshop scope)
+  if (tick.stopped) parts.push(t("largeTask.tick.stopped"));
+  return <p role="status">{parts.length > 0 ? parts.join(" ") : t("largeTask.tick.nothing")}</p>;
 }
 
 function SubtaskCard({ sub, numberOf }: { sub: Subtask; numberOf: Map<string, string> }) {
@@ -267,7 +271,7 @@ export function SubtaskView({
         </div>
       )}
 
-      {actions.notice && <Notice notice={actions.notice} />}
+      {actions.notice && <Notice notice={actions.notice} numberOf={numberOf} />}
       {actions.problems.length > 0 && (
         <div role="alert" className="error">
           <p>{t("largeTask.refused")}</p>

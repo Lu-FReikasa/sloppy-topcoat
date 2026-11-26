@@ -4,7 +4,7 @@ import { ApiError } from "../api/client";
 import { createHubEvents } from "../data/hubEvents";
 import i18n from "../i18n";
 import { LargeTaskPanel, nextKey, stagesOf, SubtaskView } from "./SubtaskView";
-import type { LargeTaskView, Subtask } from "./types";
+import type { LargeTaskTick, LargeTaskView, Subtask } from "./types";
 
 const REFUSED = 422;
 /** The first load and two more while a sub-task runs. */
@@ -84,7 +84,7 @@ function fakeApi(first: LargeTaskView) {
     })),
     giveWorkshopScope: vi.fn(async (_id: string) => ({ mandate: {} as never })),
     tickLargeTask: vi.fn(async (_id: string) => ({
-      tick: { started: ["s4"], replanned: [], blocked: [], stopped: [], done: false },
+      tick: { started: ["s4"], replanned: [], blocked: [], stopped: "", done: false } as LargeTaskTick,
       large_task: first,
     })),
     revokeProjectMandate: vi.fn(async (_id: string) => ({ mandate: {} as never })),
@@ -165,6 +165,9 @@ describe("SubtaskView", () => {
     const card = await screen.findByTestId("workshop-scope");
     expect(within(card).getByText(having("genau dem Zweig topcoat/v-3-2-1"))).toBeTruthy();
     expect(within(card).getByText(having("Gilt 14 Tage"))).toBeTruthy();
+    // every action and exclusion of the hub's own card text (vorhaben.scope_text) is on the card
+    expect(within(card).getByText(having("Theme- und Persona-Entwürfe ändern"))).toBeTruthy();
+    expect(within(card).getByText(having("topcoat/live und main"))).toBeTruthy();
     fireEvent.click(within(card).getByRole("button", { name: "Werkstatt-Umfang erteilen" }));
     await waitFor(() => expect(api.giveWorkshopScope).toHaveBeenCalledWith("lt"));
     await waitFor(() => expect(api.largeTask.mock.calls.length).toBeGreaterThan(1));
@@ -184,11 +187,30 @@ describe("SubtaskView", () => {
     expect(screen.queryByTestId("workshop-scope")).toBeNull();
   });
 
-  it("goes on one step and says what started", async () => {
+  it("goes on one step and says what started, by the sub-tasks' numbers", async () => {
     const api = fakeApi(view(PLAN));
     render(<SubtaskView api={api} nodeId="lt" />);
     fireEvent.click(await screen.findByRole("button", { name: "Weiter" }));
-    expect(await screen.findByText("Gestartet: s4.")).toBeTruthy();
+    expect(await screen.findByText("Gestartet: 3.2.1.4.")).toBeTruthy();
+  });
+
+  it("says why nothing started when the hub held a writer back (its reason is a string)", async () => {
+    const api = fakeApi(view(PLAN));
+    api.tickLargeTask.mockResolvedValueOnce({
+      tick: {
+        started: ["s3"],
+        replanned: [],
+        blocked: [],
+        stopped: "no active workshop scope for topcoat/v-3-2-1",
+        done: false,
+      },
+      large_task: view(PLAN),
+    });
+    render(<SubtaskView api={api} nodeId="lt" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Weiter" }));
+    expect(
+      await screen.findByText(having("Gestartet: 3.2.1.3. Nichts, was Dateien ändert, wurde gestartet")),
+    ).toBeTruthy();
   });
 
   it("offers the roll-out once every sub-task is done, still without a click to give", async () => {

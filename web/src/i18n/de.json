@@ -4470,7 +4470,7 @@
       "started": "Gestartet: {{ids}}.",
       "replanned": "Neu geplant: {{ids}}.",
       "blocked": "Wartet auf dich: {{ids}}.",
-      "stopped": "Gestoppt: {{ids}}.",
+      "stopped": "Nichts, was Dateien ändert, wurde gestartet: Der Werkstatt-Umfang ist nicht erteilt.",
       "done": "Alle Teilaufgaben sind fertig.",
       "nothing": "Gerade ist nichts zu starten."
     },
@@ -4478,7 +4478,7 @@
     "scopeMissing": "Nicht erteilt: Teilaufgaben, die Dateien ändern, starten nicht.",
     "scopeEnded": "Abgelaufen: Teilaufgaben, die Dateien ändern, starten nicht.",
     "scopeActive": "Erteilt bis {{until}}.",
-    "scopeText": "Vorhaben {{number}} „{{title}}“: Der Hub darf in der Werkstatt auf genau dem Zweig {{branch}} die Entwürfe seiner Teilaufgaben anwenden (Änderungen und neue Dateien), dort committen, Tests, Lint, Typprüfung und Builds laufen lassen und Screenshots des Werkstatt-Builds mit Testdaten machen, ohne Klick je Fix. Jeder Versuch wird geprüft und steht in der Akte. Nicht abgedeckt: Ausrollen auf den Hub (bleibt ein Klick), Themes oder Personas speichern oder aktivieren, andere Zweige oder Repositories, main, Push, Merge, Deploy, Löschen. Gilt {{days}} Tage oder bis zum Widerruf.",
+    "scopeText": "Vorhaben {{number}} „{{title}}“: Der Hub darf in der Werkstatt auf genau dem Zweig {{branch}} die Entwürfe seiner Teilaufgaben anwenden (Änderungen und neue Dateien), dort committen, Tests, Lint, Typprüfung und Builds laufen lassen, Screenshots des Werkstatt-Builds mit Testdaten machen und Theme- und Persona-Entwürfe ändern, ohne Klick je Fix. Jeder Versuch wird geprüft (Umfang, Inhalt, Pfade, keine Geheimnisse, saubere Werkstatt, Stopp nach gleichem Fehler zweimal) und steht in der Akte. Nicht abgedeckt: Ausrollen auf den Hub (bleibt ein Klick), Themes oder Personas speichern oder aktivieren, andere Zweige oder Repositories, topcoat/live und main, Push, Merge, Deploy, Löschen. Gilt {{days}} Tage oder bis zum Widerruf.",
     "scopeGive": "Werkstatt-Umfang erteilen",
     "scopeRevoke": "Werkstatt-Umfang widerrufen",
     "scopeGiven": "Werkstatt-Umfang erteilt.",
