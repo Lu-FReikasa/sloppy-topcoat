@@ -1,7 +1,7 @@
 // Fitting a song on one screen (the stage mode): CSS columns plus the largest font size at which
 // nothing overflows. The search is pure; the caller measures the real element (fits()).
 
-import { groupSheets, plain, type SheetGroup } from "./group";
+import { groupSheets, matchesSearch, plain, type SheetGroup } from "./group";
 import type { SheetSummary } from "./types";
 
 export const MIN_FONT = 12;
@@ -59,9 +59,8 @@ export function sortGroups(groups: SheetGroup[], mode: SortMode): SheetGroup[] {
 
 /** The songs the list shows: filtered by search and artist, sorted. */
 export function visibleGroups(list: SheetSummary[], query: string, artist: string, mode: SortMode): SheetGroup[] {
-  const q = plain(query);
   const shown = groupSheets(list).filter(
-    (g) => (!artist || plain(g.artist) === plain(artist)) && (!q || plain(`${g.title} ${g.artist}`).includes(q)),
+    (g) => (!artist || plain(g.artist) === plain(artist)) && matchesSearch(g.title, g.artist, query),
   );
   return sortGroups(shown, mode);
 }

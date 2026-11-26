@@ -395,6 +395,40 @@ describe("Sheets", () => {
     expect(window.location.hash).toBe("#/sheets/s2");
   });
 
+  it("plays in setlist order on the stage, from a song picked in the title view", async () => {
+    const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song" };
+    const gig: Setlist = { id: "L1", name: "Gig", items: [{ sheet_id: "s9", newest: false }, { sheet_id: "s1", newest: false }], updated_at: null, created_at: null };
+    const { api, calls } = client({
+      "GET /api/sheets": { sheets: [SUMMARY, zebra] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/setlists": { setlists: [gig] },
+      "GET /api/sheets/s1": detail(true, ["G", "D"]),
+      "GET /api/sheets/s9": { ...detail(true, ["G", "D"]), id: "s9" },
+    });
+    window.sessionStorage.clear();
+    window.localStorage.setItem("topcoat.sheets.setlist", "L1");
+    window.localStorage.setItem("topcoat.sheets.setlistView", JSON.stringify({ L1: "title" }));
+    window.location.hash = "#/sheets";
+    render(<SheetsPage api={api} />);
+    const panel = await screen.findByTestId("setlists");
+    const items = await within(panel).findByTestId("setlist-items");
+    const rows = within(items).getAllByRole("listitem");
+    expect(rows.map((li) => li.getAttribute("aria-label"))).toEqual(["Example Song", "Zebra Song"]);
+    fireEvent.click(within(rows[0]!).getByRole("button", { name: /^(Play on stage from this song|Ab diesem Lied auf der Bühne spielen)$/ }));
+    const at = async (n: number) =>
+      waitFor(() => expect(screen.getByTestId("sheet-stage-set").textContent).toMatch(new RegExp(`Gig · ${n} (of|von) 2`)));
+    // "Example Song" is second in the setlist: the stage starts there and pages in setlist order
+    await at(2);
+    fireEvent.keyDown(window, { key: "PageDown" });
+    await at(2);
+    fireEvent.keyDown(window, { key: "PageUp" });
+    await at(1);
+    const asked = () => calls.filter((c) => c.method === "GET" && /\/api\/sheets\/s\d$/.test(c.url)).map((c) => c.url.slice(-2));
+    await waitFor(() => expect(asked()).toEqual(["s1", "s9"]));
+    expect(calls.filter((c) => c.method === "PATCH")).toHaveLength(0);
+    window.localStorage.removeItem("topcoat.sheets.setlistView");
+  });
+
   it("adds the open sheet to a setlist and reorders with Alt+arrow keys", async () => {
     const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song" };
     const gig: Setlist = { id: "L1", name: "Gig", items: [{ sheet_id: "s9", newest: false }], updated_at: null, created_at: null };
