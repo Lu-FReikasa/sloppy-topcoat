@@ -657,24 +657,10 @@ function Stage({ api, id: startId, groups, onExit }: { api: ApiClient; id: strin
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const leaveRef = useRef(leave);
+  // full screen where the browser allows it. Leaving full screen does not end the stage (some
+  // browsers drop full screen on their own); Esc and the button do.
   useEffect(() => {
-    leaveRef.current = leave;
-  }, [leave]);
-
-  // full screen where the browser allows it; leaving full screen (Esc there) leaves the stage too
-  useEffect(() => {
-    let entered = !!document.fullscreenElement;
-    if (!entered)
-      document.documentElement.requestFullscreen?.().then(
-        () => (entered = true),
-        () => undefined,
-      );
-    const onChange = () => {
-      if (entered && !document.fullscreenElement) leaveRef.current();
-    };
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => undefined);
   }, []);
 
   const sections = useMemo(
