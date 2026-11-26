@@ -86,7 +86,7 @@ def clean_db(migrated_db: str) -> Iterator[str]:
                 "project_events, project_node_versions, project_views, project_labels, "
                 "project_change_sets, project_changes, project_templates, "
                 "project_nodes, "
-                "model_ratings, "
+                "model_ratings, setlist_items, setlists, "
                 "projects CASCADE"
             )
         )

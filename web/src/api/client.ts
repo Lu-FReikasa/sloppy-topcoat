@@ -1,5 +1,7 @@
 import type {
   Instrument,
+  Setlist,
+  SetlistItem,
   SheetComparison,
   SheetDetail,
   SheetPatch,
@@ -657,6 +659,23 @@ export class ApiClient {
       "GET",
       `/api/sheets/${encodeURIComponent(id)}/compare?source=${source}`,
     );
+  }
+
+  setlists(): Promise<{ setlists: Setlist[] }> {
+    return this.request<{ setlists: Setlist[] }>("GET", "/api/sheets/setlists");
+  }
+
+  setlistCreate(body: { name: string; items?: SetlistItem[] }): Promise<Setlist> {
+    return this.request<Setlist>("POST", "/api/sheets/setlists", body);
+  }
+
+  /** Only the fields given change; items is the whole new order. */
+  setlistUpdate(id: string, patch: { name?: string; items?: SetlistItem[] }): Promise<Setlist> {
+    return this.request<Setlist>("PATCH", `/api/sheets/setlists/${encodeURIComponent(id)}`, patch);
+  }
+
+  setlistDelete(id: string): Promise<void> {
+    return this.request<void>("DELETE", `/api/sheets/setlists/${encodeURIComponent(id)}`);
   }
 
   sheetResearchStart(body: {

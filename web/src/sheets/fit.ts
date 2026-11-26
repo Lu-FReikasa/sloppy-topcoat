@@ -66,12 +66,21 @@ export function visibleGroups(list: SheetSummary[], query: string, artist: strin
   return sortGroups(shown, mode);
 }
 
+/** Where the sheet `id` is among the songs: `at` when that song holds it (a setlist may hold one
+ *  song twice), else the first song that does; -1 when none does. */
+export function positionOf(groups: SheetGroup[], id: string, at?: number): number {
+  const holds = (g: SheetGroup | undefined) => !!g?.versions.some((s) => s.id === id);
+  if (at !== undefined && holds(groups[at])) return at;
+  return groups.findIndex(holds);
+}
+
 /** The sheet to open when paging from `id` by `step` songs through the shown songs: the newest
- *  version of the neighbour song. null at either end, or when `id` is not shown. */
-export function neighbour(groups: SheetGroup[], id: string, step: number): string | null {
-  const at = groups.findIndex((g) => g.versions.some((s) => s.id === id));
-  if (at < 0) return null;
-  const g = groups[at + step];
+ *  version of the neighbour song. null at either end, or when `id` is not shown. `at` is where
+ *  `id` is when the songs repeat (see positionOf). */
+export function neighbour(groups: SheetGroup[], id: string, step: number, at?: number): string | null {
+  const here = positionOf(groups, id, at);
+  if (here < 0) return null;
+  const g = groups[here + step];
   return g?.versions[g.versions.length - 1]?.id ?? null;
 }
 

@@ -5,6 +5,7 @@ import { describeError, toActionError } from "../errors";
 import { sheetsHref } from "../route";
 import type {
   Instrument,
+  Setlist,
   SheetComparison,
   SheetDetail,
   SheetLine,
@@ -12,11 +13,37 @@ import type {
   SheetSection,
   SheetSummary,
 } from "./types";
-import { chooseFit, isTabLine, maxColumns, neighbour, SORT_MODES, visibleGroups, type Fit, type SortMode } from "./fit";
+import {
+  chooseFit,
+  isTabLine,
+  maxColumns,
+  neighbour,
+  positionOf,
+  SORT_MODES,
+  visibleGroups,
+  type Fit,
+  type SortMode,
+} from "./fit";
 import { artistsOf, type SheetGroup } from "./group";
+import { setlistGroups } from "./setlist";
+import { Setlists } from "./Setlists";
 import "./sheets.css";
 
 export { artistsOf, groupSheets, type SheetGroup } from "./group";
+
+/** A setlist played on the stage: its songs page instead of the list; at = the song shown. */
+interface Playing {
+  setlist: Setlist;
+  at: number;
+}
+
+/** The stage handed from one sheet to the next. Both shells give every address a page of its own
+ *  (the view is keyed by its props), so paging to another sheet mounts a new SheetsPage: the stage,
+ *  the setlist played and full screen are handed over to the page of that sheet. Taken once, by
+ *  the page of `id` (a new one, or the same one if it stayed mounted). */
+let handoff: { id: string; playing: Playing | null } | null = null;
+
+const handedTo = (id: string | undefined) => (id !== undefined && handoff?.id === id ? handoff : null);
 
 interface Props {
   api: ApiClient;
@@ -82,9 +109,31 @@ export function SheetsPage({ api, id }: Props) {
     setSortState(m);
     remember(SORT_KEY, m);
   };
-  const [stage, setStage] = useState(false);
-  const exitStage = useCallback(() => setStage(false), []);
+  const [stage, setStage] = useState(() => handedTo(id) !== null);
+  const [playing, setPlaying] = useState<Playing | null>(() => handedTo(id)?.playing ?? null);
+  useEffect(() => {
+    if (handedTo(id)) handoff = null;
+  }, [id]);
+  const exitStage = useCallback(() => {
+    handoff = null;
+    setStage(false);
+    setPlaying(null);
+  }, []);
+  const openOnStage = (to: string, p: Playing | null) => {
+    // the same sheet again (a song twice in a row): no new page, nothing to hand over
+    handoff = to === id ? null : { id: to, playing: p };
+    setPlaying(p);
+    setStage(true);
+    window.location.hash = sheetsHref(to);
+  };
   const groups = useMemo(() => visibleGroups(list ?? [], query, artist, sort), [list, query, artist, sort]);
+  const playGroups = useMemo(() => (playing ? setlistGroups(playing.setlist.items, list ?? []) : null), [playing, list]);
+  const play = (setlist: Setlist, from: number) => {
+    const songs = setlistGroups(setlist.items, list ?? []);
+    const at = Math.max(0, songs.findIndex((g) => Number(g.key) >= from));
+    const first = songs[at]?.versions[0];
+    if (first) openOnStage(first.id, { setlist, at });
+  };
 
   useEffect(() => {
     api.sheets().then((r) => setList(r.sheets), fail);
@@ -104,7 +153,20 @@ export function SheetsPage({ api, id }: Props) {
     return () => window.clearInterval(timer);
   }, [api, running, reload]);
 
-  if (stage && id) return <Stage api={api} id={id} groups={groups} onExit={exitStage} />;
+  if (stage && id)
+    return playing && playGroups ? (
+      <Stage
+        api={api}
+        id={id}
+        groups={playGroups}
+        at={playing.at}
+        onGo={(to, at) => openOnStage(to, { ...playing, at })}
+        setlistName={playing.setlist.name}
+        onExit={exitStage}
+      />
+    ) : (
+      <Stage api={api} id={id} groups={groups} onGo={(to) => openOnStage(to, null)} onExit={exitStage} />
+    );
   return (
     <section className="sheets-shell" data-testid="sheets">
       <div className="sheets">
@@ -119,6 +181,7 @@ export function SheetsPage({ api, id }: Props) {
           {/* a finished research shows as its sheet in the list; only running and failed ones here */}
           {jobs.some((j) => j.status !== "done") && <Jobs jobs={jobs.filter((j) => j.status !== "done")} />}
           <PasteForm api={api} onError={fail} />
+          {list && list.length > 0 && <Setlists api={api} list={list} openId={id} onPlay={play} onError={fail} />}
           {list !== null && list.length === 0 && <p className="muted small">{t("sheets.empty")}</p>}
           {list && list.length > 0 && <SheetList
               list={list}
@@ -589,8 +652,25 @@ export function withoutTabs(sections: SheetSection[]): SheetSection[] {
 
 /** The stage mode: the sheet alone, full screen, fitted on one screen in columns. ←/→ and
  *  PageUp/PageDown (a foot pedal sends these) page through the songs of the list as it is
- *  filtered and sorted; Esc leaves. */
-function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups: SheetGroup[]; onExit: () => void }) {
+ *  filtered and sorted, or through a setlist (`setlistName`, `at` = the song shown, which
+ *  `onGo` gets the next position: a setlist may hold one song twice); Esc leaves. */
+function Stage({
+  api,
+  id,
+  groups,
+  at,
+  onGo,
+  setlistName,
+  onExit,
+}: {
+  api: ApiClient;
+  id: string;
+  groups: SheetGroup[];
+  at?: number;
+  onGo: (to: string, at: number) => void;
+  setlistName?: string;
+  onExit: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const [sheet, setSheet] = useState<SheetDetail | null>(null);
   const [error, setError] = useState("");
@@ -613,17 +693,18 @@ function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups
     );
   }, [api, id, t, i18n]);
 
-  const prev = neighbour(groups, id, -1);
-  const next = neighbour(groups, id, 1);
-  const go = (to: string | null) => {
-    if (to) window.location.hash = sheetsHref(to);
+  const here = positionOf(groups, id, at);
+  const prev = neighbour(groups, id, -1, at);
+  const next = neighbour(groups, id, 1, at);
+  const go = (to: string | null, step: number) => {
+    if (to) onGo(to, here + step);
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onExit();
-      else if (e.key === "ArrowRight" || e.key === "PageDown") go(next);
-      else if (e.key === "ArrowLeft" || e.key === "PageUp") go(prev);
+      else if (e.key === "ArrowRight" || e.key === "PageDown") go(next, 1);
+      else if (e.key === "ArrowLeft" || e.key === "PageUp") go(prev, -1);
       else return;
       e.preventDefault();
     };
@@ -645,7 +726,8 @@ function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups
     document.addEventListener("fullscreenchange", onChange);
     return () => {
       document.removeEventListener("fullscreenchange", onChange);
-      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => undefined);
+      // paging hands the stage to the next sheet's page: full screen stays
+      if (document.fullscreenElement && !handoff) document.exitFullscreen?.().catch(() => undefined);
     };
   }, [onExit]);
 
@@ -682,6 +764,11 @@ function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups
   return (
     <div className="sheet-stage" data-testid="sheet-stage">
       <header className="sheet-stage-head">
+        {setlistName && here >= 0 && (
+          <span className="sheet-stage-set" data-testid="sheet-stage-set">
+            {t("sheets.setlists.position", { name: setlistName, n: here + 1, total: groups.length })}
+          </span>
+        )}
         {v ? (
           <>
             <strong>{v.title}</strong>
@@ -698,10 +785,10 @@ function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups
           <span className="muted">{error || t("sheets.loading")}</span>
         )}
         <div className="sheet-stage-tools">
-          <button type="button" onClick={() => go(prev)} disabled={!prev} aria-label={t("sheets.stage.prev")} title={t("sheets.stage.prev")}>
+          <button type="button" onClick={() => go(prev, -1)} disabled={!prev} aria-label={t("sheets.stage.prev")} title={t("sheets.stage.prev")}>
             ←
           </button>
-          <button type="button" onClick={() => go(next)} disabled={!next} aria-label={t("sheets.stage.next")} title={t("sheets.stage.next")}>
+          <button type="button" onClick={() => go(next, 1)} disabled={!next} aria-label={t("sheets.stage.next")} title={t("sheets.stage.next")}>
             →
           </button>
           <button type="button" aria-pressed={hideTabs} onClick={() => setHideTabs(!hideTabs)}>

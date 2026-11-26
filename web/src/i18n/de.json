@@ -4386,6 +4386,30 @@
       "next": "Nächstes Lied",
       "hideTabs": "Tabs ausblenden",
       "scroll": "Zu lang für einen Bildschirm: scrollen"
+    },
+    "setlists": {
+      "title": "Setlisten",
+      "choose": "Setliste wählen",
+      "new": "Neue Setliste",
+      "name": "Name der Setliste",
+      "create": "Anlegen",
+      "play": "Auf der Bühne spielen",
+      "playFrom": "Ab diesem Lied auf der Bühne spielen",
+      "delete": "Setliste löschen",
+      "deleteConfirm": "Die Setliste „{{name}}“ löschen? Ihre Sheets bleiben.",
+      "empty": "Noch keine Lieder.",
+      "keys": "Zum Umsortieren ziehen, oder Alt + ↑/↓ auf einem Lied.",
+      "add": "„{{title}}“ hinzufügen",
+      "addHint": "Öffne ein Sheet, um es zur Setliste hinzuzufügen.",
+      "which": "Version",
+      "newestOption": "Immer die neueste Version",
+      "thisOption": "Diese Version (v{{n}})",
+      "newest": "neueste (v{{n}})",
+      "up": "Nach oben",
+      "down": "Nach unten",
+      "remove": "Aus der Setliste entfernen",
+      "missing": "Sheet gelöscht",
+      "position": "{{name}} · {{n}} von {{total}}"
     }
   },
   "images": {
