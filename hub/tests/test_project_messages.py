@@ -192,6 +192,24 @@ class TestStore:
             )
         assert await store.tree(DEV_ADMIN_ID, project.id) == []  # nothing was filed
 
+    async def test_a_result_of_the_wrong_shape_is_refused_not_a_crash(
+        self, store: ProjectStore
+    ) -> None:
+        """The brief of a result is written from its payload: a payload of the wrong shape is the
+        registry's refusal, never an error of the brief writer."""
+        project = await store.create_project(DEV_ADMIN_ID, title="Shape")
+        for payload in ({**RESULT, "summary": 123}, {**RESULT, "tests": "green"}, {"findings": 7}):
+            with pytest.raises(Invalid):
+                await store.add_message(
+                    DEV_ADMIN_ID,
+                    project.id,
+                    type="research.result",
+                    sender="research",
+                    receiver="project",
+                    payload=payload,
+                )
+        assert await store.tree(DEV_ADMIN_ID, project.id) == []
+
     async def test_the_state_moves_along_its_table_and_every_move_is_a_line(
         self, store: ProjectStore
     ) -> None:
