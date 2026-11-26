@@ -2614,13 +2614,15 @@
     "targets": {
       "research": "Recherche",
       "dev": "Entwicklung",
-      "admin": "Verwaltung"
+      "admin": "Verwaltung",
+      "project": "Dieses Projekt"
     },
     "actions": {
       "request_report": "Bericht anfordern",
       "create_branch": "Branch anlegen",
       "create_prototype": "Prototyp anlegen",
-      "read_released": "freigegebene Daten lesen"
+      "read_released": "freigegebene Daten lesen",
+      "decompose": "große Aufgaben in Teilaufgaben zerlegen"
     },
     "tree": "Baum",
     "noNodes": "Hier ist noch nichts. Lege oben ein Thema, eine Aufgabe oder einen Bericht an.",
