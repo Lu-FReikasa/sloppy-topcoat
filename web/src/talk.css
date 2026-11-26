@@ -441,3 +441,124 @@
   padding: 0 1.25rem;
   border-radius: 999px;
 }
+
+/* --- push to talk (D127) ----------------------------------------------------------------------- */
+
+/* the microphone key: a round button beside the message box, a microphone at rest and the voice
+   orb while it listens, thinks or speaks. The orb tells the states apart by shape too (reduced motion, colour blindness): listening is a full
+   dot, thinking a ring, speaking a dot with a halo. */
+.talk-composer .voice-key {
+  flex: 0 0 auto;
+  width: 2.4rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none; /* holding it must not scroll or zoom the page */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.voice-orb {
+  display: block;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.talk-composer .voice-key.voice-idle {
+  color: var(--muted);
+}
+
+.talk-composer .voice-key.voice-idle:hover:not(:disabled) {
+  color: var(--text);
+}
+
+/* the phone floor (touch.css) loses against `.talk-composer button`: hold it here */
+@media (max-width: 760px) {
+  .talk-composer .voice-key {
+    min-height: 40px;
+    min-width: 40px;
+  }
+}
+
+.voice-listening .voice-orb {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-color: var(--accent);
+  background: var(--accent);
+  animation: voice-listen 1.1s ease-in-out infinite;
+}
+
+.voice-thinking .voice-orb {
+  border-color: var(--accent);
+  border-top-color: transparent;
+  animation: voice-think 0.9s linear infinite;
+}
+
+.voice-speaking .voice-orb {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+  animation: voice-speak 0.7s ease-in-out infinite alternate;
+}
+
+.voice-key.voice-listening {
+  border-color: var(--accent);
+}
+
+@keyframes voice-listen {
+  50% { transform: scale(0.8); }
+}
+
+@keyframes voice-think {
+  to { transform: rotate(1turn); }
+}
+
+@keyframes voice-speak {
+  to { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 20%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-orb {
+    animation: none !important;
+  }
+}
+
+.voice-problem {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+}
+
+/* with the microphone key there are four things in the composer's row: in a narrow window or on a
+   small phone the message box gets the whole first row, the buttons go below it (the send button
+   to the right) */
+@container (max-width: 420px) {
+  .talk-composer:has(.voice-key) {
+    flex-wrap: wrap;
+  }
+  .talk-composer:has(.voice-key) textarea {
+    flex-basis: 100%;
+    order: -1;
+  }
+  .talk-composer:has(.voice-key) > button:last-of-type {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .talk-composer:has(.voice-key) {
+    flex-wrap: wrap;
+  }
+  .talk-composer:has(.voice-key) textarea {
+    flex-basis: 100%;
+    order: -1;
+  }
+  .talk-composer:has(.voice-key) > button:last-of-type {
+    margin-left: auto;
+  }
+}

@@ -45,6 +45,16 @@ Known limits: a game in exclusive full screen stays above the overlay; a key the
 palette) is taken by the overlay while it is up; the hidden desktop pages keep running (memory, the hub's stream: one per
 screen that was shown). UNVERIFIED on real hardware: the screen of the mouse, the rebuild after sleep, ⇄.
 
+## Push to talk (D127)
+
+The chat's microphone key (hold it, or hold `Ctrl+Space` while the chat window is in front) works in the client's
+windows as in a browser: the page records with Web Audio and talks to the hub over its own TLS connection
+(`/api/voice/ws`); the client itself adds nothing and opens no port. The first press asks for the microphone with
+WebView2's own prompt for the hub's address; the answer is kept in the client's web view profile. `Ctrl+Space` is not
+the overlay key (`Ctrl+Alt+Space`). UNVERIFIED on real hardware: the WebView2 prompt in the overlay and in program
+windows, recording while the overlay is hidden. If WebView2 refuses without asking, the next step is a
+`PermissionRequested` handler that allows only the microphone, only for the hub's origin.
+
 ## Security
 
 - The client opens **no port** and keeps **no token**: the sign-in is in the web view's cookie store, as in a browser.

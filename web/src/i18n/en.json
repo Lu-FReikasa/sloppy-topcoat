@@ -1739,7 +1739,9 @@
       "freeText": "Text",
       "exampleDe": "Example sentence (German)",
       "exampleEn": "Example sentence (English)",
-      "humorNote": "Humor is always off for errors, outages and risk."
+      "humorNote": "Humor is always off for errors, outages and risk.",
+      "voice": "Voice",
+      "voiceHint": "For push to talk: the name of a voice on the node's text to speech (for example de_DE-thorsten-medium). Empty: the node's own voice."
     },
     "verdict": {
       "helped": "Helped",
@@ -4445,6 +4447,23 @@
       "size": "An image may have at most 15 MB.",
       "count": "At most {{max}} images go with one message.",
       "read": "The image could not be read."
+    }
+  },
+  "voice": {
+    "hold": "Hold to talk",
+    "holdHint": "Hold to talk, let go to send (or hold Ctrl+Space). Esc stops.",
+    "state": {
+      "listening": "Listening …",
+      "thinking": "Thinking …",
+      "speaking": "Speaking …"
+    },
+    "problem": {
+      "micDenied": "The microphone is not allowed. Allow it for this page in the browser (or in the desktop client) and try again.",
+      "nothingHeard": "Nothing was heard. Hold the key while you speak.",
+      "tooLong": "That was too long for one message. Keep it under a minute.",
+      "noNode": "No machine can listen right now: speech to text needs a node with voice switched on.",
+      "connection": "The connection to the hub for speech ended. Try again.",
+      "failed": "Speech did not work just now. Try again in a moment."
     }
   }
 }

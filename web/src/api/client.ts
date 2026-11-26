@@ -753,6 +753,20 @@ export class ApiClient {
     return this.request<ChatModel[]>("GET", "/api/chat/models");
   }
 
+  /** Whether push to talk can work for this person now (D127): a node offers speech to text,
+   *  and text to speech for the answers. */
+  voiceStatus(): Promise<{ transcribe: boolean; speak: boolean }> {
+    return this.request("GET", "/api/voice");
+  }
+
+  /** Where the voice WebSocket is and what its first frame signs in with (a browser cannot put
+   *  a header on a WebSocket). */
+  voiceSocket(): { url: string; token: string } {
+    const url = new URL(`${this.baseUrl}/api/voice/ws`, window.location.href);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    return { url: url.toString(), token: this.token };
+  }
+
   chatSettings(): Promise<ChatSettings> {
     return this.request<ChatSettings>("GET", "/api/chat/settings");
   }
@@ -874,6 +888,8 @@ export class ApiClient {
       name?: string;
       components?: PersonaComponents;
       example?: { de?: string; en?: string } | string | null;
+      /** D127: a voice of the node's text to speech; null = the node's own */
+      voice?: string | null;
     },
   ): Promise<Persona> {
     return this.request<Persona>(

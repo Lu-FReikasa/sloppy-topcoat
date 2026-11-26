@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { overlayOf } from "../desktop/state";
 import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
@@ -42,6 +42,8 @@ import { IdleArt } from "./IdleArt";
 import { Clipper, moodOf, useClipperActive } from "../persona/Clipper";
 import { MessageLine } from "./MessageLine";
 import { MIN_LINES, useGrowingTextarea } from "./growTextarea";
+import { PushToTalkButton, VoiceProblemLine } from "../voice/PushToTalkButton";
+import { usePushToTalk } from "../voice/usePushToTalk";
 
 /** What the user sees of the history: what was said, an emoji answer, the card of a request that
  *  was handed to the queue, and the result cards of checks (folded), not the run behind it. */
@@ -357,6 +359,51 @@ export function TalkPage({
     setWantBreak(false);
     send(target, text, "auto", images);
   }
+
+  // D127 push to talk: the transcript is the person's message, sent like a typed one; an answer
+  // that is still being written gets it once it is done (half duplex)
+  // the answer to the spoken message is the first one after it: the stream while it is written,
+  // then the stored answer; a stream that ends without one (an error) ends it with what there is
+  const voiceAsked = useRef<{ after: number; stale: unknown } | null>(null);
+  const spoken = useRef<string | null>(null);
+  const sendSpoken = useRef<() => void>(() => undefined);
+  useLayoutEffect(() => {
+    sendSpoken.current = () => {
+      const text = spoken.current;
+      if (text === null || !detail || running) return;
+      spoken.current = null;
+      voiceAsked.current = { after: detail.messages.at(-1)?.id ?? 0, stale: stream };
+      stick();
+      void post(detail.id, text);
+    };
+  });
+  const voice = usePushToTalk(
+    api,
+    { conversationId: detail?.id, language: (i18n.language || "auto").slice(0, 2) },
+    (text) => {
+      spoken.current = text;
+      sendSpoken.current();
+    },
+  );
+  useEffect(() => {
+    if (!running) sendSpoken.current(); // what was said while an answer was still written
+  }, [running]);
+  const storedAnswer = detail?.messages.findLast((m) => m.role === "assistant");
+  const { answer: voiceAnswer } = voice;
+  useEffect(() => {
+    const waiting = voiceAsked.current;
+    if (!waiting) return;
+    if (running) {
+      voiceAnswer(stream?.text ?? "", false);
+    } else if (stream && stream !== waiting.stale) {
+      voiceAsked.current = null;
+      voiceAnswer(stream.text, true);
+    } else if (storedAnswer && storedAnswer.id > waiting.after) {
+      voiceAsked.current = null;
+      voiceAnswer(storedAnswer.content, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, stream, storedAnswer?.id]);
 
   function submit() {
     const text = draft.trim();
@@ -749,6 +796,7 @@ export function TalkPage({
           seed={messages.length}
         />
       )}
+      <VoiceProblemLine voice={voice} />
       <ImageDraftStrip
         images={pictures.images}
         problem={pictures.problem}
@@ -790,6 +838,7 @@ export function TalkPage({
             void pictures.add(files);
           }}
         />
+        <PushToTalkButton voice={voice} scope={room} disabled={!detail} />
         {running ? (
           <button type="button" onClick={() => detail && stop(detail.id)}>
             {t("talk.stop")}
