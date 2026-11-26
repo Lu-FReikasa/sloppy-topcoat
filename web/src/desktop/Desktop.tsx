@@ -70,6 +70,7 @@ import { ProgramWindow, type TileInfo, type WindowHandlers } from "./ProgramWind
 import { navViews, programHue, programInfo, programTitle, viewTitle } from "./programs";
 import {
   closeProgram,
+  EMPTY,
   loadOwnDesk,
   minimise,
   openProgram,
@@ -92,6 +93,7 @@ import {
   viewFor,
   viewOf,
   visible,
+  withStart,
   type DesktopState,
 } from "./state";
 import { Taskbar, type Signal } from "./Taskbar";
@@ -561,6 +563,20 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
     if (infos.some((p) => p.key === routeKey)) change((s) => openProgram(s, routeKey));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, routeKey, infos, solo]);
+  // Nothing in front when the desktop is first ready (a fresh account, cleared preferences, a
+  // program that is gone): Start opens, once per load (#115). A focus the person has, an address
+  // that names a program or a view asked for (opened just above, its change already in the
+  // preferences) wins. A solo window has its program; a screen beside the primary one keeps its own.
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || !ready || moving || solo || ownScreen) return;
+    started.current = true;
+    if (routeKey && infos.some((p) => p.key === routeKey)) return;
+    const now = settle(latestPrefs()?.desktop ?? EMPTY, infos, known);
+    if (withStart(now, infos) !== now) change((s) => withStart(s, infos));
+    // only the first ready load decides
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, moving]);
   useEffect(() => {
     if (solo) return;
     if (moving) return;

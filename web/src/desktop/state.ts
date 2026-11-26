@@ -27,6 +27,21 @@ export interface ProgramInfo {
 
 export const EMPTY: DesktopState = { open: [], minimised: [], focus: null, maximised: null, views: {} };
 
+/** Start's program (workspace key `chat` in the hub's seeds): where a load goes when the person
+ *  used no program last (a fresh account, cleared preferences, a program that is gone; #115). */
+export const START = "chat";
+
+/** The program a load shows when none was used last: Start where the person has it, else the
+ *  first program by position. */
+export function startKey(programs: readonly { key: string }[]): string | null {
+  return programs.some((p) => p.key === START) ? START : (programs[0]?.key ?? null);
+}
+
+/** Start opened and in front when nothing is (a first load, #115); a focus the person has stays. */
+export function withStart(s: DesktopState, programs: readonly { key: string }[]): DesktopState {
+  return s.focus || !programs.some((p) => p.key === START) ? s : openProgram(s, START);
+}
+
 /** The programs that are shown on the desktop (open and not minimised), in order. */
 export function visible(s: DesktopState): string[] {
   return s.open.filter((k) => !s.minimised.includes(k));
