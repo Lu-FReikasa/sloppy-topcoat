@@ -209,6 +209,7 @@ describe("Sheets", () => {
       "GET /api/sheets": { sheets: [SUMMARY, other] },
       "GET /api/sheets/research": { jobs: [] },
       "GET /api/sheets/s1": detail(true, ["G", "D"]),
+      "GET /api/sheets/s9": { ...detail(true, ["G", "D"]), id: "s9", view: { ...detail(true, ["G", "D"]).view, title: "Zebra Song" } },
     });
     window.location.hash = "#/sheets/s1";
     render(<SheetsPage api={api} id="s1" />);
@@ -217,9 +218,13 @@ describe("Sheets", () => {
     await waitFor(() => expect(chordsOf(stage)).toEqual(["G", "D", "C"]));
     expect(screen.queryByTestId("sheets-list")).toBeNull();
     fireEvent.keyDown(window, { key: "PageDown" });
-    expect(window.location.hash).toBe("#/sheets/s9");
+    // paging stays on stage and does not touch the address (the desktop shell would take it over)
+    await waitFor(() => expect(within(screen.getByTestId("sheet-stage")).queryByText("Zebra Song")).not.toBeNull());
+    expect(window.location.hash).toBe("#/sheets/s1");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByTestId("sheet-stage")).toBeNull();
+    // leaving opens the song paged to in the normal view
+    expect(window.location.hash).toBe("#/sheets/s9");
   });
 
   it("plays a setlist on the stage: the pedal pages in setlist order, the newest version, a song twice", async () => {
@@ -238,7 +243,7 @@ describe("Sheets", () => {
       updated_at: null,
       created_at: null,
     };
-    const { api } = client({
+    const { api, calls } = client({
       "GET /api/sheets": { sheets: [s1, s2, zebra] },
       "GET /api/sheets/research": { jobs: [] },
       "GET /api/sheets/setlists": { setlists: [gig] },
@@ -246,9 +251,10 @@ describe("Sheets", () => {
       "GET /api/sheets/s2": { ...detail(true, ["G", "D"]), id: "s2" },
       "GET /api/sheets/s9": { ...detail(true, ["G", "D"]), id: "s9" },
     });
+    window.sessionStorage.clear();
     window.localStorage.setItem("topcoat.sheets.setlist", "L1");
     window.location.hash = "#/sheets";
-    const view = render(<SheetsPage api={api} />);
+    render(<SheetsPage api={api} />);
     const panel = await screen.findByTestId("setlists");
     const items = await within(panel).findByTestId("setlist-items");
     expect(within(items).getAllByRole("listitem").map((li) => li.getAttribute("aria-label"))).toEqual([
@@ -259,27 +265,26 @@ describe("Sheets", () => {
     // the newest item names the version it plays now
     expect(items.textContent).toMatch(/(newest|neueste) \(v2\)/);
     fireEvent.click(within(panel).getByTestId("setlist-play"));
-    expect(window.location.hash).toBe("#/sheets/s9");
-    // the shells key a page by its address: every sheet mounts a page of its own
-    const step = async (id: string, n: number) => {
-      view.rerender(<SheetsPage key={id} api={api} id={id} />);
-      const where = await screen.findByTestId("sheet-stage-set");
-      expect(where.textContent).toMatch(new RegExp(`Gig · ${n} (of|von) 3`));
-    };
-    await step("s9", 1);
+    // paging happens inside the stage: the address stays until the stage is left
+    const at = async (n: number) =>
+      waitFor(() => expect(screen.getByTestId("sheet-stage-set").textContent).toMatch(new RegExp(`Gig · ${n} (of|von) 3`)));
+    const asked = () => calls.filter((c) => c.method === "GET" && /\/api\/sheets\/s\d$/.test(c.url)).map((c) => c.url.slice(-2));
+    await at(1);
     fireEvent.keyDown(window, { key: "PageDown" });
-    expect(window.location.hash).toBe("#/sheets/s2");
-    await step("s2", 2);
+    await at(2);
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(window.location.hash).toBe("#/sheets/s9");
-    await step("s9", 3);
+    await at(3);
     // the end of the setlist: the pedal does nothing, back goes to the song before
     fireEvent.keyDown(window, { key: "PageDown" });
-    expect(window.location.hash).toBe("#/sheets/s9");
+    await at(3);
     fireEvent.keyDown(window, { key: "PageUp" });
-    expect(window.location.hash).toBe("#/sheets/s2");
+    await at(2);
+    await waitFor(() => expect(asked()).toEqual(["s9", "s2", "s9", "s2"]));
+    expect(window.location.hash).toBe("#/sheets");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByTestId("sheet-stage")).toBeNull();
+    // leaving opens the song the setlist was at (the newest version of Example Song)
+    expect(window.location.hash).toBe("#/sheets/s2");
   });
 
   it("adds the open sheet to a setlist and reorders with Alt+arrow keys", async () => {
