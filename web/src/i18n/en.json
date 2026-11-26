@@ -2605,13 +2605,15 @@
     "targets": {
       "research": "Research",
       "dev": "Development",
-      "admin": "Administration"
+      "admin": "Administration",
+      "project": "This project"
     },
     "actions": {
       "request_report": "request a report",
       "create_branch": "create a branch",
       "create_prototype": "create a prototype",
-      "read_released": "read released data"
+      "read_released": "read released data",
+      "decompose": "split large tasks into sub-tasks"
     },
     "tree": "Tree",
     "noNodes": "Nothing here yet. Add a topic, a task or a report above.",
