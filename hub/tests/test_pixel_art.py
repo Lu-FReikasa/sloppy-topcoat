@@ -136,6 +136,41 @@ def test_half_transparent_pixels_become_opaque_or_transparent() -> None:
     assert art.getpixel((1, 0))[3] == 255  # type: ignore[index]
 
 
+def test_sizes_are_bounded_before_anything_is_decoded_or_allocated() -> None:
+    """A huge source is refused on its size alone (``Image.open`` is lazy, the first conversion
+    would decode it), and so is a result that grid times scale would make huge."""
+    lazy = Image.new("1", (pa.MAX_SOURCE_PIXELS // 1024 + 1, 1024))
+    with pytest.raises(pa.PixelArtError):
+        pa.pixelate(lazy, 8)
+    small = Image.new("RGB", (8, 8))
+    with pytest.raises(pa.PixelArtError):
+        pa.pixelate(small, pa.MAX_GRID, scale=pa.MAX_OUTPUT_SIDE // pa.MAX_GRID + 1)
+    assert pa.pixelate(small, 64, scale=pa.MAX_OUTPUT_SIDE // 64).size == (4096, 4096)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"grid": 8.0},
+        {"grid": (2.5, 3)},
+        {"grid": (True, 4)},
+        {"grid": "8"},
+        {"grid": (3, 4, 5)},
+        {"grid": 8, "scale": 2.0},
+        {"grid": 8, "colours": 2.5},
+        {"grid": 8, "key": "#000", "key_tolerance": 1.5},
+    ],
+)
+def test_options_that_are_not_whole_numbers_are_refused_plainly(options: dict) -> None:
+    with pytest.raises(pa.PixelArtError):
+        pa.pixelate(Image.new("RGB", (8, 8)), **options)
+
+
+def test_k_means_on_a_fully_transparent_image_gives_a_transparent_image() -> None:
+    art = pa.pixelate(Image.new("RGBA", (4, 4)), 4, colours=4, outline="#000")
+    assert colours_of(art) == {(0, 0, 0, 0)}
+
+
 def test_the_key_tolerance_takes_a_noisy_background_too() -> None:
     src = Image.new("RGB", (2, 1), "#ff00ff")
     src.putpixel((1, 0), (250, 6, 250))
@@ -172,9 +207,20 @@ def test_a_sprite_sheet_refuses_frames_of_mixed_size_and_bad_fps() -> None:
         pa.sprite_sheet([frame("#a8323a"), pa.pixelate(Image.new("RGB", (4, 4)), (4, 3))])
     with pytest.raises(pa.PixelArtError):
         pa.sprite_sheet([])
-    for fps in (0, -1, 61, float("nan")):
+    for fps in (0, -1, 61, float("nan"), float("inf"), 1e-310):
         with pytest.raises(pa.PixelArtError):
             pa.sprite_sheet([frame("#a8323a")], fps=fps)
+
+
+def test_a_sprite_sheet_is_bounded_in_frames_and_width() -> None:
+    with pytest.raises(pa.PixelArtError):
+        pa.sprite_sheet([frame("#a8323a")] * (pa.MAX_FRAMES + 1))
+    wide = Image.new("RGBA", (pa.MAX_SHEET_SIDE // 2 + 1, 1))
+    with pytest.raises(pa.PixelArtError):
+        pa.sprite_sheet([wide, wide])
+    # metadata made by hand is held to the same rules, so the CSS never says "infs"
+    with pytest.raises(pa.PixelArtError):
+        pa.SheetMeta(frame_width=4, frame_height=4, frames=2, fps=1e-310)
 
 
 def test_the_css_steps_through_the_frames() -> None:

@@ -40,10 +40,25 @@ PALETTES: dict[str, tuple[str, ...]] = {
 MAX_GRID = 512  # pixel art is small; a bigger grid is a mistake, not a style
 MAX_COLOURS = 64
 KMEANS_ROUNDS = 12
+# Sizes that bound memory, whatever a caller passes in: the source is checked before Pillow
+# decodes it (a lazily opened file is only read by the first conversion), the results before they
+# are allocated (a 512 grid at scale 64 would be 32768 x 32768 RGBA, 4 GiB).
+MAX_SOURCE_PIXELS = 4096 * 4096
+MAX_OUTPUT_SIDE = 4096
+MAX_FRAMES = 256
+MAX_SHEET_SIDE = 16384
+MIN_FPS, MAX_FPS = 0.1, 60.0
 
 
 class PixelArtError(ValueError):
     """The options cannot make pixel art (a grid of 0, an unknown palette, frames of mixed size)."""
+
+
+def _whole(value: object, low: int, high: int, what: str) -> int:
+    """``value`` as an int in ``low..high``; floats, strings and bools are refused."""
+    if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
+        raise PixelArtError(f"{what} must be a whole number {low}..{high}")
+    return value
 
 
 @dataclass(frozen=True)
@@ -54,6 +69,15 @@ class SheetMeta:
     frame_height: int
     frames: int
     fps: float
+
+    def __post_init__(self) -> None:
+        if not (MIN_FPS <= self.fps <= MAX_FPS and math.isfinite(self.fps)):
+            raise PixelArtError(f"fps must be {MIN_FPS:g}..{MAX_FPS:g}")
+        _whole(self.frames, 1, MAX_FRAMES, "the number of frames")
+        _whole(self.frame_width, 1, MAX_SHEET_SIDE, "the frame width")
+        _whole(self.frame_height, 1, MAX_SHEET_SIDE, "the frame height")
+        if self.width > MAX_SHEET_SIDE:
+            raise PixelArtError(f"a sprite sheet is at most {MAX_SHEET_SIDE} pixels wide")
 
     @property
     def width(self) -> int:
@@ -113,9 +137,9 @@ def nearest(colour: RGB, palette: Sequence[RGB]) -> RGB:
 def kmeans_palette(colours: Sequence[RGB], k: int, rounds: int = KMEANS_ROUNDS) -> list[RGB]:
     """``k`` colours that stand for ``colours``: Pillow's octree quantiser, refined by ``rounds``
     of k-means (in C, deterministic; median cut merged clearly different hues in a test). Fewer
-    distinct colours than ``k`` are kept as they are."""
-    if not 1 <= k <= MAX_COLOURS:
-        raise PixelArtError(f"k-means needs 1 to {MAX_COLOURS} colours")
+    distinct colours than ``k`` are kept as they are. The same for one Pillow version (``uv.lock``
+    pins it); another version may pick slightly different colours."""
+    _whole(k, 1, MAX_COLOURS, "the number of k-means colours")
     distinct = sorted(set(colours))
     if len(distinct) <= k:
         return distinct
@@ -130,16 +154,15 @@ def kmeans_palette(colours: Sequence[RGB], k: int, rounds: int = KMEANS_ROUNDS) 
 def _grid(size: int | tuple[int, int], source: tuple[int, int]) -> tuple[int, int]:
     """The target grid: ``(w, h)``, or one number for the longer side (the other keeps the
     image's proportions)."""
-    if isinstance(size, int):
-        if not 1 <= size <= MAX_GRID:
-            raise PixelArtError(f"the grid must be 1..{MAX_GRID} pixels on each side")
+    what = "the grid"
+    if isinstance(size, int) and not isinstance(size, bool):
+        side = _whole(size, 1, MAX_GRID, what)
         w, h = source
         long = max(w, h)
-        size = (max(1, round(size * w / long)), max(1, round(size * h / long)))
-    gw, gh = size
-    if not (1 <= gw <= MAX_GRID and 1 <= gh <= MAX_GRID):
-        raise PixelArtError(f"the grid must be 1..{MAX_GRID} pixels on each side")
-    return (gw, gh)
+        return (max(1, round(side * w / long)), max(1, round(side * h / long)))
+    if not isinstance(size, tuple | list) or len(size) != 2:
+        raise PixelArtError(f"{what} is (width, height) or one number")
+    return (_whole(size[0], 1, MAX_GRID, what), _whole(size[1], 1, MAX_GRID, what))
 
 
 def colour_key(image: Image.Image, key: str | Sequence[int], tolerance: int = 0) -> Image.Image:
@@ -196,13 +219,20 @@ def pixelate(
     colours. ``key``: the background colour that becomes transparent (with ``key_tolerance`` per
     channel). Semi-transparent pixels become fully opaque or fully transparent (alpha < 128).
     ``outline``: a 1-px outline colour around the opaque shape. ``scale``: a nearest-neighbour
-    upscale of the result for display (1 = the grid itself)."""
-    if not 1 <= scale <= 64:
-        raise PixelArtError("scale must be 1..64")
-    if not 0 <= key_tolerance <= 255:
-        raise PixelArtError("the key tolerance must be 0..255")
+    upscale of the result for display (1 = the grid itself).
+
+    Limits: the source at most :data:`MAX_SOURCE_PIXELS` (checked before Pillow decodes it), the
+    grid at most :data:`MAX_GRID` per side, grid times scale at most :data:`MAX_OUTPUT_SIDE`.
+    The palette mapping runs in Python (up to a few seconds for a 512 grid of noise and 64
+    colours), so an async caller runs it in a worker thread or process."""
+    _whole(scale, 1, 64, "scale")
+    _whole(key_tolerance, 0, 255, "the key tolerance")
+    if image.width * image.height > MAX_SOURCE_PIXELS:
+        raise PixelArtError(f"the image is larger than {MAX_SOURCE_PIXELS} pixels")
+    size = _grid(grid, image.size)
+    if max(size) * scale > MAX_OUTPUT_SIDE:
+        raise PixelArtError(f"grid times scale must stay within {MAX_OUTPUT_SIDE} pixels")
     src = image.convert("RGBA")
-    size = _grid(grid, src.size)
     small = src.resize(size, Image.Resampling.NEAREST)
     if key is not None:  # pointwise, so after the nearest-neighbour pick: the same pixels, fewer
         small = colour_key(small, key, key_tolerance)
@@ -237,18 +267,18 @@ def pixelate(
 
 def sprite_sheet(frames: Sequence[Image.Image], fps: float = 8.0) -> tuple[Image.Image, SheetMeta]:
     """The frames side by side in one strip (left to right, in order), and its metadata. All
-    frames must have the same size."""
+    frames must have the same size; at most :data:`MAX_FRAMES` frames, :data:`MAX_SHEET_SIDE`
+    pixels wide, and :data:`MIN_FPS` to :data:`MAX_FPS` frames a second."""
     if not frames:
         raise PixelArtError("a sprite sheet needs at least one frame")
-    if not (0 < fps <= 60 and math.isfinite(fps)):
-        raise PixelArtError("fps must be above 0 and at most 60")
     w, h = frames[0].size
     if any(f.size != (w, h) for f in frames):
         raise PixelArtError("all frames of a sprite sheet must have the same size")
-    sheet = Image.new("RGBA", (w * len(frames), h), (0, 0, 0, 0))
+    meta = SheetMeta(frame_width=w, frame_height=h, frames=len(frames), fps=fps)  # checks limits
+    sheet = Image.new("RGBA", (meta.width, h), (0, 0, 0, 0))
     for i, frame in enumerate(frames):
         sheet.paste(frame.convert("RGBA"), (i * w, 0))
-    return sheet, SheetMeta(frame_width=w, frame_height=h, frames=len(frames), fps=fps)
+    return sheet, meta
 
 
 _CSS_NAME = re.compile(r"[a-z][a-z0-9-]{0,63}")
@@ -263,8 +293,7 @@ def css_animation(meta: SheetMeta, name: str, url: str, scale: int = 1) -> str:
         raise PixelArtError("the name must be lowercase letters, digits and '-'")
     if not _CSS_URL.fullmatch(url):
         raise PixelArtError("the url may hold letters, digits and / _ . : ? = & % - only")
-    if not 1 <= scale <= 64:
-        raise PixelArtError("scale must be 1..64")
+    _whole(scale, 1, 64, "scale")
     fw, fh = meta.frame_width * scale, meta.frame_height * scale
     total = fw * meta.frames
     duration = f"{meta.duration_seconds:.3f}".rstrip("0").rstrip(".")
