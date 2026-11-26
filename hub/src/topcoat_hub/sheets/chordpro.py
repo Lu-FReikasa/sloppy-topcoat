@@ -168,10 +168,15 @@ def parse_line(text: str, german: bool = False) -> Line:
     return Line(segments)
 
 
+def writes_german(text: str) -> bool:
+    """Whether a ChordPro text writes its ``[...]`` chords with German names (an ``H``)."""
+    return uses_german_names(_CHORD_TOKEN.findall(text))
+
+
 def parse(text: str) -> Sheet:
     """A ChordPro text as a sheet in sounding pitch."""
     lines = text.replace("\r\n", "\n").split("\n")
-    german = uses_german_names(_CHORD_TOKEN.findall(text))
+    german = writes_german(text)
     sheet = Sheet()
     shape_capo = 0  # {capo}: the chords are shapes
     current: Section | None = None

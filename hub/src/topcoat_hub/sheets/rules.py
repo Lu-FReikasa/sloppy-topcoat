@@ -36,10 +36,11 @@ class Applied:
     removed: list[str] = field(default_factory=list)  # header lines dropped or made facts
 
 
-def apply(sheet: Sheet) -> Applied:
-    """Clean ``sheet`` in place; what was done, for the report."""
+def apply(sheet: Sheet, german: bool = False) -> Applied:
+    """Clean ``sheet`` in place; what was done, for the report. ``german``: the source writes German
+    note names (its ``[...]`` chords had an ``H``), so a plain ``B`` is a B flat."""
     done = Applied()
-    _chord_lines(sheet, done)
+    _chord_lines(sheet, done, german)
     _tab_blocks(sheet, done)
     _header(sheet, done)
     return done
@@ -99,8 +100,19 @@ def _german(sheet: Sheet) -> bool:
     return uses_german_names(names)
 
 
-def _chord_lines(sheet: Sheet, done: Applied) -> None:
-    german = _german(sheet)
+def _sounding(ln: Line, capo: int) -> Line:
+    """Plain chords are written as the source wrote them: the shapes when it plays with a capo (the
+    chords in ``[...]`` were moved to sounding pitch already, ``chordpro.parse``)."""
+    if not capo:
+        return ln
+    segs = [
+        Segment(g.text, g.chord.transpose(capo) if g.chord else None, g.raw) for g in ln.segments
+    ]
+    return Line(segs, ln.comment)
+
+
+def _chord_lines(sheet: Sheet, done: Applied, german: bool) -> None:
+    german = german or _german(sheet)
     out: list[Section] = []
     for sec in sheet.sections:
         out.append(sec)
@@ -123,7 +135,7 @@ def _chord_lines(sheet: Sheet, done: Applied) -> None:
                 part.kind, part.label = kind_of(label) or "other", label
             elif label:
                 chords = f"{label}: {chords}"
-            part.lines.append(parse_line(chords, german))
+            part.lines.append(_sounding(parse_line(chords, german), sheet.capo))
             done.chord_lines += 1
     _replace(sheet, out)
 
@@ -161,22 +173,20 @@ def _tab_blocks(sheet: Sheet, done: Applied) -> None:
             sec.lines = [_staff(ln) for ln in sec.lines]
             _add(out, sec, done)
             continue
-        pieces: list[tuple[bool, list[Line]]] = []
-        for ln in sec.lines:
-            tab = _is_tab(ln)
-            if pieces and pieces[-1][0] == tab:
-                pieces[-1][1].append(ln)
-            else:
-                pieces.append((tab, [ln]))
-        used = False  # the part keeps its place (a {chorus} may repeat it) with its first lines
-        for tab, lines in pieces:
-            if tab:
-                _add(out, Section("tab", name, [_staff(ln) for ln in lines]), done)
-            elif not used:
-                sec.lines, used = lines, True
-                out.append(sec)
-            else:
-                out.append(Section(sec.kind, sec.label, lines))
+        # The part keeps all its other lines in one piece: split in two, a {chorus} would repeat
+        # only one half of it, and a second "Verse 1" would not pair with the other sources. A tab
+        # block at its start stands before it, any other after it.
+        lead = 0
+        while lead < len(sec.lines) and _is_tab(sec.lines[lead]):
+            lead += 1
+        before = [_staff(ln) for ln in sec.lines[:lead]]
+        after = [_staff(ln) for ln in sec.lines[lead:] if _is_tab(ln)]
+        sec.lines = [ln for ln in sec.lines[lead:] if not _is_tab(ln)]
+        if before:
+            _add(out, Section("tab", name, before), done)
+        out.append(sec)
+        if after:
+            _add(out, Section("tab", name, after), done)
     _replace(sheet, out)
 
 
@@ -226,15 +236,19 @@ _FACT_NAMES = {
 }  # fmt: skip
 # "Standard tuning", "Drop D tuning", "Eb tuning (half step down)"
 _TUNING = re.compile(r"^(\S+(?:\s+\S+){0,3})\s+tuning\s*((?:[:(\-].*)?)$", re.I)
+# the words in front of "tuning" ("we keep on tuning" is lyrics)
+_TUNING_WORD = re.compile(
+    r"^(?:standard|drop|open|half|whole|step|down|[a-g][#b]?|[a-g#b]{4,8})$", re.I
+)
 _SOURCE = re.compile(
     r"^(?:source|quelle|from|taken from|found (?:at|on))\s*:|https?://|www\.|"
     r"^\S+\.(?:com|net|org|de|at|ch|info|co\.uk|fr|it|es|nl)(?:/\S*)?$",
     re.I,
 )
 _CREDIT = re.compile(
-    r"^(?:album|difficulty|author|composer|written by|words and music|words & music|lyrics by|"
-    r"music by|chords? by|tab(?:bed)? by|transcribed by|arranged by|submitted by|corrected by)\b|"
-    r"@",
+    r"^(?:album|difficulty|author|composer)\s*:|"  # "Album of the year…" is lyrics
+    r"^(?:written by|words and music|words & music|lyrics by|music by|chords? by|tab(?:bed)? by|"
+    r"transcribed by|arranged by|submitted by|corrected by)\b|@",
     re.I,
 )
 _FILLER_WORDS = {"by", "von", "feat", "ft", "and", "the", "und", "chords", "tab", "akkorde"}
@@ -274,7 +288,7 @@ def _header_line(text: str, sheet: Sheet) -> bool:
             sheet.meta.setdefault("x_tuning" if what == "tuning" else "tempo", value)
         return bool(what)
     m = _TUNING.match(t)
-    if m:
+    if m and all(_TUNING_WORD.match(w) for w in m.group(1).split()):
         sheet.meta.setdefault("x_tuning", (m.group(1) + m.group(2)).strip())
         return True
     return bool(_SOURCE.search(t) or _CREDIT.search(t) or _by_name(t) or _names_song(t, sheet))

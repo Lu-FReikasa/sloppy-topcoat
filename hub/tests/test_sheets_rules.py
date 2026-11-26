@@ -63,6 +63,17 @@ def test_german_plain_chords_are_read_as_german() -> None:
     assert [c.name() for c in s.sections[0].lines[0].chords] == ["B", "E", "A#"]
 
 
+def test_german_bracket_chords_make_the_plain_ones_german_too() -> None:
+    s = store.read("{start_of_verse}\n[H]wir [E]singen\n{comment: B  E}\n{end_of_verse}\n")
+    assert names(s) == ["B", "E", "A#", "E"]  # the plain B is a B flat
+
+
+def test_plain_chords_with_a_capo_are_shapes() -> None:
+    s = store.read("{capo: 2}\n{start_of_verse}\n{comment: C  G}\n[C]boats [G]sail\n"
+                   "{end_of_verse}\n")  # fmt: skip
+    assert names(s) == ["D", "A", "D", "A"]  # sounding, like the chords in brackets
+
+
 def test_a_remark_after_plain_chords_stays_text() -> None:
     s = cp("{start_of_outro}\nC  G  (to fade)\n{end_of_outro}\n")
     rules.apply(s)
@@ -96,17 +107,25 @@ def test_tab_staves_from_a_plain_page_are_a_tab_part() -> None:
     ))))  # fmt: skip
 
 
-def test_tab_lines_inside_a_part_are_split_off() -> None:
+def test_tab_lines_inside_a_part_follow_it_and_the_part_stays_whole() -> None:
     text = "\n".join(
         ["{start_of_chorus}", "[C]sail away", *STAFF, "[G]sail back home", "{end_of_chorus}",
-         "{chorus}"]
+         "{start_of_verse}", "[D]a verse", "{end_of_verse}", "{chorus}"]
     )  # fmt: skip
     s = cp(text)
     rules.apply(s)
-    assert [x.kind for x in s.sections] == ["chorus", "tab", "chorus", "chorus"]
+    assert [x.kind for x in s.sections] == ["chorus", "tab", "verse", "chorus"]
     assert s.sections[1].label == "Tab"
-    assert s.sections[3].repeat_of == 0  # {chorus} still repeats the first part
-    assert lyric_lines(s)[0] == "sail away"
+    assert lyric_lines(s)[:2] == ["sail away", "sail back home"]
+    assert s.sections[3].repeat_of == 0  # {chorus} repeats the whole chorus
+    stored = cp(chordpro.write(s))  # and still does once the sheet is stored and read again
+    assert stored.sections[3].repeat_of == 0
+
+
+def test_a_tab_block_at_the_start_of_a_part_stands_before_it() -> None:
+    s = cp("\n".join(["{start_of_solo: Solo}", *STAFF, "[Am]la la", "{end_of_solo}"]))
+    rules.apply(s)
+    assert [(x.kind, x.label) for x in s.sections] == [("tab", "Solo"), ("solo", "Solo")]
 
 
 def test_tab_lines_carry_no_words_into_tidy() -> None:
@@ -162,10 +181,12 @@ def test_a_line_with_the_title_and_artist_goes() -> None:
 
 
 def test_lyrics_before_the_first_chord_stay() -> None:
-    s = cp("by the river we sing\nthe radio tuning in\n\n[G]paper boats\n")
+    lines = ["by the river we sing", "the radio tuning in", "we keep on tuning",
+             "Album of the year"]  # fmt: skip
+    s = cp("\n".join(lines) + "\n\n[G]paper boats\n")
     done = rules.apply(s)
-    assert done.removed == []
-    assert lyric_lines(s)[:2] == ["by the river we sing", "the radio tuning in"]
+    assert done.removed == [] and "x_tuning" not in s.meta
+    assert lyric_lines(s)[:4] == lines
 
 
 def test_header_words_after_the_first_chord_stay() -> None:
