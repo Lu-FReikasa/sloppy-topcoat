@@ -521,7 +521,9 @@
   color: var(--text, CanvasText);
 }
 
+/* at the bottom, under the sheet: the arrows sit where a hand holding a turned laptop reaches them */
 .sheet-stage-head {
+  order: 1;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
