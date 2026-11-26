@@ -8,11 +8,14 @@ import { HistoryPane } from "./HistoryPane";
 import { IterationPanel } from "./IterationPanel";
 import { CheckOpenIssues, IssuePanel } from "./IssuePanel";
 import { LabelsEditor, RelationsEditor, RemindersEditor } from "./NodeExtras";
+import { LargeTaskPanel } from "./SubtaskView";
 import { AppBadge } from "./AppBadge";
 import { WikiTakeOver } from "./WikiTakeOver";
 import { fromInputValue, toInputValue } from "./time";
 import {
+  hasSubtasks,
   isIssue,
+  isSubtask,
   type ProjectNode,
   type ProjectNodePatch,
   type ProjectRepeatRule,
@@ -331,6 +334,14 @@ export function NodeDetail({
 
       {isIssue(node) && (
         <IssuePanel api={api} task={node} onChanged={onChanged} onError={onError} />
+      )}
+      {isTask && !isIssue(node) && !isSubtask(node) && (
+        <LargeTaskPanel
+          api={api}
+          nodeId={node.id}
+          open={hasSubtasks(node, nodes)}
+          onChanged={onChanged}
+        />
       )}
       {node.kind === "topic" && node.title === "Issues" && (
         <CheckOpenIssues

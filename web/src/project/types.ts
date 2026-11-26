@@ -193,6 +193,16 @@ export interface IssuePlan {
   test: { path: string; do: string };
 }
 
+/** A sub-task of a large task: its body carries the spec the hub reads back (hub vorhaben.spec_of). */
+export function isSubtask(node: Pick<ProjectNode, "kind" | "body">): boolean {
+  return node.kind === "task" && /```teilaufgabe\s*\n/.test(node.body ?? "");
+}
+
+/** Whether a task is a large task with sub-tasks filed (D109): a child of it is a sub-task. */
+export function hasSubtasks(task: Pick<ProjectNode, "id">, nodes: readonly ProjectNode[]): boolean {
+  return nodes.some((n) => n.parent_id === task.id && isSubtask(n));
+}
+
 /** A task filed from the running system (hub project_issues.py). */
 export function isIssue(node: Pick<ProjectNode, "kind" | "body">): boolean {
   return node.kind === "task" && /^Art: issue$/m.test(node.body ?? "");
@@ -527,4 +537,53 @@ export interface OrderRelease {
   days: number;
   text: string;
   push: boolean;
+}
+
+/** The state of a sub-task of a large task, derived by the hub (D109, hub vorhaben.state_of). */
+export type SubtaskState = "waiting" | "running" | "failed" | "blocked" | "done";
+
+/** One sub-task of a large task as `GET /api/project/nodes/{id}/large-task` gives it (issue #32). */
+export interface Subtask {
+  id: string;
+  node_id: string;
+  number: string;
+  title: string;
+  goal: string;
+  layer: "store" | "api" | "gui" | "proto" | "docs" | "admin" | "research";
+  files: string[];
+  new_files: string[];
+  accept: string[];
+  /** Ids of other sub-tasks (`s1`), not node ids. */
+  depends_on: string[];
+  state: SubtaskState;
+  status: ProjectTaskStatus;
+  /** The newest fix of its run (hub issue_fixes.py). */
+  result: { id: string; state: string; summary: string; error: string | null } | null;
+  /** The next step, in the hub's words (German today, hub vorhaben.next_step). */
+  next: string;
+}
+
+/** A large task with its sub-tasks (D109, D110); `planning` = not decomposed yet. */
+export interface LargeTaskView {
+  large_task: {
+    id: string;
+    project_id: string;
+    project: string;
+    number: string;
+    title: string;
+    branch: string;
+    state: "planning" | "running" | "blocked" | "done";
+    scope: { id: string; state: "active" | "ended"; expires_at: string } | null;
+  };
+  subtasks: Subtask[];
+  rollout: { ready: boolean };
+}
+
+/** What one step of a large task's run did (`POST …/large-task/tick`): sub-task ids. */
+export interface LargeTaskTick {
+  started: string[];
+  replanned: string[];
+  blocked: string[];
+  stopped: string[];
+  done: boolean;
 }
