@@ -117,6 +117,8 @@ import {
   type ZoomPath,
 } from "./nest";
 
+/** The id of a window's zoom move (Web Animations), to take a running one over. */
+const NEST_MOVE = "dt-nest-move";
 const sameZoom = (a: readonly number[], b: readonly number[]) => a.length === b.length && a.every((v, i) => b[i] === v);
 
 interface Props {
@@ -652,13 +654,22 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
   const themeNow = preview ?? resolveTheme(prefs?.look, ui.boot?.themes ?? []);
   const nesting = themeNow.layout.kind === "nest";
   const [nest, setNest] = useState<NestState>(() => loadNests(() => true)[0] ?? { tree: null, zoom: [] });
+  // a solo window shows one program and keeps no nest: it shares this storage with the overlay in
+  // the desktop client, and its one-program tree would replace the overlay's
   useEffect(() => {
-    if (nesting) saveNests({ 0: nest });
-  }, [nest, nesting]);
+    if (nesting && !solo) saveNests({ 0: nest });
+  }, [nest, nesting, solo]);
+  // the nest is drawn only on a wide screen (a narrow one shows the program in front alone): its
+  // keys and Esc step do nothing there, so Esc minimises as in every other layout
+  const nestKeys = nesting && !narrow;
   // A zoom moves every window at once: where each was is read from the page just before, and the
   // windows play the move from there to their new place as a transform (FLIP), for the theme's
   // length. The windows are not drawn again for it, nor mounted again.
   const nestFrom = useRef<Map<string, DOMRect> | null>(null);
+  const focusNow = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    focusNow.current = state.focus;
+  }, [state.focus]);
   const nestMs = useRef(0);
   const zoomNest = useCallback(
     (fn: (n: NestState) => ZoomPath) => {
@@ -742,7 +753,9 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
             onMaximise: () => change((s) => toggleMaximise(s, key)),
             onClose: () => leave(key, (s) => closeProgram(s, key)),
             onZoom: () => {
-              change((s) => openProgram(s, key), true);
+              // the press before the click brought it forward already; a second change at once
+              // raced the address (it brought the program back that the address still named)
+              if (focusNow.current !== key) change((s) => openProgram(s, key), true);
               // eslint-disable-next-line react-hooks/refs -- handler: the zoom reads its refs when it runs
               zoomToProgram(key);
             },
@@ -832,20 +845,43 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
     nestFrom.current = null;
     const el = stage.current;
     if (!from || !el || !nestMs.current) return;
-    for (const w of el.querySelectorAll<HTMLElement>(".dt-program")) {
+    const windows = [...el.querySelectorAll<HTMLElement>(".dt-program")];
+    // the places change at once: the move is the transform below, not the places' own short
+    // transition (desktop.css), which would also hide the new place from the measuring
+    for (const w of windows) w.style.transition = "none";
+    for (const w of windows) {
       const was = from.get(w.dataset.program ?? "");
+      if (!was || typeof w.animate !== "function") continue;
+      // a zoom that is still moving is taken over from where it is (`was` was read mid-move)
+      for (const a of w.getAnimations()) if (a.id === NEST_MOVE) a.cancel();
       const now = w.getBoundingClientRect();
-      if (!was || !now.width || !now.height || typeof w.animate !== "function") continue;
-      // the window's own scale (a program drawn smaller than its minimum) stays outside the move
+      if (!now.width || !now.height) continue;
+      // the window's own scale (a program drawn smaller than its minimum) stays outside the move;
+      // such a window turns about its top left corner, the others about their middle
       const s = parseFloat(w.style.getPropertyValue("scale")) || 1;
-      const dx = (was.left - now.left) / s;
-      const dy = (was.top - now.top) / s;
-      w.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${was.width / now.width}, ${was.height / now.height})` }], {
-        duration: nestMs.current,
-        easing: "ease-out",
-      });
+      const [dx, dy] =
+        s < 1
+          ? [(was.left - now.left) / s, (was.top - now.top) / s]
+          : [was.left + was.width / 2 - (now.left + now.width / 2), was.top + was.height / 2 - (now.top + now.height / 2)];
+      // the look's own transform (a paper slip's tilt) stays on while it moves, so it does not jump at the end
+      const own = getComputedStyle(w).transform;
+      const base = own && own !== "none" ? own : "";
+      w.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px) scale(${was.width / now.width}, ${was.height / now.height}) ${base}`.trim() },
+          { transform: base || "none" },
+        ],
+        { id: NEST_MOVE, duration: nestMs.current, easing: "ease-out" },
+      );
     }
+    // measured: the places are final, so the transition coming back starts nothing
+    for (const w of windows) w.style.transition = "";
   }, [nest.zoom]);
+  // the windows' places read for a zoom belong to that zoom only: one that changed nothing must not
+  // leave them for a later move (they would be stale by then)
+  useLayoutEffect(() => {
+    nestFrom.current = null;
+  });
   const nestStep = useCallback(
     (go: "in" | "out" | "all") =>
       zoomNest((n) =>
@@ -879,7 +915,7 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
         return;
       }
       // the nest's levels: Alt+Down in towards the program in front, Alt+Up out, Alt+0 everything
-      if (nesting && e.altKey && !mod && !e.shiftKey && !typing(e.target)) {
+      if (nestKeys && e.altKey && !mod && !e.shiftKey && !typing(e.target)) {
         const go = e.key === "ArrowDown" ? "in" : e.key === "ArrowUp" ? "out" : e.key === "0" ? "all" : null;
         if (go) {
           e.preventDefault();
@@ -898,7 +934,7 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
       // zoomed into the nest, Esc steps out one level before it minimises anything
       if (
         e.key === "Escape" &&
-        nesting &&
+        nestKeys &&
         !overlay &&
         nestZoom.length > 0 &&
         !typing(e.target) &&
@@ -922,7 +958,7 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [palette, state.focus, programs, change, focusChat, overlay, toggleTalk, nesting, nestStep, nestZoom.length]);
+  }, [palette, state.focus, programs, change, focusChat, overlay, toggleTalk, nestKeys, nestStep, nestZoom.length]);
 
   const entries = useMemo<PaletteEntry[]>(() => {
     const out: PaletteEntry[] = [];
@@ -996,7 +1032,7 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
         run: () => toggleTalk(front),
       });
     }
-    if (nesting) {
+    if (nestKeys) {
       const words = "nest zoom ebene level gruppe group";
       for (const [id, go] of [["zoomIn", "in"], ["zoomOut", "out"], ["overview", "all"]] as const)
         // eslint-disable-next-line react-hooks/refs -- handler: the zoom reads its refs when it runs
@@ -1009,7 +1045,7 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
       run: onLogout,
     });
     return out;
-  }, [programs, modules, ctx.isAdmin, t, change, onLogout, ui.boot, setPrefs, hasSettings, state.focus, toggleTalk, nesting, nestStep]);
+  }, [programs, modules, ctx.isAdmin, t, change, onLogout, ui.boot, setPrefs, hasSettings, state.focus, toggleTalk, nestKeys, nestStep]);
 
   if (ui.status === "loading" && !ui.boot) return <ShellLoading />;
   if (!ui.boot) return <ShellFailure unreachable={ui.unreachable} detail={ui.error} onRetry={ui.reload} />;
@@ -1157,7 +1193,8 @@ export function Desktop({ api, ctx, routeKey, moving = false, uiTick, status, on
             top: pct(r.y),
             width: pct(r.w / scale),
             height: pct(r.h / scale),
-            ...(nesting ? { transformOrigin: "0 0", scale: scale < 1 ? String(scale) : undefined } : {}),
+            // scaled from its top left corner, where its place starts; the others keep the look's origin
+            ...(scale < 1 ? { transformOrigin: "0 0", scale: String(scale) } : {}),
             // the order they lie in; a maximised window lies above the rest
             zIndex: 1 + Math.max(0, stack.indexOf(key)) + (big ? stack.length + 1 : 0),
           };
