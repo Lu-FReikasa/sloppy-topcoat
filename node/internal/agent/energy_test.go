@@ -156,7 +156,7 @@ func TestTheMachineSleepsByItselfAfterTheIdleTime(t *testing.T) {
 	waitSlept(t, h, 1)
 }
 
-func TestTheMachineDoesNotSleepWhileSomeoneIsThereOrAModelIsLoaded(t *testing.T) {
+func TestTheMachineDoesNotSleepWhileSomeoneIsThere(t *testing.T) {
 	// Someone is at the machine before the node gets its config. Set only after the handshake,
 	// the input would still be unknown (= nobody there) while the config is applied, and a
 	// handshake slower than the idle time (a busy CI runner) would already count as idle (#72).
@@ -165,20 +165,35 @@ func TestTheMachineDoesNotSleepWhileSomeoneIsThereOrAModelIsLoaded(t *testing.T)
 	})
 	staysAwake(t, h, hc, 1500*time.Millisecond, "while somebody was at the machine")
 
-	// The model is loaded before the person leaves, so the node is never idle in between: a
-	// load that reaches the node late cannot let the idle time run out first.
+	// When the person leaves, the machine sleeps: the check above was not vacuous.
+	h.world.SetInputIdle(time.Hour, true)
+	if d := hc.waitEvent(t, protocol.EventSleeping); d["reason"] != "idle" {
+		t.Fatalf("%v", d)
+	}
+	waitSlept(t, h, 1)
+}
+
+// A loaded model keeps the machine awake only while it is used (plan step 1.7): a house model is
+// a resident that is never unloaded for idleness, so "nothing loaded" would never come.
+func TestALoadedResidentUnusedForTheIdleTimeLetsTheMachineSleep(t *testing.T) {
+	cfg := strings.Replace(sleepConfig(`{"sleep_after_idle_seconds":2}`), `"capabilities":[]`,
+		`"residents":[{"model":"fake-llm-3b-q8","priority":50,"auto_reload":true}],"capabilities":[]`, 1)
+	h, hc := energySetup(t, cfg)
+	h.world.SetInputIdle(time.Hour, true)
 	if res := hc.action(t, "models.load", `{"model":"fake-llm-3b-q8"}`); !res.OK {
 		t.Fatalf("load: %+v", res.Error)
 	}
-	h.world.SetInputIdle(time.Hour, true)
-	staysAwake(t, h, hc, 1500*time.Millisecond, "with a model loaded")
-
-	// Without the model nothing keeps the machine awake: the checks above were not vacuous.
-	if res := hc.action(t, "models.unload", `{"model":"fake-llm-3b-q8"}`); !res.OK {
-		t.Fatalf("unload: %+v", res.Error)
+	time.Sleep(1200 * time.Millisecond) // just loaded = just used: not yet
+	if h.world.Slept() != 0 {
+		t.Fatal("slept right after a load")
 	}
-	if d := hc.waitEvent(t, protocol.EventSleeping); d["reason"] != "idle" {
+	d := hc.waitEvent(t, protocol.EventSleeping)
+	if d["reason"] != "idle" {
 		t.Fatalf("%v", d)
+	}
+	waitSlept(t, h, 1)
+	if loaded, _ := h.world.Runner().Loaded(t.Context()); len(loaded) != 0 {
+		t.Fatalf("models must be unloaded before the sleep: %v", loaded)
 	}
 }
 
