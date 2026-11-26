@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from topcoat_hub.auth import hash_secret
 from topcoat_hub.db import get_db
 from topcoat_hub.gateway import spawn
+from topcoat_hub.house_residents import keep_house_resident
 from topcoat_hub.live import NodeSession
 from topcoat_hub.models import Node, NodeAlias, PairingCode
 from topcoat_hub.nodeauth import parse_authorization, signed_message, verify_signature
@@ -241,6 +242,11 @@ async def node_ws(ws: WebSocket) -> None:
             await ws.close(code=CLOSE_PROTOCOL)
             return
 
+    config, config_hash_ = node.config, node.config_hash
+    if not session.read_only:
+        # before the session is registered, so the change is not pushed twice
+        config, config_hash_ = await _keep_house_model(state, node)
+
     previous = state.sessions.add(session)
     if previous is not None:
         previous.fail_all()
@@ -268,9 +274,7 @@ async def node_ws(ws: WebSocket) -> None:
 
     try:
         if not session.read_only:
-            await session.send(
-                envelope("config", {"config_hash": node.config_hash, "config": node.config})
-            )
+            await session.send(envelope("config", {"config_hash": config_hash_, "config": config}))
         await service.publish_node(node.id)
         while True:
             try:
@@ -287,6 +291,23 @@ async def node_ws(ws: WebSocket) -> None:
         # the next test's TRUNCATE (the last leak of the suite hang).
         cleanup = spawn(_on_disconnect(session))
         await asyncio.shield(cleanup)
+
+
+async def _keep_house_model(state: Any, node: Node) -> tuple[dict[str, Any], str]:
+    """Make the node's house model an auto-reloading resident again (plan step 1.6) and return
+    the config to send. A failure leaves the stored config as it was: the node still connects."""
+    gateway = getattr(state, "gateway", None)
+    model = gateway.policy.house.get(node.name) if gateway is not None else None
+    if not model:
+        return node.config, node.config_hash
+    try:
+        config, hash_, _ = await keep_house_resident(
+            state.nodes, state.schemas, node.id, model, source="house_reconnect"
+        )
+    except (LookupError, ProtocolError) as exc:
+        log.warning("node %s: could not keep house model %s: %s", node.name, model, exc)
+        return node.config, node.config_hash
+    return config, hash_
 
 
 async def _on_disconnect(session: NodeSession) -> None:
