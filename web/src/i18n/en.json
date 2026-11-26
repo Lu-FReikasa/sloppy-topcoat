@@ -3290,6 +3290,7 @@
       "probe_read": "Find the code an investigation's test must call",
       "probe_test": "Write one small test that tries a guess of an investigation",
       "issue_plan": "Carry out an issue's settled plan step by step",
+      "decompose": "Cut a large task into checked sub-tasks",
       "checklist_check": "Work through a task's checklist, one item per fresh run"
     }
   },

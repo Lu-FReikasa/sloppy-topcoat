@@ -3290,6 +3290,7 @@
       "probe_read": "Den Code finden, den der Test einer Untersuchung aufrufen muss",
       "probe_test": "Einen kleinen Test schreiben, der eine Vermutung einer Untersuchung ausprobiert",
       "issue_plan": "Den beschlossenen Plan eines Issues Schritt für Schritt ausführen",
+      "decompose": "Eine große Aufgabe in geprüfte Teilaufgaben zerlegen",
       "checklist_check": "Die Checkliste einer Aufgabe abarbeiten, ein Punkt pro neuem Lauf"
     }
   },
