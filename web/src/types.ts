@@ -355,7 +355,27 @@ export interface ChatMessage {
   report?: ReportCard | null;
   /** E7-01: what the hub did to produce this answer, in order (thoughts, calls, checks …). */
   activity?: ActivityItem[];
+  /** D125: the images the person sent with this message. */
+  images?: ChatImageRef[];
   created_at: string | null;
+}
+
+/** An image of a message (D125): the hub's id and size; `src` is set while only this browser has
+ *  it (the preview of a message the hub has not confirmed yet). */
+export interface ChatImageRef {
+  id: string;
+  width: number;
+  height: number;
+  src?: string;
+}
+
+/** What happened to the images of an answer (D125): who looked, or that nobody could. */
+export interface VisionOutcome {
+  sees: boolean;
+  model: string;
+  images: number;
+  routed_from?: string;
+  node?: string;
 }
 
 /** One thing the hub did for an answer (`activity.py`): plain data, the browser words it. */
@@ -1950,6 +1970,9 @@ export interface MemoryTagTree {
 export interface IncognitoMessage {
   role: "user" | "assistant";
   content: string;
+  /** D125: images of a question, and what happened to them in its answer. */
+  images?: ChatImageRef[];
+  vision?: VisionOutcome;
 }
 
 /** A conversation that lives in the memory of the hub only. */

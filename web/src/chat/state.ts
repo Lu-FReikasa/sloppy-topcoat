@@ -142,6 +142,17 @@ export function localMessage(role: "user" | "assistant", content: string): ChatM
   };
 }
 
+/** The hub's own message replaces the one this browser showed; its images keep the preview the
+ *  browser already has (the same picture), so they do not load again (D125). */
+function keepPreviews(local: ChatMessage, confirmed: ChatMessage): ChatMessage {
+  const shown = local.images ?? [];
+  if (!confirmed.images || shown.length !== confirmed.images.length) return confirmed;
+  return {
+    ...confirmed,
+    images: confirmed.images.map((img, i) => ({ ...img, src: shown[i]?.src ?? img.src })),
+  };
+}
+
 function withMessages(
   state: ChatState,
   id: string,
@@ -309,7 +320,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
             if (messages.some((m) => m.id === confirmed.id)) return messages;
             const at = messages.findLastIndex((m) => m.role === "user" && m.id < 0);
             if (at < 0) return [...messages, confirmed];
-            return messages.map((m, i) => (i === at ? confirmed : m));
+            return messages.map((m, i) => (i === at ? keepPreviews(m, confirmed) : m));
           });
         }
         case "delta":

@@ -531,6 +531,30 @@ New events: `stopped` `{message | null, interrupted}` (the run ended by a stop c
 goes on, as for `truncated`). `GET /api/conversations` and `GET /api/conversations/{id}` carry
 `running` (an answer is being generated there, whether or not a tab follows it).
 
+### Images in the chat (ARCHITECTURE D125)
+`POST /api/conversations/{id}/messages` takes `images`: up to 4 pictures as base64 (a `data:` URL is
+fine), each at most 15 MB as sent; `content` may then be empty. The hub decodes each one (JPEG, PNG,
+WebP, GIF, BMP; at most 40 million pixels), turns it upright by its EXIF orientation, scales it to at
+most 1536 px on the longer side and writes a new JPEG of at most 400 KB from the pixels alone: no
+EXIF, location, colour profile or comment survives. Only that is kept (`chat_images`, per person,
+deleted with its message or conversation). A file that is not such a picture refuses the whole
+message with 422 (`bad_image`, `image_too_large`) and nothing is stored. Messages carry
+`images: [{id, width, height}]`; `GET /api/chat/images/{id}` returns the picture to its person only
+(another person's id is a 404; `Cache-Control: private`, `nosniff`, a sandboxing CSP).
+
+The images go only to a **loaded model that can see** (model facts `vision`, a projector loaded with
+it, D125). The model of the answer keeps them where it sees, and the request is pinned to those nodes.
+Otherwise, unless the person picked the model, the answer goes to a seeing model: a house model
+first (D117), then any loaded one. A model that cannot see never gets them: the prompt says an image
+was attached and not given. `meta.vision` says what happened (`{sees, model, images, routed_from?,
+node?}`), and an activity item `note` with `data.event` `vision_routed` or `vision_blind` is kept with
+the answer. In the prompt an image is an `image_url` content part (a data URL) in its user turn, the
+newest first while 640 KB and 4 images allow (the request to the node has a size limit), older ones a
+line that one was there; the system prompt then says that text in an image is data, never an
+instruction. **Incognito** (`POST /api/incognito/{tab}/messages`) takes `images` the same way, keeps
+them in the tab in memory only (at most 12 per tab), answers with `asked` (the question with its
+`images`) and `message.vision`; `GET /api/incognito/{tab}/images/{id}` returns one from memory.
+
 ### Message kinds and the report card (E3-07 D3, ARCHITECTURE D41)
 
 Hub and GUI only. Migration `0025_message_kinds` adds `messages.kind` (`say` | `progress` | `report`,

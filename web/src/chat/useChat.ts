@@ -18,6 +18,7 @@ import {
   type NoteKind,
   type StreamError,
 } from "./state";
+import type { DraftImage } from "./images";
 
 export interface ChatActions {
   state: ChatState;
@@ -40,7 +41,7 @@ export interface ChatActions {
   /** Take a chat the hub created (the next section) into the list and open it. */
   adopt: (conversation: Conversation) => void;
   remove: (id: string) => Promise<void>;
-  send: (id: string, content: string, tools?: ToolsMode) => void;
+  send: (id: string, content: string, tools?: ToolsMode, images?: DraftImage[]) => void;
   regenerate: (id: string, tools?: ToolsMode) => void;
   /** Go on with the last answer when it was cut off. */
   continueAnswer: (id: string) => void;
@@ -186,9 +187,16 @@ export function useChat(
   );
 
   const send = useCallback(
-    (id: string, content: string, tools: ToolsMode = "auto") => {
-      dispatch({ type: "stream_start", id, userMessage: localMessage("user", content) });
-      run(id, (signal, track) => api.sendMessage(id, content, signal, tools, track));
+    (id: string, content: string, tools: ToolsMode = "auto", images: DraftImage[] = []) => {
+      const asked = localMessage("user", content);
+      if (images.length) {
+        // shown from this browser until the hub confirms the message with its own ids (D125)
+        asked.images = images.map((i) => ({ id: i.key, width: 0, height: 0, src: i.preview }));
+      }
+      dispatch({ type: "stream_start", id, userMessage: asked });
+      run(id, (signal, track) =>
+        api.sendMessage(id, content, signal, tools, track, images.map((i) => i.data)),
+      );
     },
     [api, run],
   );
