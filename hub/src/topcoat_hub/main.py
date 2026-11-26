@@ -56,6 +56,7 @@ from topcoat_hub.api import theme_workshop as theme_workshop_api
 from topcoat_hub.api import tools as tools_api
 from topcoat_hub.api import ui as ui_api
 from topcoat_hub.api import updates as updates_api
+from topcoat_hub.api import voice as voice_api
 from topcoat_hub.api import vorhaben as vorhaben_api
 from topcoat_hub.api import wiki as wiki_api
 from topcoat_hub.bench.service import BenchService
@@ -116,6 +117,7 @@ from topcoat_hub.trace_tool import TraceService
 from topcoat_hub.ui.runtime import build_runtime
 from topcoat_hub.ui.seeds import ensure_builtin as ensure_ui_builtin
 from topcoat_hub.updates import UpdateStore, parse_keys
+from topcoat_hub.voice import VoiceService
 from topcoat_hub.wake import UdpWakeSender, demand_waker
 from topcoat_hub.wiki_tools import WikiTools
 
@@ -328,6 +330,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.incognito = IncognitoService(
             app.state.gateway, app.state.tools, app.state.sessionmaker, settings
         )
+        app.state.voice = VoiceService(app.state.sessionmaker, app.state.tools)
         app.state.blocks = BlockService(
             app.state.gateway, app.state.agents, app.state.sessionmaker, settings
         )
@@ -531,6 +534,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(vorhaben_api.router)
     app.include_router(project_export_api.router)
     app.include_router(incognito_api.router)
+    app.include_router(voice_api.router)
     app.include_router(handovers_api.router)
     app.include_router(ui_api.router)
     app.include_router(plugins_api.router)

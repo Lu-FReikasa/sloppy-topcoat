@@ -496,7 +496,7 @@ a note file has `source_type=kb`, `source_ref {path, sha256, source, verified, c
 |---|---|
 | `GET /api/personas` | `templates[]`, `own[]` (each `{id, key, name, version, scope, status, components, example{de,en}, defaults, text, tokens, truncated, ref}` — `text` is the rendered persona in the user's language, at most 400 tokens, `truncated` says something was left out), `default_id`, `max_tokens`, `wizard {state, show, banner}` |
 | `POST /api/personas` `{name, components, example?, scope?}` | a personal persona from blocks (`components`: `role{de,en}`, `address` du/sie, `humor` 0/1/2, `length` short/long, `ask` ask_first/read_first, `transparency`, `emojis`; or `{free_text}`); `scope: household` is an admin's template. The secret filter runs on every text |
-| `PUT /api/personas/{id}` · `DELETE /api/personas/{id}` | change (a new version if the content changed) / archive; templates: admin only (`403`); another user's persona is `404` |
+| `PUT /api/personas/{id}` · `DELETE /api/personas/{id}` | change (a new version if the content changed) / archive; templates: admin only (`403`); another user's persona is `404`. `{voice}` (D127) names the voice of `voice.speak` the persona speaks with (`null` = the node's own); it is kept in `defaults.voice` and makes no new version |
 | `PUT /api/personas/default` `{persona_id}` | the persona new conversations start with (null = none); existing conversations keep theirs |
 | `GET /api/personas/stats` | per persona the user's own count: `answers`, `helped`, `unfit` |
 | `GET /api/personas/questionnaire` | the first-start questionnaire (a file of the hub): `scenes[]` (three, each with three answers in different tones), `questions[]` (six, with defaults), `roles`, `none_role` |
@@ -556,6 +556,40 @@ line that one was there; the system prompt then says that text in an image is da
 instruction. **Incognito** (`POST /api/incognito/{tab}/messages`) takes `images` the same way, keeps
 them in the tab in memory only (at most 12 per tab), answers with `asked` (the question with its
 `images`) and `message.vision`; `GET /api/incognito/{tab}/images/{id}` returns one from memory.
+
+### Voice: push to talk (ARCHITECTURE D127, issues #54, #55)
+`GET /api/voice/ws` (WebSocket, over the person's TLS connection like every call) carries speech
+between a client and the node services `voice.transcribe` / `voice.speak` (docs/PROTOCOL.md, "Voice
+capabilities"). `GET /api/voice` → `{transcribe, speak}` says up front whether it can work for the
+caller (the client shows its key only then). A browser cannot set a header on a WebSocket, so the **first frame** is
+`{"type": "auth", "token": "<the GUI's bearer token or an API key>"}`; anything else closes the
+socket with `4401`. The hub answers `{"type": "ready", "transcribe": bool, "speak": bool}`: whether
+a connected node offers that capability to this person (grants and node config as for every
+capability call). Then, in any order, each request with an `id` of the client's choosing:
+
+| client → hub | hub → client |
+|---|---|
+| `{"type": "listen", "id", "rate"?: 8000–48000 (16000), "language"?: "auto"\|"de"…, "incognito"?: bool}`, then **binary frames**: raw 16-bit little-endian mono samples at `rate`, any chunk size | — |
+| `{"type": "end", "id"}` (the key is let go) | `{"type": "transcript", "id", "text", "language"}` (`text` may be empty: nothing heard) |
+| `{"type": "speak", "id", "text" (1–8000 characters), "conversation_id"?, "incognito"?: bool}` | per piece `{"type": "audio", "id", "seq", "format": "wav", "text", "bytes"}` and right behind it one **binary frame** with that WAV; at the end `{"type": "spoken", "id", "pieces"}` |
+| `{"type": "cancel", "id"?}` (no `id`: everything; barge-in) | `{"type": "cancelled", "id"}` per request it stopped |
+| `{"type": "ping"}` | `{"type": "pong"}` |
+| | `{"type": "error", "id", "code", "message"}`: `no_voice_node`, `too_long`, `not_listening`, `invalid_input`, `busy`, or the code of the capability call (`not_granted`, `node_offline`, `timeout`, …). The socket stays open. |
+
+A recording holds at most 2.5 MB of WAV (about 78 s at 16 kHz); more is refused with `too_long`
+and nothing is sent to the node. Speech requests are spoken **one after the other in the order
+asked**; the hub cuts each text into sentences without their Markdown (code is not read out, a link
+is its text) of at most 600 characters, so the first sound comes after the first sentence. The client
+can therefore send an answer sentence by sentence while the chat still writes it. `conversation_id`
+picks the voice: the persona of that conversation of this person (else their default persona),
+`defaults.voice`; a voice the node does not have falls back to the node's own.
+
+**What is kept:** nothing of the audio. Each node call is audited like any capability call, but its
+input and output are withheld (`{"withheld": "voice: …"}`, no excerpt); with `incognito` no audit row
+is written at all. **The hub writes no message here**: the client posts the transcript as the
+person's message through the normal chat (`POST /api/conversations/{id}/messages`, or the incognito
+tab), so it goes through every rule of the chat. A spoken "yes" is only text: it never confirms an
+action, approval cards stay click or key (D15, D83); the socket has no message that reaches one.
 
 ### Message kinds and the report card (E3-07 D3, ARCHITECTURE D41)
 

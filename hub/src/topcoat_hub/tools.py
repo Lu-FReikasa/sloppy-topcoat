@@ -357,12 +357,18 @@ class ToolService:
         task_id: uuid.UUID | None = None,
         quiet: bool = False,
         unrecorded: bool = False,
+        private: str | None = None,
+        max_input_bytes: int = MAX_INPUT_BYTES,
+        wait_seconds: float | None = None,
     ) -> dict[str, Any]:
         """Run one read-only capability. ``quiet`` is for the hub's own periodic reads (the
         inventory, E3-10): a call that works leaves no audit row (it would be one per node per
         few minutes), a refused or failed one is audited like any other. ``unrecorded`` is for
         the incognito folder: nothing is audited, whatever the outcome (the input may be the
-        person's private question); a call that carries private data is still refused."""
+        person's private question); a call that carries private data is still refused. ``private``
+        keeps the call in the audit but neither its input nor its output (the voice path, D127:
+        audio and what was said are never stored); its text says why. ``max_input_bytes`` and
+        ``wait_seconds`` are for the few capabilities whose input is a recording, not a name."""
         audit = self._skip_audit if unrecorded else self._audit
         async with self.sessionmaker() as db:
             node = await db.get(Node, node_id)
@@ -373,7 +379,7 @@ class ToolService:
             grants = await self.grants_of(db, caller.user_id, node_id)
             config, node_name = node.config, node.name
 
-        audited_input = tool_input
+        audited_input: dict[str, Any] = tool_input if private is None else {"withheld": private}
 
         def row(**kw: Any) -> ToolCall:
             return ToolCall(
@@ -413,7 +419,7 @@ class ToolService:
                 "needs_confirmation",
                 f"{capability} changes state: it runs only after the user confirms that action",
             )
-        if len(json.dumps(tool_input).encode("utf-8")) > MAX_INPUT_BYTES:
+        if len(json.dumps(tool_input).encode("utf-8")) > max_input_bytes:
             raise await refuse(422, "invalid_input", f"the input of {capability} is too large")
         try:
             jsonschema.Draft202012Validator(info["input_schema"]).validate(tool_input)
@@ -457,7 +463,7 @@ class ToolService:
                 node_id,
                 ACTION,
                 args,
-                self.settings.tool_timeout_seconds,
+                wait_seconds or self.settings.tool_timeout_seconds,
             )
         except NodeOffline as exc:
             raise await refuse(409, "node_offline", "the node is not connected") from exc
@@ -485,6 +491,8 @@ class ToolService:
         body = result.get("result") or {}
         output = body.get("output")
         size, excerpt = self._excerpt(output)
+        if private is not None:
+            excerpt = None
         call_id = (
             None
             if quiet

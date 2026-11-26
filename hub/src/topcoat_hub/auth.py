@@ -54,6 +54,15 @@ async def api_user(request: Request, db: AsyncSession = Depends(get_db)) -> Curr
     token = bearer_token(request.headers)
     if token is None:
         raise _unauthorized()
+    user = await user_of_token(db, token, request.app.state.settings.dev_admin_token)
+    if user is None:
+        raise _unauthorized()
+    return user
+
+
+async def user_of_token(db: AsyncSession, token: str, expected: str | None) -> CurrentUser | None:
+    """The user a bearer token stands for, or ``None``. Shared by :func:`api_user` and the
+    WebSockets a browser opens (it cannot set a header there: the token is their first frame)."""
     if token.startswith(API_KEY_PREFIX):
         row = (
             await db.execute(
@@ -63,14 +72,13 @@ async def api_user(request: Request, db: AsyncSession = Depends(get_db)) -> Curr
             )
         ).first()
         if row is None:
-            raise _unauthorized()
+            return None
         key, user = row
         key.last_used_at = func.now()
         await db.commit()
         return CurrentUser(id=str(user.id), name=user.name, role=user.role, via_key=True)
-    expected = request.app.state.settings.dev_admin_token
     if not expected or not hmac.compare_digest(token, expected):
-        raise _unauthorized()
+        return None
     user = (await db.execute(select(User).where(User.id == DEV_ADMIN_ID))).scalar_one_or_none()
     if user is None:
         raise HTTPException(
