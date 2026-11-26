@@ -100,7 +100,10 @@ export function SheetsPage({ api, id }: Props) {
       /* the stage mode then ends with this page */
     }
   }, []);
-  const exitStage = useCallback(() => setStage(false), [setStage]);
+  const exitStage = useCallback(() => {
+    setStage(false);
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => undefined);
+  }, [setStage]);
   const groups = useMemo(() => visibleGroups(list ?? [], query, artist, sort), [list, query, artist, sort]);
 
   useEffect(() => {
@@ -650,20 +653,18 @@ function Stage({ api, id, groups, onExit }: { api: ApiClient; id: string; groups
 
   // full screen where the browser allows it; leaving full screen (Esc there) leaves the stage too
   useEffect(() => {
-    const el = document.documentElement;
-    let entered = false;
-    el.requestFullscreen?.().then(
-      () => (entered = true),
-      () => undefined,
-    );
+    // paging may mount a new stage while the old one's full screen is still on: keep it then
+    let entered = !!document.fullscreenElement;
+    if (!entered)
+      document.documentElement.requestFullscreen?.().then(
+        () => (entered = true),
+        () => undefined,
+      );
     const onChange = () => {
       if (entered && !document.fullscreenElement) onExit();
     };
     document.addEventListener("fullscreenchange", onChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", onChange);
-      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => undefined);
-    };
+    return () => document.removeEventListener("fullscreenchange", onChange);
   }, [onExit]);
 
   const sections = useMemo(
