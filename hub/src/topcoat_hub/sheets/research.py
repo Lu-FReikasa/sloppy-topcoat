@@ -32,7 +32,7 @@ from difflib import SequenceMatcher
 from typing import Any, Protocol
 from urllib.parse import quote, urlparse
 
-from topcoat_hub.sheets import chordpro, compare, plaintext, sources, tidy
+from topcoat_hub.sheets import chordpro, compare, plaintext, rules, sources, tidy
 from topcoat_hub.sheets.chordpro import Sheet
 from topcoat_hub.sheets.sources import Found
 
@@ -127,7 +127,7 @@ def _words(text: str) -> list[str]:
 
 def lyrics_match(sheet: Sheet, reference: str) -> float:
     """How much of the reference lyrics the sheet's words follow (0..1, word order counts)."""
-    mine = _words(" ".join(ln.lyrics for s in sheet.sections for ln in s.lines))
+    mine = _words(" ".join(ln.lyrics for s in sheet.sections if s.kind != "tab" for ln in s.lines))
     ref = _words(reference)
     if not mine or not ref:
         return 0.0
@@ -144,6 +144,7 @@ def _sheet_of(found: Found) -> Sheet | None:
         head.append(f"Key: {found.key}")
     text = plaintext.to_chordpro("\n".join([*head, found.text]), found.title, found.artist)
     sheet = chordpro.parse(text)
+    rules.apply(sheet)  # before the sources are compared and tidied with each other
     if len(sheet.chords()) < 4:
         return None
     if sheet.key is None:
@@ -401,8 +402,8 @@ async def _judge(
 ) -> None:
     parts = []
     for i, s in enumerate(srcs):
-        lyrics = " / ".join(ln.lyrics.strip() for sec in s.sheet.sections for ln in sec.lines
-                            if ln.lyrics.strip())[:300]  # fmt: skip
+        lyrics = " / ".join(ln.lyrics.strip() for sec in s.sheet.sections if sec.kind != "tab"
+                            for ln in sec.lines if ln.lyrics.strip())[:300]  # fmt: skip
         parts.append(
             f"[{i}] {s.found.site} | title: {s.found.title} | artist: {s.found.artist} | "
             f"kind: {s.found.kind} | page says: {s.found.version_note} | flags: {s.flags} | "

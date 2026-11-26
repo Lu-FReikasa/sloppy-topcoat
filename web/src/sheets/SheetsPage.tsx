@@ -25,6 +25,7 @@ import {
   type SortMode,
 } from "./fit";
 import { artistsOf, type SheetGroup } from "./group";
+import { asWritten, collapseRepeats, type BodyItem } from "./collapse";
 import { setlistGroups } from "./setlist";
 import { Setlists } from "./Setlists";
 import "./sheets.css";
@@ -40,6 +41,7 @@ interface Props {
 const POLL_MS = 3000;
 const SORT_KEY = "topcoat.sheets.sort";
 const TABS_KEY = "topcoat.sheets.hideTabs";
+const COLLAPSE_KEY = "topcoat.sheets.stageCollapse";
 const STAGE_KEY = "topcoat.sheets.stage";
 
 /** A remembered choice of this browser; storage may be missing or blocked. */
@@ -400,6 +402,7 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
   const [transpose, setTranspose] = useState(0);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"sheet" | "sources" | "chordpro">("sheet");
+  const [collapse, setCollapse] = useState(false);
   const fail = useCallback((e: unknown) => setError(describeError(toActionError(e), t, i18n)), [t, i18n]);
 
   useEffect(() => {
@@ -466,6 +469,9 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
               +
             </button>
           </div>
+          <button type="button" aria-pressed={collapse} onClick={() => setCollapse(!collapse)}>
+            {t("sheets.collapse")}
+          </button>
           {sheet.report_id && (
             <a className="small" href={`#/library/report:${sheet.report_id}`}>
               {t("sheets.research.openReport")}
@@ -485,7 +491,7 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
         </div>
       </header>
       {error && <p className="error">{error}</p>}
-      {tab === "sheet" && <Body sections={v.sections} />}
+      {tab === "sheet" && <Body items={collapse ? collapseRepeats(v.sections) : asWritten(v.sections)} />}
       {tab === "sources" && <Sources api={api} sheet={sheet} />}
       {tab === "chordpro" && <pre className="sheet-chordpro">{v.chordpro}</pre>}
     </article>
@@ -510,21 +516,40 @@ function Flow({ sheet }: { sheet: SheetDetail }) {
   );
 }
 
-function Body({ sections }: { sections: SheetSection[] }) {
+function Body({ items }: { items: BodyItem[] }) {
   const { t } = useTranslation();
+  const name = (s: SheetSection) => s.label || t(`sheets.kind.${KINDS.includes(s.kind) ? s.kind : "other"}`);
   return (
     <div className="sheet-body">
-      {sections.map((s) => (
-        <section key={s.index} id={`sheet-part-${s.index}`} className={`sheet-part ${kindClass(s.kind)}`}>
-          <h3 className="sheet-part-label">
-            {s.label || t(`sheets.kind.${KINDS.includes(s.kind) ? s.kind : "other"}`)}
-            {s.repeat_of !== null && <span className="muted small"> · {t("sheets.repeat")}</span>}
-          </h3>
-          {s.lines.map((ln, i) => (
-            <Line key={i} line={ln} />
-          ))}
-        </section>
-      ))}
+      {items.map(({ section: s, again, times, indices }) => {
+        // the flow links to every part; parts merged into this block keep their anchor here
+        const anchors = indices.slice(1).map((i) => <span key={i} id={`sheet-part-${i}`} />);
+        const count = times > 1 && <span className="sheet-times"> ×{times}</span>;
+        if (again)
+          return (
+            <section key={s.index} id={`sheet-part-${s.index}`} className={`sheet-part sheet-again ${kindClass(s.kind)}`} data-testid="sheet-again">
+              {anchors}
+              <h3 className="sheet-part-label">
+                {name(s)}
+                {count}
+                <span className="muted small"> · {t("sheets.asAbove")}</span>
+              </h3>
+            </section>
+          );
+        return (
+          <section key={s.index} id={`sheet-part-${s.index}`} className={`sheet-part ${kindClass(s.kind)}`}>
+            {anchors}
+            <h3 className="sheet-part-label">
+              {name(s)}
+              {count}
+              {s.repeat_of !== null && <span className="muted small"> · {t("sheets.repeat")}</span>}
+            </h3>
+            {s.lines.map((ln, i) => (
+              <Line key={i} line={ln} />
+            ))}
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -677,12 +702,18 @@ function Stage({
   const [sheet, setSheet] = useState<SheetDetail | null>(null);
   const [error, setError] = useState("");
   const [hideTabs, setHideTabsState] = useState(() => remembered(TABS_KEY) !== "0");
+  // default on: a repeat written out once saves lines when a song has to fit one screen
+  const [collapse, setCollapseState] = useState(() => remembered(COLLAPSE_KEY) !== "0");
   const [fit, setFit] = useState<Fit | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const setHideTabs = (on: boolean) => {
     setHideTabsState(on);
     remember(TABS_KEY, on ? "1" : "0");
+  };
+  const setCollapse = (on: boolean) => {
+    setCollapseState(on);
+    remember(COLLAPSE_KEY, on ? "1" : "0");
   };
 
   useEffect(() => {
@@ -726,16 +757,16 @@ function Stage({
     if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => undefined);
   }, []);
 
-  const sections = useMemo(
-    () => (sheet ? (hideTabs ? withoutTabs(sheet.view.sections) : sheet.view.sections) : []),
-    [sheet, hideTabs],
-  );
+  const items = useMemo(() => {
+    const sections = sheet ? (hideTabs ? withoutTabs(sheet.view.sections) : sheet.view.sections) : [];
+    return collapse ? collapseRepeats(sections) : asWritten(sections);
+  }, [sheet, hideTabs, collapse]);
 
   // fit: columns and the largest font at which nothing spills into an extra column
   useLayoutEffect(() => {
     const b = box.current;
     const c = body.current;
-    if (!b || !c || sections.length === 0) return;
+    if (!b || !c || items.length === 0) return;
     const measure = () => {
       const height = b.clientHeight;
       c.style.height = `${height}px`;
@@ -753,7 +784,7 @@ function Stage({
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
     ro?.observe(b);
     return () => ro?.disconnect();
-  }, [sections]);
+  }, [items]);
 
   const v = sheet?.view;
   return (
@@ -789,6 +820,9 @@ function Stage({
           <button type="button" aria-pressed={hideTabs} onClick={() => setHideTabs(!hideTabs)}>
             {t("sheets.stage.hideTabs")}
           </button>
+          <button type="button" aria-pressed={collapse} onClick={() => setCollapse(!collapse)}>
+            {t("sheets.collapse")}
+          </button>
           <button type="button" onClick={leave}>
             {t("sheets.stage.exit")}
           </button>
@@ -796,7 +830,7 @@ function Stage({
       </header>
       <div ref={box} className={`sheet-stage-box${fit && !fit.fits ? " is-scroll" : ""}`}>
         <div ref={body} className="sheet-stage-body">
-          {v && <Body sections={sections} />}
+          {v && <Body items={items} />}
         </div>
       </div>
     </div>
