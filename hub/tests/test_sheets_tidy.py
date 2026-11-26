@@ -212,4 +212,6 @@ def test_a_header_is_found_with_any_spelling_of_the_artist() -> None:
     text = f"EXAMPLE SONG\nThe Band & The Friends\n\n[Verse]\nG     D\n{VERSE[0]}\n"
     s = sheet(text)
     done = tidy.tidy(s, [], "", ["The Band and the Friends", "The Band & The Friends"])
-    assert kinds(s) == [("verse", "Verse")] and len(done.removed) == 1
+    # the title line goes by the sheet's own rules (rules.py), the artist line by its spellings
+    assert kinds(s) == [("verse", "Verse")]
+    assert done.removed == ["EXAMPLE SONG", "The Band & The Friends"]
