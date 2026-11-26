@@ -4386,6 +4386,30 @@
       "next": "Nächstes Lied",
       "hideTabs": "Tabs ausblenden",
       "scroll": "Zu lang für einen Bildschirm: scrollen"
+    },
+    "print": {
+      "open": "Drucken oder PDF",
+      "list": "Diese Songs drucken oder als PDF sichern …",
+      "title": "Drucken oder als PDF sichern",
+      "hint": "Ein Song pro Seite, gesetzt wie im Bühnenmodus. Wähle im Druckdialog „Als PDF speichern“, dann hast du die Songs auch in Räumen ohne WLAN.",
+      "songs": "Zu druckende Songs",
+      "picked": "{{count}} von {{total}} Songs gewählt",
+      "all": "Alle",
+      "none": "Keine",
+      "up": "{{title}} nach oben",
+      "down": "{{title}} nach unten",
+      "paper": "Papier",
+      "paperName": {
+        "a4": "A4",
+        "letter": "Letter"
+      },
+      "orientation": "Ausrichtung",
+      "orientationName": {
+        "portrait": "Hochformat",
+        "landscape": "Querformat"
+      },
+      "preparing": "Die Seiten werden vorbereitet …",
+      "start": "Drucken"
     }
   },
   "images": {

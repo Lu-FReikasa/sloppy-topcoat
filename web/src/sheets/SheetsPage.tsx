@@ -14,6 +14,7 @@ import type {
 } from "./types";
 import { chooseFit, isTabLine, maxColumns, neighbour, SORT_MODES, visibleGroups, type Fit, type SortMode } from "./fit";
 import { artistsOf, type SheetGroup } from "./group";
+import { PrintDialog } from "./PrintSheets";
 import "./sheets.css";
 
 export { artistsOf, groupSheets, type SheetGroup } from "./group";
@@ -83,6 +84,7 @@ export function SheetsPage({ api, id }: Props) {
     remember(SORT_KEY, m);
   };
   const [stage, setStage] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const exitStage = useCallback(() => setStage(false), []);
   const groups = useMemo(() => visibleGroups(list ?? [], query, artist, sort), [list, query, artist, sort]);
 
@@ -126,6 +128,23 @@ export function SheetsPage({ api, id }: Props) {
               openId={id}
               filter={{ query, setQuery, artist, setArtist, sort, setSort }}
             />}
+          {groups.length > 0 && (
+            <button type="button" className="link-button small" onClick={() => setPrinting(true)} data-testid="sheets-print-list">
+              {t("sheets.print.list")}
+            </button>
+          )}
+          {printing && (
+            <PrintDialog
+              api={api}
+              songs={groups.flatMap((g) => {
+                // the newest version of each song, as the stage mode pages through them
+                const s = g.versions[g.versions.length - 1];
+                return s ? [{ id: s.id, title: g.title, artist: g.artist }] : [];
+              })}
+              hideTabs={remembered(TABS_KEY) !== "0"}
+              onClose={() => setPrinting(false)}
+            />
+          )}
         </nav>
         {id ? (
           <OpenSheet key={id} api={api} id={id} onChanged={reload} onStage={() => setStage(true)} />
@@ -340,6 +359,7 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
   const [transpose, setTranspose] = useState(0);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"sheet" | "sources" | "chordpro">("sheet");
+  const [printing, setPrinting] = useState(false);
   const fail = useCallback((e: unknown) => setError(describeError(toActionError(e), t, i18n)), [t, i18n]);
 
   useEffect(() => {
@@ -406,6 +426,9 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
               +
             </button>
           </div>
+          <button type="button" onClick={() => setPrinting(true)} data-testid="sheet-print-open">
+            {t("sheets.print.open")}
+          </button>
           {sheet.report_id && (
             <a className="small" href={`#/library/report:${sheet.report_id}`}>
               {t("sheets.research.openReport")}
@@ -424,6 +447,15 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
           ))}
         </div>
       </header>
+      {printing && (
+        <PrintDialog
+          api={api}
+          songs={[{ id, title: v.title, artist: v.artist }]}
+          view={{ instrument: instrument ?? undefined, transpose }}
+          hideTabs={remembered(TABS_KEY) !== "0"}
+          onClose={() => setPrinting(false)}
+        />
+      )}
       {error && <p className="error">{error}</p>}
       {tab === "sheet" && <Body sections={v.sections} />}
       {tab === "sources" && <Sources api={api} sheet={sheet} />}
@@ -450,7 +482,7 @@ function Flow({ sheet }: { sheet: SheetDetail }) {
   );
 }
 
-function Body({ sections }: { sections: SheetSection[] }) {
+export function Body({ sections }: { sections: SheetSection[] }) {
   const { t } = useTranslation();
   return (
     <div className="sheet-body">

@@ -1,0 +1,125 @@
+/* Printing sheets (PrintSheets.tsx, print.ts): one song per page, laid out like the stage mode.
+   On screen the pages sit off screen at the paper's size, so they can be measured; in print only
+   they show, black on white, whatever the look. */
+
+.sheet-print-songs {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  max-height: 45vh;
+  overflow-y: auto;
+}
+
+.sheet-print-songs li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.15rem 0;
+}
+
+.sheet-print-songs label.check {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sheet-print-dialog select {
+  width: auto;
+  font-size: 16px;
+}
+
+.sheet-print-move {
+  display: inline-flex;
+  gap: 0.15rem;
+}
+
+.sheet-print-dialog .sheets-row {
+  align-items: center;
+}
+
+.sheet-print {
+  position: fixed;
+  top: 0;
+  left: -100000px;
+  visibility: hidden;
+  pointer-events: none;
+  color: #000;
+  background: #fff;
+}
+
+.sheet-print-page {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.sheet-print-page.is-long {
+  height: auto !important;
+  overflow: visible;
+}
+
+/* a song too long for one page runs on page by page: balanced columns fragment per page in print
+   (filled columns of auto height left empty pages behind in Chromium) */
+.sheet-print-page.is-long .sheet-print-body {
+  column-fill: balance;
+}
+
+.sheet-print-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 1rem;
+  font-size: 13px;
+  border-bottom: 1px solid #0003;
+  padding-bottom: 2px;
+}
+
+.sheet-print-box {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.sheet-print-body {
+  column-gap: 1.5em;
+  column-fill: auto;
+  column-rule: 1px solid #0002;
+}
+
+.sheet-print-body .sheet-body {
+  display: block;
+}
+
+.sheet-print-body .sheet-part {
+  break-inside: avoid;
+  margin-bottom: 0.6em;
+}
+
+.sheet-print-body .sheet-part-label {
+  font-size: 0.7em;
+}
+
+@media print {
+  body.sheets-printing > :not(.sheet-print) {
+    display: none !important;
+  }
+
+  body.sheets-printing {
+    background: #fff;
+  }
+
+  .sheet-print {
+    position: static;
+    visibility: visible;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .sheet-print-page {
+    break-after: page;
+  }
+
+  .sheet-print-page:last-child {
+    break-after: auto;
+  }
+}

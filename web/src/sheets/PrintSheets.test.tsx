@@ -1,0 +1,215 @@
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ApiClient } from "../api/client";
+import { jsonResponse, mockFetch } from "../test/mockFetch";
+import { move, pageBox, pageRule, printColumns } from "./print";
+import { PRINTING_CLASS, PrintDialog } from "./PrintSheets";
+import { SheetsPage } from "./SheetsPage";
+import type { SheetDetail, SheetSummary } from "./types";
+
+function summary(id: string, title: string): SheetSummary {
+  return {
+    id,
+    title,
+    artist: "Example Band",
+    instrument: "guitar",
+    key: "A",
+    capo: 0,
+    capo_view: false,
+    version_note: "",
+    sources: 0,
+    report_id: null,
+    updated_at: null,
+  };
+}
+
+function detail(id: string, title: string): SheetDetail {
+  return {
+    ...summary(id, title),
+    view: {
+      title,
+      artist: "Example Band",
+      instrument: "guitar",
+      key: "A",
+      key_estimated: false,
+      shown_key: "A",
+      capo: 0,
+      capo_view: false,
+      transpose: 0,
+      flow: [{ index: 0, kind: "verse", label: "Verse 1", repeat_of: null }],
+      sections: [
+        {
+          index: 0,
+          kind: "verse",
+          label: "Verse 1",
+          repeat_of: null,
+          lines: [{ segments: [{ chord: "A", text: `Words of ${title}` }] }, { comment: "e|--3--2--0--3--|" }],
+        },
+        { index: 1, kind: "tab", label: "Tab", repeat_of: null, lines: [{ comment: "e|--0--2--3--|" }] },
+      ],
+      chordpro: "",
+    },
+    source_list: [],
+  };
+}
+
+function client(routes: Record<string, unknown>) {
+  const m = mockFetch(routes);
+  return { api: new ApiClient({ token: "t", fetchImpl: m.fetch }), calls: m.calls };
+}
+
+const SONGS = [
+  { id: "s1", title: "First Song", artist: "Example Band" },
+  { id: "s2", title: "Second Song", artist: "Example Band" },
+  { id: "s3", title: "Third Song", artist: "" },
+];
+
+const pageTitles = () =>
+  screen.queryAllByTestId("sheet-print-page").map((p) => p.querySelector(".sheet-print-head strong")?.textContent);
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("print layout", () => {
+  it("sizes the page inside a 10 mm margin and picks the columns by its width", () => {
+    expect(pageBox("a4", "portrait")).toEqual({ width: 718, height: 1046 });
+    expect(pageBox("a4", "landscape")).toEqual({ width: 1046, height: 718 });
+    expect(pageBox("letter", "portrait")).toEqual({ width: 740, height: 980 });
+    expect(printColumns(pageBox("a4", "portrait").width)).toBe(2);
+    expect(printColumns(pageBox("a4", "landscape").width)).toBe(3);
+    expect(printColumns(200)).toBe(1);
+    expect(pageRule("letter", "landscape")).toBe("@page { size: letter landscape; margin: 10mm; }");
+  });
+
+  it("moves a song in the order and leaves the ends alone", () => {
+    expect(move(["a", "b", "c"], 2, -1)).toEqual(["a", "c", "b"]);
+    expect(move(["a", "b", "c"], 0, 1)).toEqual(["b", "a", "c"]);
+    const list = ["a", "b"];
+    expect(move(list, 0, -1)).toBe(list);
+    expect(move(list, 1, 1)).toBe(list);
+  });
+});
+
+describe("PrintDialog", () => {
+  it("prints the picked songs in the chosen order, one per page, and cleans up after the print", async () => {
+    const titles: (string | null | undefined)[][] = [];
+    const print = vi.spyOn(window, "print").mockImplementation(() => {
+      // what the print dialog sees: only the pages, the rest of the page is hidden by class
+      expect(document.body.classList.contains(PRINTING_CLASS)).toBe(true);
+      titles.push(pageTitles());
+    });
+    const { api, calls } = client({
+      "GET /api/sheets/s1": detail("s1", "First Song"),
+      "GET /api/sheets/s2": detail("s2", "Second Song"),
+      "GET /api/sheets/s3": detail("s3", "Third Song"),
+    });
+    const onClose = vi.fn();
+    render(<PrintDialog api={api} songs={SONGS} hideTabs onClose={onClose} />);
+    const dialog = screen.getByTestId("sheet-print-dialog");
+    // leave out the second song, put the third one first
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: /Second Song/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /Third Song (up|nach oben)/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /Third Song (up|nach oben)/ }));
+    expect(within(dialog).getByText(/2 (of|von) 3/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByTestId("sheet-print-start"));
+
+    await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+    expect(titles).toEqual([["Third Song", "First Song"]]);
+    expect(calls.map((c) => c.url)).toEqual(["/api/sheets/s3", "/api/sheets/s1"]);
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(print).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves tab lines out when asked and keeps them otherwise", async () => {
+    let bodies: string[] = [];
+    vi.spyOn(window, "print").mockImplementation(() => {
+      bodies = screen.getAllByTestId("sheet-print-page").map((p) => p.textContent ?? "");
+    });
+    const { api } = client({ "GET /api/sheets/s1": detail("s1", "First Song") });
+    const onClose = vi.fn();
+    const { unmount } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} hideTabs onClose={onClose} />);
+    fireEvent.click(screen.getByTestId("sheet-print-start"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(bodies[0]).toContain("Words of First Song");
+    expect(bodies[0]).not.toContain("e|--");
+    unmount();
+
+    onClose.mockClear();
+    render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} hideTabs onClose={onClose} />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /Hide tabs|Tabs ausblenden/ }));
+    fireEvent.click(screen.getByTestId("sheet-print-start"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(bodies[0]).toContain("e|--0--2--3--|");
+  });
+
+  it("removes the pages and the print class once printed", async () => {
+    vi.spyOn(window, "print").mockImplementation(() => undefined);
+    const { api } = client({ "GET /api/sheets/s1": detail("s1", "First Song") });
+    const onClose = vi.fn();
+    const { rerender } = render(<PrintDialog api={api} songs={SONGS.slice(0, 1)} hideTabs={false} onClose={onClose} />);
+    fireEvent.click(screen.getByTestId("sheet-print-start"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    // the parent closes the dialog: nothing of the songs stays in the page
+    rerender(<></>);
+    expect(screen.queryByTestId("sheet-print")).toBeNull();
+    expect(document.body.classList.contains(PRINTING_CLASS)).toBe(false);
+  });
+
+  it("shows why a song could not be loaded and does not print", async () => {
+    const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
+    const { api } = client({
+      "GET /api/sheets/s1": detail("s1", "First Song"),
+      "GET /api/sheets/s2": jsonResponse({ detail: "boom" }, 500),
+    });
+    render(<PrintDialog api={api} songs={SONGS.slice(0, 2)} hideTabs onClose={() => undefined} />);
+    fireEvent.click(screen.getByTestId("sheet-print-start"));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(print).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("sheet-print")).toBeNull();
+    expect((screen.getByTestId("sheet-print-start") as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("Sheets page printing", () => {
+  it("offers the shown songs, newest version each, in the list's order", async () => {
+    const { api } = client({
+      "GET /api/sheets": {
+        sheets: [
+          summary("w", "Wonderwall"),
+          { ...summary("a1", "Another Song"), created_at: "2026-11-20T10:00:00Z" },
+          { ...summary("a2", "Another Song"), created_at: "2026-11-20T11:00:00Z" },
+        ],
+      },
+      "GET /api/sheets/research": { jobs: [] },
+    });
+    render(<SheetsPage api={api} />);
+    fireEvent.click(await screen.findByTestId("sheets-print-list"));
+    const songs = within(screen.getByTestId("sheet-print-dialog")).getByRole("list");
+    expect(within(songs).getAllByRole("checkbox").map((c) => c.closest("label")?.textContent)).toEqual([
+      "Another Song · Example Band",
+      "Wonderwall · Example Band",
+    ]);
+  });
+
+  it("prints the open sheet as it is shown: instrument and transposition", async () => {
+    vi.spyOn(window, "print").mockImplementation(() => undefined);
+    const { api, calls } = client({
+      "GET /api/sheets": { sheets: [summary("s1", "First Song")] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/s1": detail("s1", "First Song"),
+      "GET /api/sheets/s1?transpose=2": detail("s1", "First Song"),
+    });
+    render(<SheetsPage api={api} id="s1" />);
+    const sheet = await screen.findByTestId("sheet");
+    const up = within(sheet).getByRole("button", { name: /semitone up|Halbton höher/i });
+    fireEvent.click(up);
+    fireEvent.click(up);
+    await waitFor(() => expect(calls.some((c) => c.url === "/api/sheets/s1?transpose=2")).toBe(true));
+    const before = calls.length;
+    fireEvent.click(within(sheet).getByTestId("sheet-print-open"));
+    fireEvent.click(screen.getByTestId("sheet-print-start"));
+    await waitFor(() => expect(screen.queryByTestId("sheet-print-dialog")).toBeNull());
+    expect(calls.slice(before).map((c) => c.url)).toEqual(["/api/sheets/s1?transpose=2"]);
+  });
+});
