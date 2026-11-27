@@ -2,7 +2,12 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, type ApiClient } from "../api/client";
 import i18n from "../i18n";
-import { fakeApi, node, project } from "../test/projectFixtures";
+import {
+  chooseProjectAction,
+  fakeApi,
+  node,
+  project,
+} from "../test/projectFixtures";
 import * as download from "./download";
 import { ProjectPage } from "./ProjectPage";
 import type { ProjectTemplate } from "./types";
@@ -122,16 +127,13 @@ describe("export", () => {
     const api = fakeApi({ project: project(), nodes: [] });
     render(<ProjectPage api={as(api)} />);
     fireEvent.click(await screen.findByRole("button", { name: /Topcoat/ }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Export (JSON)" }),
-    );
+    await screen.findByRole("button", { name: "Project actions" });
+    chooseProjectAction("Export (JSON)");
     await waitFor(() =>
       expect(api.downloadProjectExport).toHaveBeenCalledWith("p1", "json"),
     );
     expect(save).toHaveBeenCalledWith(expect.any(Blob), "project-topcoat.json");
-    fireEvent.click(
-      screen.getByRole("button", { name: "Export (Markdown, zip)" }),
-    );
+    chooseProjectAction("Export (Markdown, zip)");
     await waitFor(() =>
       expect(api.downloadProjectExport).toHaveBeenCalledWith("p1", "markdown"),
     );
@@ -149,9 +151,8 @@ describe("export", () => {
     );
     render(<ProjectPage api={as(api)} />);
     fireEvent.click(await screen.findByRole("button", { name: /Topcoat/ }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Export (JSON)" }),
-    );
+    await screen.findByRole("button", { name: "Project actions" });
+    chooseProjectAction("Export (JSON)");
     expect(await screen.findByRole("alert")).toBeTruthy();
   });
 });
@@ -170,15 +171,12 @@ describe("templates", () => {
     const api = fakeApi({ project: project(), nodes: [] });
     render(<ProjectPage api={as(api)} />);
     fireEvent.click(await screen.findByRole("button", { name: /Topcoat/ }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Save as template" }),
-    );
+    await screen.findByRole("button", { name: "Project actions" });
+    chooseProjectAction("Save as template");
     fireEvent.change(screen.getByLabelText("Name of the template"), {
       target: { value: "Release" },
     });
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "Save as template" })[1]!,
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Save as template" }));
     await waitFor(() =>
       expect(api.saveProjectTemplate).toHaveBeenCalledWith({
         project_id: "p1",
