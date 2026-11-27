@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"topcoat/node/internal/providers/capability"
@@ -845,5 +846,23 @@ func TestOmadaCutKeepsCharactersWhole(t *testing.T) {
 	got := cut("Süd", 2) // "S" + the first byte of "ü"
 	if got != "S…" || !utf8.ValidString(got) {
 		t.Errorf("cut = %q", got)
+	}
+}
+
+// review of #226: the asked name comes from the model, so matching it must not backtrack
+// exponentially ("?ü" 32 times against a long run of "ü" took minutes before).
+func TestOmadaGarbledFitsStaysFast(t *testing.T) {
+	done := make(chan bool, 1)
+	go func() { done <- garbledFits(strings.Repeat("?ü", 32), strings.Repeat("ü", 200)+"x") }()
+	select {
+	case got := <-done:
+		if got {
+			t.Error("a name ending in x fits no name of marks and ü")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("garbledFits backtracks exponentially")
+	}
+	if !garbledFits("?ü?", "üüüü") || garbledFits("?ü?", "ü") || !garbledFits("Zuhause S??d", "zuhause süd") {
+		t.Error("garbledFits rules changed")
 	}
 }

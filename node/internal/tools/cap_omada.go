@@ -269,11 +269,21 @@ func (c *omadaClient) resolveSite(ctx context.Context, asked string) (omadaSite,
 // ASCII (a character of several bytes may have become several marks); the rest matches in any case.
 func garbledFits(garbled, full string) bool {
 	g, f := []rune(garbled), []rune(full)
+	// seen[i][j] marks a pair already tried and failed: without it "?ü?ü…" against a long run of
+	// "ü" backtracks exponentially (the asked name comes from the model).
+	seen := make([][]bool, len(g)+1)
+	for i := range seen {
+		seen[i] = make([]bool, len(f)+1)
+	}
 	var fits func(i, j int) bool
 	fits = func(i, j int) bool {
 		if i == len(g) {
 			return j == len(f)
 		}
+		if seen[i][j] {
+			return false
+		}
+		seen[i][j] = true
 		if g[i] == '?' || g[i] == '\uFFFD' {
 			k := i
 			for k < len(g) && (g[k] == '?' || g[k] == '\uFFFD') {
