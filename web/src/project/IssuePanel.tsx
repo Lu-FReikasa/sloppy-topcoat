@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
 import { formatInt } from "../format";
 import { summarizeTestOutput } from "../summaries";
+import { fixHistory, fixReason, shortPrint, type FixRow } from "./fixHistory";
 import type { IssueFix, IssuePlan, ProjectMandate, ProjectNode } from "./types";
 
 const BUSY = new Set(["applying", "testing", "queued"]);
@@ -19,21 +20,6 @@ const PLAN_TEMPLATE: IssuePlan = {
   test: { path: "web/src/…/name.test.tsx", do: "…" },
 };
 const POLL_MS = 5000;
-
-/** For each failed fix: how many fixes in a row up to it failed the same way (hub
- *  failure_print.py; the hub stops drafting after two). `fixes` oldest first. */
-export function sameFailures(fixes: IssueFix[]): Map<string, number> {
-  const out = new Map<string, number>();
-  let prev: IssueFix | undefined;
-  for (const f of fixes) {
-    if (f.state === "failed" && f.failure_print) {
-      const before = prev?.state === "failed" && prev.failure_print === f.failure_print ? (out.get(prev.id) ?? 1) : 0;
-      out.set(f.id, before + 1);
-    }
-    prev = f;
-  }
-  return out;
-}
 
 export function IssuePanel({
   api,
@@ -97,7 +83,7 @@ export function IssuePanel({
   const running = task.status === "in_progress";
   const shown = fixes.filter((f) => f.state !== "discarded");
   const live = shown.some((f) => f.state === "live");
-  const repeats = sameFailures(shown);
+  const history = fixHistory(shown);
 
   return (
     <section className="project-issue" aria-label={t("issues.panel")}>
@@ -225,64 +211,15 @@ export function IssuePanel({
 
       {shown.length > 0 && (
         <ol className="project-fixes">
-          {shown.map((f) => (
-            <li key={f.id} data-testid={`fix-${f.state}`}>
-              <p>
-                <span className={`badge fix-${f.state}`}>{t(`issues.state.${f.state}`)}</span> {f.summary}
-                {(repeats.get(f.id) ?? 0) > 1 && (
-                  <>
-                    {" "}
-                    <span className="badge fix-failed" title={f.failure_print ?? ""}>
-                      {t("issues.sameFailure", { count: repeats.get(f.id) })}
-                    </span>
-                  </>
-                )}
-              </p>
-              {f.error && <p className="error small">{f.error}</p>}
-              <details>
-                <summary>{t("issues.changes", { count: f.edits.length + f.files.length })}</summary>
-                {f.diff ? (
-                  <pre className="project-diff">{f.diff}</pre>
-                ) : (
-                  <ul className="small">
-                    {f.edits.map((e, i) => (
-                      <li key={i}>
-                        <code>{e.path}</code>
-                      </li>
-                    ))}
-                    {f.files.map((e) => (
-                      <li key={e.path}>
-                        <code>{e.path}</code> ({t("issues.newFile")})
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </details>
-              {f.tests?.output && <TestRun state={f.tests.state} output={f.tests.output} />}
-              {f.rollout?.message && (
-                <p className="small">
-                  {t("issues.rollout")}: {f.rollout.message}
-                  {f.rollout.build ? ` (${f.rollout.build})` : ""}
-                </p>
-              )}
-              <div className="project-actions">
-                {f.state === "draft" && (
-                  <button type="button" disabled={busy} onClick={() => void act(() => api.applyFix(f.id))}>
-                    {t("issues.apply")}
-                  </button>
-                )}
-                {f.state === "passed" && (
-                  <button type="button" disabled={busy} onClick={() => void act(() => api.rolloutFix(f.id))}>
-                    {t("issues.rolloutButton")}
-                  </button>
-                )}
-                {["draft", "failed", "passed", "refused", "rolled_back"].includes(f.state) && (
-                  <button type="button" disabled={busy} onClick={() => void act(() => api.discardFix(f.id))}>
-                    {t("issues.discard")}
-                  </button>
-                )}
-              </div>
-            </li>
+          {history.map((row) => (
+            <FixHistoryRow
+              key={row.fix.id}
+              row={row}
+              busy={busy}
+              onApply={(id) => void act(() => api.applyFix(id))}
+              onRollout={(id) => void act(() => api.rolloutFix(id))}
+              onDiscard={(id) => void act(() => api.discardFix(id))}
+            />
           ))}
         </ol>
       )}
@@ -309,6 +246,131 @@ export function IssuePanel({
         </div>
       )}
     </section>
+  );
+}
+
+const DISCARDABLE = new Set(["draft", "failed", "passed", "refused", "rolled_back"]);
+
+/** One row of the fix history (#180): state, fingerprint and reason in view, the output folded;
+ *  a row that stands for several equal attempts says how many and keeps the older ones folded. */
+function FixHistoryRow({
+  row,
+  busy,
+  onApply,
+  onRollout,
+  onDiscard,
+}: {
+  row: FixRow;
+  busy: boolean;
+  onApply: (id: string) => void;
+  onRollout: (id: string) => void;
+  onDiscard: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const f = row.fix;
+  const print = shortPrint(f.failure_print);
+  const reason = fixReason(f);
+  // the whole error goes into the fold only when the one sentence above leaves something out
+  const fullError = f.error && f.error.trim() !== reason ? f.error : "";
+  // likewise the whole fingerprint when the row shows it shortened (the title alone needs a hover)
+  const fullPrint = !!f.failure_print && f.failure_print.trim() !== print;
+  return (
+    <li className="project-fix" data-testid={`fix-${f.state}`}>
+      <p className="project-fix-head">
+        <span className={`badge fix-${f.state}`}>{t(`issues.state.${f.state}`)}</span>
+        {row.times > 1 && (
+          <>
+            {" "}
+            <span className="badge fix-failed" title={f.failure_print ?? ""}>
+              {t("issues.sameFailure", { count: row.times })}
+            </span>
+          </>
+        )}{" "}
+        {f.summary}
+      </p>
+      {(print || reason) && (
+        <p className="project-fix-why small" data-testid="fix-why">
+          {print && (
+            <code className="project-fix-print" title={f.failure_print ?? ""}>
+              {print}
+            </code>
+          )}
+          {print && reason && " "}
+          {reason && <span className={f.error ? "error" : undefined}>{reason}</span>}
+        </p>
+      )}
+      <details className="project-fix-output">
+        <summary>{t("issues.output")}</summary>
+        {fullPrint && (
+          <p className="project-fix-why small" data-testid="fix-print">
+            <code>{f.failure_print}</code>
+          </p>
+        )}
+        {fullError && <pre className="project-diff">{fullError}</pre>}
+        <p className="small">
+          <strong>{t("issues.changes", { count: f.edits.length + f.files.length })}</strong>
+        </p>
+        {f.diff ? (
+          <pre className="project-diff">{f.diff}</pre>
+        ) : (
+          <ul className="small">
+            {f.edits.map((e, i) => (
+              <li key={i}>
+                <code>{e.path}</code>
+              </li>
+            ))}
+            {f.files.map((e) => (
+              <li key={e.path}>
+                <code>{e.path}</code> ({t("issues.newFile")})
+              </li>
+            ))}
+          </ul>
+        )}
+        {f.tests?.output && <TestRun state={f.tests.state} output={f.tests.output} />}
+        {f.rollout?.message && (
+          <p className="small">
+            {t("issues.rollout")}: {f.rollout.message}
+            {f.rollout.build ? ` (${f.rollout.build})` : ""}
+          </p>
+        )}
+        {row.earlier.length > 0 && (
+          <div data-testid="fix-earlier">
+            <p className="small">
+              <strong>{t("issues.earlier", { count: row.earlier.length })}</strong>
+            </p>
+            <ul className="small">
+              {row.earlier.map((e) => (
+                <li key={e.id}>
+                  {e.summary}{" "}
+                  {DISCARDABLE.has(e.state) && (
+                    <button type="button" className="link" disabled={busy} onClick={() => onDiscard(e.id)}>
+                      {t("issues.discard")}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </details>
+      <div className="project-actions">
+        {f.state === "draft" && (
+          <button type="button" disabled={busy} onClick={() => onApply(f.id)}>
+            {t("issues.apply")}
+          </button>
+        )}
+        {f.state === "passed" && (
+          <button type="button" disabled={busy} onClick={() => onRollout(f.id)}>
+            {t("issues.rolloutButton")}
+          </button>
+        )}
+        {DISCARDABLE.has(f.state) && (
+          <button type="button" disabled={busy} onClick={() => onDiscard(f.id)}>
+            {t("issues.discard")}
+          </button>
+        )}
+      </div>
+    </li>
   );
 }
 
