@@ -35,6 +35,10 @@ export function PersonaEditor({ api, persona, template, onSaved, onCancel }: Pro
   const [emojis, setEmojis] = useState(c.emojis ?? false);
   const [exDe, setExDe] = useState(persona?.example.de ?? "");
   const [exEn, setExEn] = useState(persona?.example.en ?? "");
+  // D127: the voice this persona speaks with (a voice of the node's text to speech)
+  const [voice, setVoice] = useState(
+    typeof persona?.defaults.voice === "string" ? persona.defaults.voice : "",
+  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -60,15 +64,19 @@ export function PersonaEditor({ api, persona, template, onSaved, onCancel }: Pro
       ...(exDe.trim() ? { de: exDe.trim() } : {}),
       ...(exEn.trim() ? { en: exEn.trim() } : {}),
     };
+    const spoken = voice.trim() || null;
     try {
-      if (persona) await api.updatePersona(persona.id, { name: name.trim(), components, example });
-      else
-        await api.createPersona({
+      if (persona) {
+        await api.updatePersona(persona.id, { name: name.trim(), components, example, voice: spoken });
+      } else {
+        const made = await api.createPersona({
           name: name.trim(),
           components,
           example,
           scope: template ? "household" : "user",
         });
+        if (spoken) await api.updatePersona(made.id, { voice: spoken });
+      }
       onSaved();
     } catch (err) {
       setError(describeError(toActionError(err), t, i18n));
@@ -191,6 +199,17 @@ export function PersonaEditor({ api, persona, template, onSaved, onCancel }: Pro
           </label>
         </>
       )}
+      <label>
+        <span className="fact-label">{t("persona.editor.voice")}</span>
+        <input
+          value={voice}
+          maxLength={128}
+          pattern="[A-Za-z0-9][A-Za-z0-9._\-]*"
+          spellCheck={false}
+          onChange={(e) => setVoice(e.target.value)}
+        />
+        <span className="muted small">{t("persona.editor.voiceHint")}</span>
+      </label>
       {error && (
         <p className="error" role="alert">
           {error}

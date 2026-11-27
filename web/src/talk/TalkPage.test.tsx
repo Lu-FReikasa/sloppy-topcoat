@@ -10,7 +10,9 @@ import { ApiClient } from "../api/client";
 import { requestCompose, takeCompose } from "../desktop/compose";
 import { takeShow } from "../files/bus";
 import { mockFetch } from "../test/mockFetch";
-import { controlledSse } from "../test/sse";
+import { controlledSse, sseResponse } from "../test/sse";
+import { FakeMicrophone, FakePlayer, FakeVoiceLink } from "../voice/fake";
+import { VoiceDepsContext } from "../voice/usePushToTalk";
 import type {
   ActivityItem,
   ChatMessage,
@@ -839,5 +841,131 @@ describe("the choices that stay in the calm view", () => {
         ),
       ).toBe(true),
     );
+  });
+});
+
+describe("push to talk (D127)", () => {
+  const link = new FakeVoiceLink();
+  const voiceDeps = () => ({ link, mic: new FakeMicrophone(), player: new FakePlayer() });
+
+  function talkSetup(voice: { transcribe: boolean; speak: boolean }, answer = "Es ist zehn Uhr. Schönen Abend!") {
+    const mock = mockFetch({
+      "GET /api/conversations": [CONV],
+      "GET /api/conversations/c1": {
+        ...CONV,
+        messages: [msg(1, "user", "Hi"), msg(2, "assistant", "Hallo")],
+      },
+      "GET /api/conversations/c1/memory": [],
+      "GET /api/voice": voice,
+      "POST /api/conversations/c1/section": { created: false, conversation: CONV },
+      "POST /api/conversations/c1/messages": () =>
+        sseResponse([
+          ["meta", { ...META, message_id: 4 }],
+          ["delta", { text: answer }],
+          ["done", { message: msg(4, "assistant", answer) }],
+        ]),
+    });
+    const api = new ApiClient({ token: "t", fetchImpl: mock.fetch });
+    render(
+      <VoiceDepsContext.Provider value={voiceDeps}>
+        <TalkPage api={api} />
+      </VoiceDepsContext.Provider>,
+    );
+    return mock;
+  }
+
+  afterEach(() => {
+    link.transcripts = [];
+    link.spoken = [];
+  });
+
+  it("is not offered when no node can listen", async () => {
+    talkSetup({ transcribe: false, speak: false });
+    await screen.findByText("Hallo");
+    expect(screen.queryByRole("button", { name: "Gedrückt halten zum Sprechen" })).toBeNull();
+  });
+
+  it("holding the key sends what was said as the message and reads the answer out", async () => {
+    const mock = talkSetup({ transcribe: true, speak: true });
+    link.transcripts.push("Wie spät ist es?");
+    const key = await screen.findByRole("button", { name: "Gedrückt halten zum Sprechen" });
+    fireEvent.pointerDown(key, { button: 0, pointerId: 1 });
+    await waitFor(() => expect(key.getAttribute("aria-pressed")).toBe("true"));
+    fireEvent.pointerUp(key, { pointerId: 1 });
+    await waitFor(() =>
+      expect(
+        mock.calls.find((c) => c.method === "POST" && c.url === "/api/conversations/c1/messages")
+          ?.body,
+      ).toMatchObject({ content: "Wie spät ist es?" }),
+    );
+    expect(await screen.findByText("Es ist zehn Uhr. Schönen Abend!")).toBeTruthy();
+    await waitFor(() =>
+      expect(link.spoken.map((s) => s.text)).toEqual(["Es ist zehn Uhr.", "Schönen Abend!"]),
+    );
+    expect(link.spoken[0]!.opts.conversationId).toBe("c1");
+  });
+
+  it("Ctrl+Space works as the key too, even while typing", async () => {
+    const mock = talkSetup({ transcribe: true, speak: false });
+    link.transcripts.push("Hallo Topcoat");
+    const box = await screen.findByLabelText("Schreib mir …");
+    await screen.findByRole("button", { name: "Gedrückt halten zum Sprechen" });
+    fireEvent.keyDown(box, { code: "Space", key: " ", ctrlKey: true });
+    await screen.findByText("Ich höre zu …");
+    fireEvent.keyUp(box, { code: "Space", key: " ", ctrlKey: true });
+    await waitFor(() =>
+      expect(mock.calls.some((c) => c.url === "/api/conversations/c1/messages")).toBe(true),
+    );
+  });
+
+  it("what was said while an answer was written never goes into another chat", async () => {
+    const live = controlledSse();
+    const other: Conversation = { ...CONV, id: "c2", title: "Anderes" };
+    const mock = mockFetch({
+      "GET /api/conversations": [CONV, other],
+      "GET /api/conversations/c1": {
+        ...CONV,
+        messages: [msg(1, "user", "Prüf Plex"), msg(2, "assistant", "", { status: "running" })],
+      },
+      "GET /api/conversations/c2": { ...other, messages: [msg(5, "assistant", "Anderer Chat")] },
+      "GET /api/conversations/c1/memory": [],
+      "GET /api/conversations/c2/memory": [],
+      "GET /api/chat/messages/2/stream?offset=0": () => live.response,
+      "GET /api/voice": { transcribe: true, speak: true },
+      "POST /api/conversations/c2/section": { created: false, conversation: other },
+    });
+    const api = new ApiClient({ token: "t", fetchImpl: mock.fetch });
+    const page = (id: string) => (
+      <VoiceDepsContext.Provider value={voiceDeps}>
+        <TalkPage api={api} conversationId={id} />
+      </VoiceDepsContext.Provider>
+    );
+    const { rerender } = render(page("c1"));
+    live.push("meta", META, 0);
+    link.transcripts.push("Und wie spät ist es?");
+    const key = await screen.findByRole("button", { name: "Gedrückt halten zum Sprechen" });
+    fireEvent.pointerDown(key, { button: 0, pointerId: 1 });
+    await waitFor(() => expect(key.getAttribute("aria-pressed")).toBe("true"));
+    fireEvent.pointerUp(key, { pointerId: 1 });
+    await screen.findByText("Ich denke nach …"); // it waits for the answer being written
+    rerender(page("c2"));
+    await screen.findByText("Anderer Chat");
+    await waitFor(() => expect(screen.queryByText("Ich denke nach …")).toBeNull());
+    expect(mock.calls.filter((c) => c.method === "POST").map((c) => c.url)).toEqual([]);
+    expect(link.spoken).toEqual([]);
+  });
+
+  it("a spoken yes is sent as text and confirms nothing (D15, D83)", async () => {
+    const mock = talkSetup({ transcribe: true, speak: true }, "Gut.");
+    link.transcripts.push("Ja, mach das");
+    const key = await screen.findByRole("button", { name: "Gedrückt halten zum Sprechen" });
+    fireEvent.pointerDown(key, { button: 0, pointerId: 1 });
+    await waitFor(() => expect(key.getAttribute("aria-pressed")).toBe("true"));
+    fireEvent.pointerUp(key, { pointerId: 1 });
+    await waitFor(() =>
+      expect(mock.calls.some((c) => c.url === "/api/conversations/c1/messages")).toBe(true),
+    );
+    const posts = mock.calls.filter((c) => c.method !== "GET").map((c) => c.url);
+    expect(posts).toEqual(["/api/conversations/c1/section", "/api/conversations/c1/messages"]);
   });
 });

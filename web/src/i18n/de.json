@@ -1739,7 +1739,9 @@
       "freeText": "Text",
       "exampleDe": "Beispielsatz (Deutsch)",
       "exampleEn": "Beispielsatz (Englisch)",
-      "humorNote": "Bei Fehlern, Störungen und Risiko ist der Humor immer aus."
+      "humorNote": "Bei Fehlern, Störungen und Risiko ist der Humor immer aus.",
+      "voice": "Stimme",
+      "voiceHint": "Für Push-to-Talk: der Name einer Stimme der Sprachausgabe auf dem Knoten (zum Beispiel de_DE-thorsten-medium). Leer: die eigene Stimme des Knotens."
     },
     "verdict": {
       "helped": "Hat geholfen",
@@ -4445,6 +4447,23 @@
       "size": "Ein Bild darf höchstens 15 MB groß sein.",
       "count": "Höchstens {{max}} Bilder gehen mit einer Nachricht mit.",
       "read": "Das Bild konnte nicht gelesen werden."
+    }
+  },
+  "voice": {
+    "hold": "Gedrückt halten zum Sprechen",
+    "holdHint": "Gedrückt halten zum Sprechen, loslassen zum Senden (oder Strg+Leertaste halten). Esc bricht ab.",
+    "state": {
+      "listening": "Ich höre zu …",
+      "thinking": "Ich denke nach …",
+      "speaking": "Ich spreche …"
+    },
+    "problem": {
+      "micDenied": "Das Mikrofon ist nicht erlaubt. Erlaube es für diese Seite im Browser (oder im Desktop-Client) und versuch es noch einmal.",
+      "nothingHeard": "Es war nichts zu hören. Halte die Taste, während du sprichst.",
+      "tooLong": "Das war zu lang für eine Nachricht. Bleib unter einer Minute.",
+      "noNode": "Gerade kann keine Maschine zuhören: Sprache zu Text braucht einen Knoten, auf dem Sprache eingeschaltet ist.",
+      "connection": "Die Verbindung zum Hub für Sprache ist abgerissen. Versuch es noch einmal.",
+      "failed": "Sprache hat gerade nicht geklappt. Versuch es gleich noch einmal."
     }
   },
   "largeTask": {
