@@ -881,7 +881,7 @@ role Viewer**): `POST /openapi/authorize/token?grant_type=client_credentials` wi
 client_id, client_secret}`, then `Authorization: AccessToken=<token>` (re-requested when it expires or the
 controller answers -44112/-44113) on `GET /openapi/v1/{omadacId}/sites`, `…/sites/{siteId}/devices`,
 `…/clients`, `…/logs/events`, `…/logs/alerts`, `…/audit-logs`, `…/devices/{mac}/latest-firmware-info`.
-The site is always taken from the controller's own list (a model's text never becomes part of a path).
+The site is always taken from the controller's own list (a model's text never becomes part of a path). A name the list does not hold reads the only site when the controller has one, or the one site it fits when its non-ASCII characters became `?` or U+FFFD; the answer then carries `site` and `site_note` saying which site was read. Otherwise the error lists the sites.
 The logs need `filters.timeStart` and `filters.timeEnd` (ms): without them the controller answers HTTP 400
 with a framework body (`{"status":400,"error":"Bad Request"}`, no `errorCode`), which the node passes on.
 Checked against a real controller on 2026-11-17: sites, devices, clients, logs/events, logs/alerts

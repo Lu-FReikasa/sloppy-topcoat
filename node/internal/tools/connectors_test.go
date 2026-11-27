@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"unicode/utf8"
 
 	"topcoat/node/internal/providers/capability"
 )
@@ -781,5 +782,68 @@ func TestOmadaEventsSummarizeTheWholeWindow(t *testing.T) {
 	}
 	if k := w["by_key"].(map[string]any); k["DEV_CONN"] != float64(1) || k["L_C_CONN"] != float64(1) {
 		t.Errorf("%v", k)
+	}
+}
+
+// issue #226: a guessed or garbled site name on a controller with one site reads that site, and
+// the answer says so.
+func TestOmadaAnUnknownSiteFallsBackToTheOnlySite(t *testing.T) {
+	f := &fakeOmada{t: t, sites: oneSite}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	for _, asked := range []string{"default", "Z..??"} {
+		out, err := invoke(t, omadaOptions(srv.URL, ""), "omada.devices", fmt.Sprintf(`{"site":%q}`, asked))
+		if err != nil {
+			t.Fatalf("%q: %v", asked, err)
+		}
+		note, _ := out["site_note"].(string)
+		if out["site"] != "Home" || !strings.Contains(note, asked) || !strings.Contains(note, `"Home"`) {
+			t.Errorf("%q: the answer must name the site read: %v", asked, out)
+		}
+	}
+	// a configured site the controller no longer has: the only one as well
+	if out, err := invoke(t, omadaOptions(srv.URL, "Old"), "omada.devices", `{}`); err != nil || out["site"] != "Home" {
+		t.Errorf("configured site gone: %v %v", out, err)
+	}
+	// the right name: no note
+	if out, err := invoke(t, omadaOptions(srv.URL, ""), "omada.devices", `{"site":"home"}`); err != nil || out["site_note"] != nil {
+		t.Errorf("the right name needs no note: %v %v", out, err)
+	}
+	for _, c := range f.calls {
+		if strings.Contains(c, "default") || strings.Contains(c, "Z..") {
+			t.Errorf("the asked name reached the controller: %s", c)
+		}
+	}
+}
+
+// issue #226: a site name with characters beyond ASCII reaches the controller lookup whole,
+// whether the JSON carries it as UTF-8 or escaped, and one whose characters were lost on the way
+// still names the one site it fits.
+func TestOmadaANonASCIISiteNameIsReadWhole(t *testing.T) {
+	two := `{"totalRows":2,"data":[{"siteId":"s1","name":"Zuhause Süd"},{"siteId":"s2","name":"Zuhause Nord"}]}`
+	f := &fakeOmada{t: t, sites: two}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	for _, in := range []string{`{"site":"Zuhause Süd"}`, `{"site":"zuhause süd"}`, `{"site":"Zuhause S??d"}`, `{"site":"Zuhause S�d"}`} {
+		out, err := invoke(t, omadaOptions(srv.URL, ""), "omada.devices", in)
+		if err != nil || out["total"] != float64(2) {
+			t.Errorf("%s: %v %v", in, out, err)
+		}
+	}
+	var ie *InputError
+	// two sites, a name that fits neither: the error lists both, nothing is guessed
+	if _, err := invoke(t, omadaOptions(srv.URL, ""), "omada.devices", `{"site":"default"}`); !errors.As(err, &ie) || !strings.Contains(err.Error(), "Zuhause Nord, Zuhause Süd") {
+		t.Errorf("two sites, unknown name: %v", err)
+	}
+	// a mark stands for characters beyond ASCII only: "Zuhause ?ord" is no site
+	if _, err := invoke(t, omadaOptions(srv.URL, ""), "omada.devices", `{"site":"Zuhause ?ord"}`); !errors.As(err, &ie) {
+		t.Errorf("a mark for an ASCII letter: %v", err)
+	}
+}
+
+func TestOmadaCutKeepsCharactersWhole(t *testing.T) {
+	got := cut("Süd", 2) // "S" + the first byte of "ü"
+	if got != "S…" || !utf8.ValidString(got) {
+		t.Errorf("cut = %q", got)
 	}
 }
