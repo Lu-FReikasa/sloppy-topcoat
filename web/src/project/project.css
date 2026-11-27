@@ -931,3 +931,87 @@
   font-size: 0.85em;
   white-space: pre;
 }
+
+/* a large task's sub-tasks (SubtaskView.tsx, issue #33) */
+.large-task,
+.large-task-folded {
+  border-top: 1px solid var(--border);
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+}
+.large-task h4 {
+  margin: 0 0 0.35rem;
+}
+.large-task-folded > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.large-task code {
+  overflow-wrap: anywhere;
+}
+.subtask-stages {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+}
+.subtask-stage + .subtask-stage {
+  margin-top: 0.5rem;
+}
+.subtask-stage-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.subtask-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 0.75rem;
+  border-left: 2px solid var(--border);
+  display: grid;
+  gap: 0.4rem;
+}
+.subtask {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  min-width: 0;
+}
+.subtask p {
+  margin: 0.2rem 0 0;
+}
+.subtask-head {
+  overflow-wrap: anywhere;
+}
+.subtask-number {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.subtask-files {
+  margin: 0.2rem 0;
+  padding-left: 1.2rem;
+}
+.subtask-badge-done,
+.large-task-badge-done {
+  background: var(--ok);
+  color: var(--on-ok, #fff);
+}
+.subtask-badge-running,
+.large-task-badge-running {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.subtask-badge-failed,
+.subtask-badge-blocked,
+.large-task-badge-blocked {
+  background: var(--warn);
+  color: var(--on-warn, #fff);
+}
+.subtask-badge-waiting,
+.large-task-badge-planning {
+  background: var(--off);
+  color: var(--on-off, #fff);
+}
+.subtask-blocked,
+.subtask-failed {
+  border-color: var(--warn);
+}
