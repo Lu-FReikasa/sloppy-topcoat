@@ -52,6 +52,7 @@ from topcoat_hub import (
     report,
     research_chat,
     research_profile,
+    secretary,
     tool_groups,
     wiki_tools,
 )
@@ -2723,6 +2724,16 @@ async def _pipeline_events(
                 ask_allowed=not turn.care_asked,
                 application=turn.application,
             )
+        # The secretary decides who does the task, by the contracts (D112, issue #36).
+        decision = await _secretary_route(request, user, turn, tools, bool(route.candidates))
+        if decision is not None:
+            outcome.set_result(None)
+            async with contextlib.aclosing(
+                _secretary_events(request, user, turn, decision, recalled, context_length)
+            ) as routed_events:
+                async for chunk in routed_events:
+                    yield chunk
+            return
         # A question about the user's servers is answered after a check (E3-01d).
         checking, refusal = await _plan_check(request, user, turn, tools, bool(route.candidates))
         if refusal is not None:
@@ -3452,6 +3463,111 @@ async def _reaction_events(
             content=emoji,
             status="complete",
             kind="reaction",
+        )
+        await db.commit()
+    turn.message_id = None
+    yield chat.sse("done", {"message": message_view(row) if row is not None else {}})
+
+
+# the last turns the routing decision sees ("do that", "and the other one"), each cut
+SECRETARY_TURNS = 4
+SECRETARY_TURN_CHARS = 300
+
+
+async def _secretary_route(
+    request: Request, user: CurrentUser, turn: Turn, tools: str, routable: bool
+) -> secretary.Route | None:
+    """The secretary's decision for this message (D112): a task handed on or a question about the
+    tasks handed on; ``None`` when the answer is written here as before. Only in the assistant's
+    own conversation (Chat), for a new message the person wrote, with tools and agents on; a
+    decision that cannot be made (no model answer, no contract) leaves the old path."""
+    state = request.app.state
+    if (
+        not state.settings.secretary_routing
+        or not state.settings.agent_enabled
+        or turn.application != "chat"
+        or turn.continues is not None
+        or turn.from_hub
+        or turn.accepted_question
+        or tools == "off"
+        or not routable
+        or not secretary.targets()
+        or not turn.last_user_text.strip()
+    ):
+        return None
+    earlier = [
+        f"{role}: {' '.join(text.split())[:SECRETARY_TURN_CHARS]}"
+        for role, text in turn.history[:-1][-SECRETARY_TURNS:]
+    ]
+    decision = await secretary.route(
+        state.gateway, turn.requested, turn.last_user_text, "\n".join(earlier)
+    )
+    if decision is None or not (decision.hands_on or decision.asks_status):
+        return None  # the secretary answers it itself, as before
+    return decision
+
+
+SECRETARY_SAY = {
+    "en": {
+        "handed": "I handed this to {who}: “{topic}”.",
+        "report": " I'll tell you here when it is done.",
+        "ask": " Ask me “how far is it?” any time.",
+        "held": " It is not in the queue yet ({reason}).",
+        "failed": "I could not hand this on ({reason}). Please ask {who} directly.",
+    },
+    "de": {
+        "handed": "Ich habe das an {who} weitergegeben: „{topic}“.",
+        "report": " Ich sage dir hier Bescheid, wenn es fertig ist.",
+        "ask": " Frag mich jederzeit „wie weit ist es?“.",
+        "held": " Es ist noch nicht in der Warteschlange ({reason}).",
+        "failed": "Ich konnte das nicht weitergeben ({reason}). Frag bitte {who} direkt.",
+    },
+}
+
+
+async def _secretary_events(
+    request: Request,
+    user: CurrentUser,
+    turn: Turn,
+    decision: secretary.Route,
+    recalled: list[Recalled],
+    context_length: int,
+) -> AsyncIterator[str]:
+    """The secretary's answer in the hub's own words, no second model call: the state of the
+    tasks handed on, or that the task was handed on (an ``assistant.request`` in the person's
+    Secretary project, queued at once: it only reads, so no click, D112)."""
+    from topcoat_hub.message_service import MessageService
+
+    yield _meta_event(turn, "hub", None, None, context_length, 0, 0, recalled)
+    state = request.app.state
+    lang = hub_language(turn.language, turn.last_user_text)
+    say = SECRETARY_SAY[lang]
+    if decision.asks_status:
+        text = await secretary.status_lines(
+            state.sessionmaker, user.uuid, turn.conversation_id, lang
+        )
+    else:
+        contract = agent_contract.get(decision.to)
+        who = contract.title(lang) if contract is not None else decision.to
+        service = MessageService(
+            ProjectStore(state.sessionmaker, PERSON, state.settings.hub_timezone),
+            state.agents,
+            getattr(state, "proposals", None),
+        )
+        try:
+            handed = await secretary.hand_on(
+                service, user.uuid, user.is_admin, turn.conversation_id, decision
+            )
+        except (ValueError, ProjectError) as exc:
+            text = say["failed"].format(reason=str(exc)[:200], who=who)
+        else:
+            text = say["handed"].format(who=who, topic=decision.topic)
+            text += say["report"] if decision.report_when_done else say["ask"]
+            if handed.reason:
+                text += say["held"].format(reason=handed.reason)
+    async with state.sessionmaker() as db:
+        row = await ChatStore(db, user.uuid).update_message(
+            turn.conversation_id, turn.message_id or 0, content=text, status="complete"
         )
         await db.commit()
     turn.message_id = None

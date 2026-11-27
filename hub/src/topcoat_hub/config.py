@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     gateway_load_mb_per_second: float = 400.0
     # Hand-over of heavy chat requests to the task queue (only when the person asks for it).
     handoff_enabled: bool = True
+    # The secretary (D112, issue #36): in Chat, one model call decides from the contracts whether
+    # the assistant answers itself, hands a reading task on to an employee, or says how far the
+    # tasks it handed on are.
+    secretary_routing: bool = True
     # The second look: a model other than the author reads answers of the last ``review_hours``.
     review_enabled: bool = True
     # a plain acknowledgement (thanks, ok) is answered with an emoji, not a text block

@@ -181,7 +181,7 @@ The programs (Chat, Research, Development, Administration, Projects), their righ
 | [D69](decisions/D69.md) | The tools of an application are a ceiling | Amended |
 | [D116](decisions/D116.md) | One application profile: run, prompt and rights of a program in one place | Current |
 | [D118](decisions/D118.md) | Each application has a contract | Current |
-| [D112](decisions/D112.md) | A secretary is the first contact; reading tasks go out without a click | Decided, not built |
+| [D112](decisions/D112.md) | A secretary is the first contact; reading tasks go out without a click | Built (issues #34–#36) |
 | [D105](decisions/D105.md) | Applications as plug-ins: data in the hub, code only as a node of its own | Current |
 | [D59](decisions/D59.md) | Flows | Removed |
 | [D66](decisions/D66.md) | Effort is a variable of the run | Amended |
