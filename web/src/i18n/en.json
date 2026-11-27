@@ -79,7 +79,6 @@
     "ram": "RAM",
     "gpus": "GPUs",
     "vram": "VRAM",
-    "agentVersion": "Agent version",
     "lastSeen": "Last seen",
     "never": "never",
     "unknown": "unknown",
@@ -4578,5 +4577,12 @@
     "reportWhenDone": "I'll tell you here when it is done.",
     "talkDirectly": "Talk to {{employee}} directly",
     "openFailed": "The conversation could not be opened. Please try again."
+  },
+  "nodeHeader": {
+    "version": "Agent {{version}}",
+    "updateAvailable": "Update {{version}} available",
+    "cpuLoad": "{{value}} % load",
+    "loadPick": "Model to load",
+    "load": "Load model"
   }
 }
