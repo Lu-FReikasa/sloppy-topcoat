@@ -14,6 +14,7 @@
 //! `"mode": "windows"` keeps the selector and a native window per program.
 
 mod nav;
+mod devtools;
 mod overlay;
 
 use std::{fs, path::PathBuf};
@@ -338,6 +339,9 @@ fn toggle_selector(app: &AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // a developer's opt-in only (TOPCOAT_DEVTOOLS_PORT): lets web/scripts/overlay-capture.mjs
+    // take screenshots of the real overlay; set before the first web view starts
+    devtools::enable_from_env();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| on_key(app, false)))
         .plugin(tauri_plugin_window_state::Builder::default().build())

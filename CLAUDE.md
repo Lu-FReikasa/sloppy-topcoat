@@ -36,6 +36,10 @@ privacy of the repo stay strict; everything else is a default you may bend when 
 - **Hardware.** Cloud sessions have no GPU, audio or LAN: hardware-specific code sits behind an interface with a fake;
   mark untested real code `UNVERIFIED on real hardware`. Local sessions may test on the dev machines
   (hosts in `.dev/hosts.env`, see `scripts/dev/hosts.env.example`).
+- **GUI checks: the desktop overlay first.** The maintainer works in the client's overlay (`desktop/`), so GUI changes
+  are checked there first and in the browser's navigation shell second. Take the screenshots with the tools, not by
+  hand: `npm run overlay-layout` (simulated, anyone) and `npm run overlay-capture` (the real client, maintainer's PC);
+  see "GUI checks in the desktop overlay" in `docs/DEVELOPMENT.md`.
 - **Tests are for behaviour, not for ceremony.** New logic and bug fixes get a test (fakes are fine). Pure docs, copy,
   styling, renames and config need none. Do not write tests that only mirror the implementation.
 - **Test loop: targeted while working, full once before a push.** `scripts/dev/remote-ci.sh changed` (seconds) or with
