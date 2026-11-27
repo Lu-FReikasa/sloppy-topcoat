@@ -43,7 +43,9 @@ def read(text: str, fmt: str = "chordpro", title: str = "", artist: str = "") ->
     sheet = chordpro.parse(text)
     sheet.title = title.strip() or sheet.title
     sheet.artist = artist.strip() or sheet.artist
-    rules.apply(sheet)  # chords written as text, no tab, a header (sheets/rules.py)
+    rules.apply(
+        sheet, chordpro.writes_german(text), chordpro.shape_capo(text)
+    )  # chords written as text, no tab, a header (sheets/rules.py)
     if not sheet.chords():
         raise SheetError(422, "invalid", "the sheet has no chords")
     if sheet.key is None:

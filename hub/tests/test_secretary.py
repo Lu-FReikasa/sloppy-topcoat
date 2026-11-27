@@ -20,7 +20,7 @@ from topcoat_hub.agent_store import AgentStore
 from topcoat_hub.chat_store import ChatStore
 from topcoat_hub.gateway import GatewayError
 from topcoat_hub.message_service import MessageService
-from topcoat_hub.models import DEV_ADMIN_ID, Message, Order
+from topcoat_hub.models import DEV_ADMIN_ID, Message, Node, Order
 from topcoat_hub.project_events import SYSTEM
 from topcoat_hub.project_store import ProjectStore
 
@@ -159,6 +159,21 @@ async def test_a_reading_task_is_queued_at_once_and_remembered(client: TestClien
     # the second task goes into the same project
     again, _, _ = await _hand_on(client)
     assert again.message.project_id == node.project_id
+
+
+async def test_a_task_the_queue_refuses_fails_at_once_with_the_reason(client: TestClient) -> None:
+    fake = QueueFake(client.app.state.sessionmaker, refuse="too many tasks")
+    conv = await _conversation(client)
+    decision = secretary.Route("hand_on", "research", "Compare two backup tools", (), True)
+    handed = await secretary.hand_on(_service(client, fake), DEV_ADMIN_ID, True, conv, decision)
+    assert "too many tasks" in handed.reason
+    assert handed.message.msg_state == "failed" and handed.order.status == "failed"
+    sm = client.app.state.sessionmaker
+    async with sm() as db:
+        assert await secretary.OrderStore(db, DEV_ADMIN_ID).listed(open_only=True) == []
+    status = await secretary.status_lines(sm, DEV_ADMIN_ID, conv)
+    assert "Compare two backup tools" in status and "failed" in status
+    assert "I will tell you" not in status  # nothing is left to report
 
 
 async def test_only_an_employee_of_the_contract_is_handed_a_task(client: TestClient) -> None:
@@ -375,3 +390,154 @@ async def test_a_question_back_makes_the_order_wait_without_a_planner(client: Te
     assert await _messages(client, conv) == []  # waiting is not done: nothing reported yet
     text = await secretary.status_lines(client.app.state.sessionmaker, DEV_ADMIN_ID, conv)
     assert "has a question back" in text
+
+
+# --- work cards and "talk to … directly" (issue #37) ---------------------------------------------
+
+
+def _node(name: str) -> Node:
+    return Node(name=name, os="linux", arch="amd64", public_key="k", config={}, config_hash="h")
+
+
+def test_a_work_card_stands_under_the_message_that_handed_it_on(
+    client: TestClient,
+    world,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client.app.state.settings.secretary_routing = True
+    fake = QueueFake(client.app.state.sessionmaker)
+    monkeypatch.setattr(client.app.state.agents, "start", fake.start)
+
+    async def route(gateway: Any, requested: str, text: str, history: str = "") -> Any:
+        return secretary.Route("hand_on", "admin", "Look at the disk usage", (), False)
+
+    monkeypatch.setattr(secretary, "route", route)
+    conv = _chat(client)
+    _, events, _ = ask_with(client, conv, "Have Administration look at the disk usage")
+    said = events[-1][1]["message"]
+    cards = client.get(f"/api/conversations/{conv}/orders", headers=AUTH).json()
+    assert len(cards) == 1
+    card = cards[0]
+    assert card["chat_message_id"] == said["id"]
+    assert card["employee"] == "admin" and card["employee_title"] == "Administration"
+    assert card["topic"] == "Look at the disk usage" and card["status"] == "queued"
+    assert card["summary"] is None and card["direct_conversation_id"] is None
+    de = client.get(f"/api/conversations/{conv}/orders?language=de", headers=AUTH).json()
+    assert de[0]["employee_title"] == "Verwaltung"
+
+
+async def test_a_finished_card_carries_the_filtered_summary(client: TestClient) -> None:
+    handed, fake, conv = await _hand_on(client, report=False)
+    await _answer(client, handed, fake)
+    cards = await secretary.cards(client.app.state.sessionmaker, DEV_ADMIN_ID, conv)
+    assert [c["status"] for c in cards] == ["done"]
+    assert cards[0]["summary"] == FINDINGS_SUMMARY and cards[0]["withheld"] == []
+    # a result that names a machine of the network stays in the employee's own place
+    secret = f"node-{uuid.uuid4().hex[:6]}"
+    async with client.app.state.sessionmaker() as db:
+        db.add(_node(secret))
+        await db.commit()
+    handed2, fake2, conv2 = await _hand_on(client, report=False)
+    service = _service(client, fake2)
+    request = await service.store.get_node(DEV_ADMIN_ID, handed2.message.id)
+    await service.on_task_event(DEV_ADMIN_ID, request.task_id, "started")  # type: ignore[arg-type]
+    request = await service.store.get_node(DEV_ADMIN_ID, handed2.message.id)
+    task = await _task(client, request.task_id)
+    await service.deliver_result(
+        DEV_ADMIN_ID, request, summary=f"The disk of {secret} is full.", claims=[], task=task,
+        evidence=[],
+    )  # fmt: skip
+    card = (await secretary.cards(client.app.state.sessionmaker, DEV_ADMIN_ID, conv2))[0]
+    assert secret not in (card["summary"] or "") and card["withheld"]
+
+
+async def test_cards_are_the_persons_own(client: TestClient) -> None:
+    other, other_auth = make_user(TEST_DB_URL, "card-stranger")
+    handed, _, conv = await _hand_on(client, report=False)
+    assert await secretary.cards(client.app.state.sessionmaker, other, conv) == []
+    assert client.get(f"/api/conversations/{conv}/orders", headers=other_auth).status_code == 404
+    reply = client.post(f"/api/orders/{handed.order.id}/direct", headers=other_auth)
+    assert reply.status_code == 404
+    assert client.post(f"/api/orders/{uuid.uuid4()}/direct", headers=AUTH).status_code == 404
+
+
+async def test_talking_directly_opens_the_employees_conversation_once(client: TestClient) -> None:
+    fake = QueueFake(client.app.state.sessionmaker)
+    conv = await _conversation(client)
+    decision = secretary.Route(
+        "hand_on", "research", "Compare two backup tools", ("Which one is maintained?",), False
+    )
+    handed = await secretary.hand_on(_service(client, fake), DEV_ADMIN_ID, True, conv, decision)
+    # before the result: the task and that it is not done yet
+    first = client.post(f"/api/orders/{handed.order.id}/direct", headers=AUTH)
+    assert first.status_code == 200
+    body = first.json()
+    assert body["application"] == "research"
+    direct = uuid.UUID(body["conversation_id"])
+    seen = client.get(f"/api/conversations/{direct}", headers=AUTH).json()
+    assert seen["application"] == "research" and seen["title"] == "Compare two backup tools"
+    text = seen["messages"][0]["content"]
+    assert seen["messages"][0]["role"] == "assistant"
+    assert "Compare two backup tools" in text and "Which one is maintained?" in text
+    assert "not done yet" in text
+    # a second click opens the same conversation; the card knows it
+    again = client.post(f"/api/orders/{handed.order.id}/direct", headers=AUTH).json()
+    assert again["conversation_id"] == body["conversation_id"]
+    card = (await secretary.cards(client.app.state.sessionmaker, DEV_ADMIN_ID, conv))[0]
+    assert card["direct_conversation_id"] == body["conversation_id"]
+    # the secretary's own conversation got nothing from this
+    assert await _messages(client, conv) == []
+
+
+async def test_the_direct_conversation_holds_the_employees_own_result(client: TestClient) -> None:
+    handed, fake, _ = await _hand_on(client, report=False)
+    hidden = f"node-{uuid.uuid4().hex[:6]}"
+    async with client.app.state.sessionmaker() as db:
+        db.add(_node(hidden))
+        await db.commit()
+    service = _service(client, fake)
+    request = await service.store.get_node(DEV_ADMIN_ID, handed.message.id)
+    await service.on_task_event(DEV_ADMIN_ID, request.task_id, "started")  # type: ignore[arg-type]
+    request = await service.store.get_node(DEV_ADMIN_ID, handed.message.id)
+    task = await _task(client, request.task_id)
+    await service.deliver_result(
+        DEV_ADMIN_ID, request, summary=f"Tool A runs on {hidden}.", claims=[], task=task,
+        evidence=[],
+    )  # fmt: skip
+    body = client.post(f"/api/orders/{handed.order.id}/direct?language=de", headers=AUTH).json()
+    seen = client.get(f"/api/conversations/{body['conversation_id']}", headers=AUTH).json()
+    text = seen["messages"][0]["content"]
+    # the employee's own context: its summary as it wrote it (the filter stands before the
+    # secretary only), in the language asked for
+    assert f"Tool A runs on {hidden}." in text and "Mein Ergebnis" in text
+
+
+async def test_a_deleted_direct_conversation_is_made_again(client: TestClient) -> None:
+    handed, _, _ = await _hand_on(client, report=False)
+    first = client.post(f"/api/orders/{handed.order.id}/direct", headers=AUTH).json()
+    assert (
+        client.delete(f"/api/conversations/{first['conversation_id']}", headers=AUTH).status_code
+        == 204
+    )
+    second = client.post(f"/api/orders/{handed.order.id}/direct", headers=AUTH).json()
+    assert second["conversation_id"] != first["conversation_id"]
+
+
+def test_in_chat_a_refused_hand_on_says_so_instead_of_handed(
+    client: TestClient,
+    world,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client.app.state.settings.secretary_routing = True
+    fake = QueueFake(client.app.state.sessionmaker, refuse="too many tasks")
+    monkeypatch.setattr(client.app.state.agents, "start", fake.start)
+
+    async def route(gateway: Any, requested: str, text: str, history: str = "") -> Any:
+        return secretary.Route("hand_on", "research", "Compare two backup tools", (), True)
+
+    monkeypatch.setattr(secretary, "route", route)
+    status, events, _ = ask_with(client, _chat(client), "Have research compare two backup tools")
+    assert status == 200 and events[-1][0] == "done"
+    done = events[-1][1]["message"]["content"]
+    assert "could not hand this on" in done and "too many tasks" in done
+    assert "I handed this" not in done

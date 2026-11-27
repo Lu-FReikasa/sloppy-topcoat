@@ -167,6 +167,7 @@ import type {
   ToolCallRow,
   ToolResult,
   UserRow,
+  WorkCard,
 } from "../types";
 
 /** Error raised for any non-2xx hub response or network failure. */
@@ -450,6 +451,27 @@ export class ApiClient {
     return this.request<{ created: boolean; enabled?: boolean }>(
       "POST",
       `/api/conversations/${encodeURIComponent(id)}/segments/break`,
+    );
+  }
+
+  /** The work cards of a conversation: what the secretary handed on in it (D112, #37). */
+  conversationOrders(id: string, language?: string): Promise<WorkCard[]> {
+    const q = language === "de" || language === "en" ? `?language=${language}` : "";
+    return this.request<WorkCard[]>(
+      "GET",
+      `/api/conversations/${encodeURIComponent(id)}/orders${q}`,
+    );
+  }
+
+  /** "Talk to … directly": the employee's own conversation with the task and its result. */
+  talkToEmployee(
+    orderId: string,
+    language?: string,
+  ): Promise<{ conversation_id: string; application: string }> {
+    const q = language === "de" || language === "en" ? `?language=${language}` : "";
+    return this.request<{ conversation_id: string; application: string }>(
+      "POST",
+      `/api/orders/${encodeURIComponent(orderId)}/direct${q}`,
     );
   }
 

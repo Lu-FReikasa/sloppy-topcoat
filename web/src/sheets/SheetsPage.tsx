@@ -27,6 +27,7 @@ import {
   type SortMode,
 } from "./fit";
 import { artistsOf, type SheetGroup } from "./group";
+import { PrintDialog, type PrintSong } from "./PrintSheets";
 import { asWritten, collapseRepeats, type BodyItem } from "./collapse";
 import { setlistGroups } from "./setlist";
 import { Setlists } from "./Setlists";
@@ -137,6 +138,8 @@ export function SheetsPage({ api, id }: Props) {
     setSideState(on);
     keepForSession(SIDE_KEY, on);
   }, []);
+  // the songs offered for printing: the shown list or a setlist (null: no print dialog)
+  const [printSongs, setPrintSongs] = useState<PrintSong[] | null>(null);
   // a setlist played on the stage: its songs page instead of the list, from the song at `at`.
   // The address stays as it is (paging happens inside the stage), so the page is not remounted.
   const [playing, setPlaying] = useState<{ setlist: Setlist; at: number } | null>(null);
@@ -214,7 +217,15 @@ export function SheetsPage({ api, id }: Props) {
     );
   if (stage && id) return <Stage api={api} id={id} groups={groups} onExit={exitStage} />;
   const setlists = list && list.length > 0 && (
-    <Setlists api={api} list={list} openId={id} onOpen={() => setSide(true)} onPlay={play} onError={fail} />
+    <Setlists
+      api={api}
+      list={list}
+      openId={id}
+      onOpen={() => setSide(true)}
+      onPlay={play}
+      onPrint={(s) => setPrintSongs(setlistSongs(s, list))}
+      onError={fail}
+    />
   );
   return (
     <section ref={shell} className="sheets-shell" data-testid="sheets">
@@ -269,17 +280,33 @@ export function SheetsPage({ api, id }: Props) {
           {list !== null && list.length === 0 && <p className="muted">{t("sheets.empty")}</p>}
           {list && list.length > 0 && (
             <div className="sheets-library-body">
-              <SheetTable
-                list={list}
-                groups={groups}
-                search={search}
-                onOpen={() => setSide(false)}
-                filter={{ query, setQuery, artist, setArtist, sort, setSort }}
-              />
+              {/* the print link stays with the table: on a phone the setlists stand below it */}
+              <div className="sheets-library-main">
+                <SheetTable
+                  list={list}
+                  groups={groups}
+                  search={search}
+                  onOpen={() => setSide(false)}
+                  filter={{ query, setQuery, artist, setArtist, sort, setSort }}
+                />
+                {groups.length > 0 && (
+                  <button type="button" className="link-button small" onClick={() => setPrintSongs(songsOf(groups))} data-testid="sheets-print-list">
+                    {t("sheets.print.list")}
+                  </button>
+                )}
+              </div>
               <aside className="sheets-library-side">{setlists}</aside>
             </div>
           )}
         </div>
+      )}
+      {printSongs && (
+        <PrintDialog
+          api={api}
+          songs={printSongs}
+          collapse={remembered(COLLAPSE_KEY) !== "0"}
+          onClose={() => setPrintSongs(null)}
+        />
       )}
       {adding && (
         <Dialog title={t("sheets.new.title")} onClose={() => setAdding(false)}>
@@ -311,6 +338,20 @@ export function SheetsPage({ api, id }: Props) {
   );
 }
 
+/** The songs to print, in the given order: the newest version of each (a setlist's songs hold
+ *  only the sheet it plays). A song's key tells apart a sheet that is in a setlist twice. */
+function songsOf(groups: SheetGroup[]): PrintSong[] {
+  return groups.flatMap((g) => {
+    const s = g.versions[g.versions.length - 1];
+    return s ? [{ key: g.key, id: s.id, title: g.title, artist: g.artist }] : [];
+  });
+}
+
+/** A setlist's songs to print, in its order; sheets deleted meanwhile are left out. */
+export function setlistSongs(setlist: Setlist, list: SheetSummary[]): PrintSong[] {
+  return songsOf(setlistGroups(setlist.items, list));
+}
+
 /** Whether the keys belong to this page: in the desktop shell only the window in front takes
  *  them, and never while a dialog is open. */
 function inFront(el: HTMLElement | null): boolean {
@@ -320,10 +361,13 @@ function inFront(el: HTMLElement | null): boolean {
 }
 
 /** Whether the shell around the page has a menu or drawer open (the web shell's drawer or user
- *  menu, the taskbar menu): Esc then closes that, it does not leave the sheet. Expanded controls
- *  inside this page or in other windows do not count. */
+ *  menu, the taskbar menu): Esc then closes that, it does not leave the sheet. Only popups count:
+ *  other expanded controls (the unfolded Clipper dock beside the window) stay open for as long as
+ *  the person likes and must not take the page's Esc. Popups inside this page or in other windows
+ *  do not count either. */
 function shellPopupOpen(el: HTMLElement | null): boolean {
-  return [...document.querySelectorAll('[aria-expanded="true"]')].some((x) => !el?.contains(x) && !x.closest(".dt-program"));
+  const open = document.querySelectorAll('[aria-haspopup][aria-expanded="true"], .ws-burger[aria-expanded="true"]');
+  return [...open].some((x) => !el?.contains(x) && !x.closest(".dt-program"));
 }
 
 function typing(target: EventTarget | null): boolean {
@@ -591,6 +635,7 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
   const [transpose, setTranspose] = useState(0);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"sheet" | "sources" | "chordpro">("sheet");
+  const [printing, setPrinting] = useState(false);
   const [collapse, setCollapse] = useState(false);
   const fail = useCallback((e: unknown) => setError(describeError(toActionError(e), t, i18n)), [t, i18n]);
 
@@ -661,6 +706,9 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
           <button type="button" aria-pressed={collapse} onClick={() => setCollapse(!collapse)}>
             {t("sheets.collapse")}
           </button>
+          <button type="button" onClick={() => setPrinting(true)} data-testid="sheet-print-open">
+            {t("sheets.print.open")}
+          </button>
           {sheet.report_id && (
             <a className="small" href={`#/library/report:${sheet.report_id}`}>
               {t("sheets.research.openReport")}
@@ -679,6 +727,15 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
           ))}
         </div>
       </header>
+      {printing && (
+        <PrintDialog
+          api={api}
+          songs={[{ id, title: v.title, artist: v.artist }]}
+          view={{ instrument: instrument ?? undefined, transpose }}
+          collapse={collapse}
+          onClose={() => setPrinting(false)}
+        />
+      )}
       {error && <p className="error">{error}</p>}
       {tab === "sheet" && <Body items={collapse ? collapseRepeats(v.sections) : asWritten(v.sections)} />}
       {tab === "sources" && <Sources api={api} sheet={sheet} />}
@@ -706,7 +763,7 @@ function Flow({ sheet }: { sheet: SheetDetail }) {
 }
 
 /** `anchors` off for the stage's hidden measuring copy, so ids stay unique on the page. */
-function Body({ items, anchors: withAnchors = true }: { items: BodyItem[]; anchors?: boolean }) {
+export function Body({ items, anchors: withAnchors = true }: { items: BodyItem[]; anchors?: boolean }) {
   const { t } = useTranslation();
   const name = (s: SheetSection) => s.label || t(`sheets.kind.${KINDS.includes(s.kind) ? s.kind : "other"}`);
   return (
@@ -918,6 +975,8 @@ function Stage({
       // a dialog over the stage (the desktop's command palette) keeps its keys, and so does another
       // window brought in front of this one (its text field's arrows, its own Esc)
       if (e.defaultPrevented || !inFront(root.current)) return;
+      // the stage has no fields: keys typed in one beside it (the Clipper dock) stay with the field
+      if (typing(e.target)) return;
       if (e.key === "Escape") leave();
       else if (e.key === "ArrowRight" || e.key === "PageDown") go(next, 1);
       else if (e.key === "ArrowLeft" || e.key === "PageUp") go(prev, -1);

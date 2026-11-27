@@ -322,7 +322,9 @@ async def _on_disconnect(session: NodeSession) -> None:
 
 
 async def _close_quietly(ws: WebSocket, code: int) -> None:
-    with contextlib.suppress(RuntimeError, OSError):
+    # the replaced socket is often already gone: starlette then raises WebSocketDisconnect, which
+    # broke the new connection's handshake before its state was stored
+    with contextlib.suppress(RuntimeError, OSError, WebSocketDisconnect):
         await ws.close(code=code)
 
 

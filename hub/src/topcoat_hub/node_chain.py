@@ -28,9 +28,12 @@ async def pick(gateway: Gateway, chain: list[tuple[str, str]]) -> Pick | None:
     first_state: str | None = None
     full: Pick | None = None  # the first entry that could take it, but only after a wait
     has_room = getattr(gateway, "_has_room", None)
+    # "can take it now": never wake an asleep node here (the caller's own route does that), or an
+    # asleep first entry holds up the whole row for the wake timeout
+    route_now = getattr(gateway, "route_now", gateway.route)
     for i, (node, model) in enumerate(chain):
         try:
-            route = await gateway.route(f"{model}@{node}")
+            route = await route_now(f"{model}@{node}")
         except GatewayError as exc:
             if i == 0:
                 # a node the admin keeps free of chat (node policy) shows as "paused": the GUI

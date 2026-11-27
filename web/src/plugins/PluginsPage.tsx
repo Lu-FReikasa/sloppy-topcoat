@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, type ApiClient } from "../api/client";
 import type { HubEvents } from "../data/hubEvents";
@@ -360,6 +360,15 @@ function PluginVersions({
   const compared =
     other && detail.versions.some((v) => v.version === other) ? other : null;
   const [a, b] = compared ? ordered(detail, compared) : [null, null];
+  // the versions open under the whole list: bring them into view and move focus to their
+  // heading, or a click on a plug-in shows nothing new on a long list (UI review 2, #174)
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const el = heading.current;
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.scrollIntoView?.({ block: "start" });
+  }, [detail.key]);
   const diff = useResource(
     `plugin-diff:${detail.key}:${a ?? ""}:${b ?? ""}`,
     async () => (a && b ? (await api.pluginDiff(detail.key, a, b)).lines : []),
@@ -372,7 +381,9 @@ function PluginVersions({
       data-testid="plugin-detail"
       aria-label={title}
     >
-      <h3>{t("plugins.versionsOf", { name: title })}</h3>
+      <h3 ref={heading} tabIndex={-1}>
+        {t("plugins.versionsOf", { name: title })}
+      </h3>
       <ul className="plugin-versions">
         {detail.versions.map((v) => {
           const current = v.version === detail.version;

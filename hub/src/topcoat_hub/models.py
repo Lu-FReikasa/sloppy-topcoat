@@ -1536,6 +1536,14 @@ class Order(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     reported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # the chat message that said it was handed on: its work card stands under it (issue #37)
+    chat_message_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("messages.id", ondelete="SET NULL")
+    )
+    # the employee's own conversation that "talk to … directly" opened (issue #37)
+    direct_conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="SET NULL")
+    )
 
 
 class ProjectChange(Base):

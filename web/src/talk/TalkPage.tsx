@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { overlayOf } from "../desktop/state";
 import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
@@ -7,6 +7,7 @@ import { ActivityTimeline } from "../chat/ActivityTimeline";
 import { CheckControls } from "../chat/CheckControls";
 import { ExportButtons } from "../chat/ExportButtons";
 import { HandoffCard } from "../chat/HandoffCard";
+import { placeCards, useWorkCards, WorkCardView } from "../chat/WorkCards";
 import { InternetSwitch, internetOn } from "../chat/InternetSwitch";
 import { ScopeHint } from "../chat/ScopeHint";
 import { ChatOrigin } from "../chat/ChatOrigin";
@@ -73,6 +74,9 @@ interface Props {
   application?: string;
   /** A conversation to open instead of the newest one (a link from the shelf or the inbox). */
   conversationId?: string;
+  /** Actions of the window around the conversation ("Hand over"): they sit in the conversation's
+   *  header above the stream, so they never cover a message (#173). */
+  headerActions?: ReactNode;
 }
 
 /** A conversation from before applications belongs to Chat. */
@@ -132,6 +136,7 @@ export function TalkPage({
   newChatScope,
   application = DEFAULT_APPLICATION,
   conversationId,
+  headerActions,
 }: Props) {
   const { t, i18n } = useTranslation();
   const chat = useChat(api, newChatScope, application);
@@ -294,6 +299,14 @@ export function TalkPage({
   const history = wantBreak
     ? []
     : [...(showEarlier ? earlier.flatMap((e) => e.messages) : []), ...messages];
+  // the secretary's work cards (D112, #37): only Chat's own conversations hand tasks on
+  const cards = useWorkCards(
+    api,
+    id,
+    detail !== undefined && (detail.application ?? DEFAULT_APPLICATION) === DEFAULT_APPLICATION,
+    messageCount * 2 + (running ? 1 : 0),
+  );
+  const cardsUnder = placeCards(history, cards);
   const breaks = new Map<number, SectionBreak>();
   let offset = 0;
   (showEarlier ? earlier : []).forEach((e, i) => {
@@ -451,6 +464,21 @@ export function TalkPage({
     lastAnswer?.status === "truncated" || lastAnswer?.status === "interrupted";
   return (
     <section ref={room} className="talk" aria-label={t("talk.label")}>
+      {(detail || headerActions) && (
+        <header className="talk-head" data-testid="talk-head">
+          {detail && (
+            <ChatOrigin
+              application={ownApp}
+              overview={overview}
+              internet={internetOn(overview, detail.tool_scope, settings?.user.internet ?? true)}
+              pinned={detail.pinned}
+              onPin={(pinned) => void update(detail.id, { pinned })}
+              onDone={() => void update(detail.id, { done: true })}
+            />
+          )}
+          {headerActions && <div className="talk-head-actions">{headerActions}</div>}
+        </header>
+      )}
       <div
         className="talk-stream"
         ref={ref}
@@ -459,16 +487,6 @@ export function TalkPage({
         aria-live="polite"
       >
         {!detail && <p className="muted">{t("app.loading")}</p>}
-        {detail && (
-          <ChatOrigin
-            application={ownApp}
-            overview={overview}
-            internet={internetOn(overview, detail.tool_scope, settings?.user.internet ?? true)}
-            pinned={detail.pinned}
-            onPin={(pinned) => void update(detail.id, { pinned })}
-            onDone={() => void update(detail.id, { done: true })}
-          />
-        )}
         {detail && !wantBreak && !showEarlier && earlierSections.length > 0 && (
           <button
             type="button"
@@ -606,6 +624,9 @@ export function TalkPage({
                     )}
                 </MessageLine>
               )}
+              {cardsUnder.get(m.id)?.map((card) => (
+                <WorkCardView key={card.id} card={card} api={api} />
+              ))}
               {m.role === "assistant" && notes?.[m.id] && id && (
                 <RememberedNotes
                   notes={notes[m.id]!}

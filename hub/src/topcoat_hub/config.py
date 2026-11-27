@@ -90,7 +90,9 @@ class Settings(BaseSettings):
     handoff_enabled: bool = True
     # The secretary (D112, issue #36): in Chat, one model call decides from the contracts whether
     # the assistant answers itself, hands a reading task on to an employee, or says how far the
-    # tasks it handed on are.
+    # tasks it handed on are. Cost: that decision is one extra (short) model call before every
+    # Chat answer, so each turn waits for it; plain acknowledgements (thanks, ok) skip it. Set
+    # TOPCOAT_SECRETARY_ROUTING=false to answer every Chat message directly.
     secretary_routing: bool = True
     # The second look: a model other than the author reads answers of the last ``review_hours``.
     review_enabled: bool = True

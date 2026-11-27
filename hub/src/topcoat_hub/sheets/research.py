@@ -144,7 +144,9 @@ def _sheet_of(found: Found) -> Sheet | None:
         head.append(f"Key: {found.key}")
     text = plaintext.to_chordpro("\n".join([*head, found.text]), found.title, found.artist)
     sheet = chordpro.parse(text)
-    rules.apply(sheet)  # before the sources are compared and tidied with each other
+    rules.apply(
+        sheet, chordpro.writes_german(text), chordpro.shape_capo(text)
+    )  # before the sources are compared and tidied with each other
     if len(sheet.chords()) < 4:
         return None
     if sheet.key is None:

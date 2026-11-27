@@ -465,6 +465,49 @@ async def get_conversation(
         }
 
 
+async def _card_language(request: Request, user: CurrentUser, language: str | None) -> str:
+    """The language of a work card: the one the GUI shows, else the person's stored one."""
+    if language in ("en", "de"):
+        return language
+    async with request.app.state.sessionmaker() as db:
+        row = await db.get(User, user.uuid)
+        return (row.language if row else None) or "en"
+
+
+@router.get("/conversations/{conversation_id}/orders")
+async def conversation_orders(
+    conversation_id: uuid.UUID,
+    request: Request,
+    language: str | None = Query(None, pattern="^(en|de)$"),
+    user: CurrentUser = Depends(api_user),
+) -> list[dict[str, Any]]:
+    """The work cards of a conversation (D112, issue #37): each task the secretary handed on in
+    it, with the employee, the task, the state and the result summary through the filter."""
+    async with request.app.state.sessionmaker() as db:
+        if await ChatStore(db, user.uuid).get_conversation(conversation_id) is None:
+            raise _http(404, "not_found", "unknown conversation")
+    lang = await _card_language(request, user, language)
+    return await secretary.cards(request.app.state.sessionmaker, user.uuid, conversation_id, lang)
+
+
+@router.post("/orders/{order_id}/direct")
+async def talk_to_employee_directly(
+    order_id: uuid.UUID,
+    request: Request,
+    language: str | None = Query(None, pattern="^(en|de)$"),
+    user: CurrentUser = Depends(api_user),
+) -> dict[str, Any]:
+    """The button "talk to … directly" on a work card (issue #37): the employee's own
+    conversation with the task and the result, made on the first click and found again on the
+    next. It is the person's own click and changes nothing outside the person's conversations."""
+    lang = await _card_language(request, user, language)
+    found = await secretary.talk_directly(request.app.state.sessionmaker, user.uuid, order_id, lang)
+    if found is None:
+        raise _http(404, "not_found", "unknown order")
+    conversation_id, application = found
+    return {"conversation_id": str(conversation_id), "application": application}
+
+
 @router.get("/chat/images/{image_id}")
 async def get_chat_image(
     image_id: uuid.UUID, request: Request, user: CurrentUser = Depends(api_user)
@@ -3556,15 +3599,19 @@ async def _secretary_events(
         )
         try:
             handed = await secretary.hand_on(
-                service, user.uuid, user.is_admin, turn.conversation_id, decision
-            )
+                service, user.uuid, user.is_admin, turn.conversation_id, decision,
+                chat_message_id=turn.message_id,
+            )  # fmt: skip
         except (ValueError, ProjectError) as exc:
             text = say["failed"].format(reason=str(exc)[:200], who=who)
         else:
-            text = say["handed"].format(who=who, topic=decision.topic)
-            text += say["report"] if decision.report_when_done else say["ask"]
-            if handed.reason:
-                text += say["held"].format(reason=handed.reason)
+            if handed.order.status == "failed":
+                text = say["failed"].format(reason=handed.reason[:200], who=who)
+            else:
+                text = say["handed"].format(who=who, topic=decision.topic)
+                text += say["report"] if decision.report_when_done else say["ask"]
+                if handed.reason:
+                    text += say["held"].format(reason=handed.reason)
     async with state.sessionmaker() as db:
         row = await ChatStore(db, user.uuid).update_message(
             turn.conversation_id, turn.message_id or 0, content=text, status="complete"

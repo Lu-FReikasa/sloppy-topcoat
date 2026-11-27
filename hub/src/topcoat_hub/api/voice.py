@@ -32,7 +32,11 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 CLOSE_UNAUTHORIZED = 4401
-AUTH_TIMEOUT = 10.0
+CLOSE_TOO_BIG = 1009
+AUTH_TIMEOUT = 10.0  # for the whole sign-in frame; a client that sends nothing is closed
+# the sign-in frame holds a type and one token (a few hundred characters at most); before sign-in
+# nobody is known, so nothing larger is read, parsed or looked up
+MAX_AUTH_FRAME = 4 * 1024
 MAX_TEXT_FRAME = 64 * 1024
 MAX_QUEUED = 64  # speak requests waiting (sentences of the answers being written)
 # recordings being turned into text at once: push to talk has one, a quick second press may add
@@ -270,23 +274,42 @@ async def status(request: Request, user: CurrentUser = Depends(api_user)) -> dic
     return (await service.available(Caller.of(user))).view()
 
 
+async def _sign_in_token(ws: WebSocket) -> tuple[str | None, int]:
+    """The token of the first frame, or ``None`` with the close code the socket gets: a frame
+    that is not a short text frame, or none within :data:`AUTH_TIMEOUT`, signs nobody in."""
+    try:
+        frame = await asyncio.wait_for(ws.receive(), AUTH_TIMEOUT)
+    except (TimeoutError, WebSocketDisconnect, RuntimeError):
+        return None, CLOSE_UNAUTHORIZED
+    text = frame.get("text") if frame.get("type") == "websocket.receive" else None
+    if not isinstance(text, str):
+        return None, CLOSE_UNAUTHORIZED
+    # characters first (cheap on a huge frame), then the UTF-8 bytes the limit is stated in
+    if len(text) > MAX_AUTH_FRAME or len(text.encode()) > MAX_AUTH_FRAME:
+        return None, CLOSE_TOO_BIG
+    try:
+        msg = json.loads(text)
+    except ValueError:
+        return None, CLOSE_UNAUTHORIZED
+    token = msg.get("token") if isinstance(msg, dict) and msg.get("type") == "auth" else None
+    return (token if isinstance(token, str) and token else None), CLOSE_UNAUTHORIZED
+
+
 @router.websocket("/api/voice/ws")
 async def voice_ws(ws: WebSocket) -> None:
     await ws.accept()
     state = ws.app.state
-    try:
-        first = await asyncio.wait_for(ws.receive_text(), AUTH_TIMEOUT)
-        msg = json.loads(first)
-        token = msg.get("token") if isinstance(msg, dict) and msg.get("type") == "auth" else None
-    except (TimeoutError, WebSocketDisconnect, ValueError, KeyError, RuntimeError):
-        token = None
+    token, close_code = await _sign_in_token(ws)
     user = None
-    if isinstance(token, str) and token:
+    if token:
         async with state.sessionmaker() as db:
             user = await user_of_token(db, token, state.settings.dev_admin_token)
     if user is None:
         with contextlib.suppress(Exception):
-            await ws.close(CLOSE_UNAUTHORIZED, "missing or invalid token")
+            if close_code == CLOSE_TOO_BIG:
+                await ws.close(CLOSE_TOO_BIG, "the sign-in frame is too large")
+            else:
+                await ws.close(CLOSE_UNAUTHORIZED, "missing or invalid token")
         return
     caller = Caller.of(user)
     service: VoiceService = state.voice
