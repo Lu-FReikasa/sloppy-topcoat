@@ -2,6 +2,7 @@
 2026-11-27: "Shall I enable the setting for you?" with only read access to the Omada controller,
 and after "yes": "I cannot")."""
 
+import time
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -9,6 +10,7 @@ from fastapi.testclient import TestClient
 from tests.fakenode import online_node
 from tests.test_chat import new_conv, use_model
 from tests.test_chat_tools import ask_with
+from tests.test_tools import tools_node
 from topcoat_hub import chat, offer_guard
 
 READ_ONLY: list[dict[str, str]] = []  # only read capabilities: nothing to propose
@@ -34,6 +36,10 @@ def test_an_offer_without_an_action_is_cut() -> None:
     assert offer_guard.without_unbacked_offer(de, READ_ONLY, "de") == (
         "Ich kann den Controller nur lesen."
     )
+    for polite in ("Would you like me to disable it?", "Darf ich den Port sperren?"):
+        assert offer_guard.without_unbacked_offer(polite, READ_ONLY, "en") == (
+            offer_guard.cut_note("en")
+        )
     asked = "Die Funktion ist aus. Möchtest du, dass ich sie einschalte?"
     assert offer_guard.without_unbacked_offer(asked, READ_ONLY, "de") == "Die Funktion ist aus."
 
@@ -60,6 +66,30 @@ def test_offers_to_explain_or_to_look_are_kept() -> None:
         "The setting is off.",
     ):
         assert offer_guard.without_unbacked_offer(text, READ_ONLY, "en") == text
+
+
+def test_steps_before_the_offer_stay() -> None:
+    # the closing "sentence" runs back to the last full stop: the steps for the person are kept
+    steps = "The setting is off. You can enable it here:\n- Open the controller\n- Turn on X"
+    assert offer_guard.without_unbacked_offer(f"{steps}\n{OFFER}", READ_ONLY, "en") == steps
+    code = "Die Datei:\n```\nport: 8080\n```"
+    assert (
+        offer_guard.without_unbacked_offer(f"{code}\nSoll ich den Dienst neu starten?", [], "de")
+        == code
+    )
+
+
+def test_an_offer_to_look_first_is_kept() -> None:
+    for text in (
+        "Soll ich prüfen, ob ich es deaktivieren kann?",
+        "Shall I look at why it does not restart?",
+        "That is all I found. Shall I stop here, or go on with the details?",
+    ):
+        assert offer_guard.without_unbacked_offer(text, READ_ONLY, "en") == text
+    # the change comes first: the offer is a change
+    assert offer_guard.without_unbacked_offer(
+        "Shall I restart it and check the logs?", READ_ONLY, "en"
+    ) == offer_guard.cut_note("en")
 
 
 def test_a_conversation_with_its_own_way_to_change_keeps_the_offer() -> None:
@@ -93,6 +123,7 @@ def _ask(client: TestClient, connect: Any, actions: list[dict[str, str]], monkey
         return list(actions)
 
     monkeypatch.setattr(client.app.state.agents.loop, "chat_actions", chat_actions)
+    tools_node(client, connect, "vm-docker")  # read tools: the person looks at a system
     node = online_node(client, connect, "node-a", loaded=["small"])
     use_model(client)
     node.stream_text_fn = lambda req: f"{ANSWER} {OFFER}"
@@ -107,8 +138,26 @@ def test_with_only_read_access_the_offer_does_not_reach_the_person(
     assert _ask(client, connect, [], monkeypatch) == ANSWER
 
 
+def test_without_any_tools_the_offer_stays(client: TestClient, connect: Any) -> None:
+    # no system to look at: "Shall I enable …" is about the conversation, not a whitelist action
+    node = online_node(client, connect, "node-a", loaded=["small"])
+    use_model(client)
+    node.stream_text_fn = lambda req: f"{ANSWER} {OFFER}"
+    status, events, _ = ask_with(client, new_conv(client), "Is the setting on?", "off")
+    assert status == 200
+    assert events[-1][1]["message"]["content"] == f"{ANSWER} {OFFER}"
+
+
 def test_with_a_matching_action_the_offer_reaches_the_person(
     client: TestClient, connect: Any, monkeypatch: Any
 ) -> None:
     toggle = {**TOGGLE, "node": "node-a", "capability": "repo.edit"}
     assert _ask(client, connect, [toggle], monkeypatch) == f"{ANSWER} {OFFER}"
+
+
+def test_long_runs_of_offer_words_stay_fast() -> None:
+    # a model stuck in a loop: every "darf ich" is a start, none may scan to the end (regex-gotchas)
+    for text in ("darf ich " * 6000, "Soll ich " * 6000 + "x?y?", "Shall I " + "schalte " * 6000):
+        started = time.perf_counter()
+        offer_guard.without_unbacked_offer(text, READ_ONLY, "en")
+        assert time.perf_counter() - started < 0.5

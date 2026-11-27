@@ -1694,7 +1694,10 @@ async def _answer(
                     text,
                     turn.actions,
                     language,
-                    keep=turn.application == "project"
+                    # a person with no tools at all has no system the answer could change:
+                    # "Shall I remove the second verse?" is about the conversation
+                    keep=not turn.decide_available
+                    or turn.application == "project"
                     or (change_facts is not None and change_facts[0] > 0),
                 )
                 if guarded != text:

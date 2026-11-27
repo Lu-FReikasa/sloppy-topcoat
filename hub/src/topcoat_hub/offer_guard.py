@@ -43,7 +43,8 @@ _KINDS: tuple[tuple[str, re.Pattern[str], frozenset[str]], ...] = (
     (
         "stop",
         re.compile(
-            r"\b(?:stop|shut\s+down|stoppen|stoppe|anhalten|herunterfahren|beenden)\b", re.I
+            r"\b(?:stop(?!\s+(?:here|there|now))|shut\s+down|stoppen|stoppe|anhalten|herunterfahren|beenden)\b",
+            re.I,
         ),
         frozenset({"stop", "shutdown"}),
     ),
@@ -91,17 +92,54 @@ _EXPLAIN = re.compile(
     r"tell\s+you\s+how|sagen,?\s+wie)\b",
     re.I,
 )
+# the start of an offer (chat_loop.OFFER, plus the other polite forms of asking for permission);
+# the offer runs from there to the closing "?" (see _closing_offer: no [^?]*, which is quadratic)
+_OFFER = re.compile(
+    r"\b(?:soll ich|möchtest du,? dass ich|willst du,? dass ich|darf ich|shall i|should i|"
+    r"do you want me to|want me to|would you like me to|may i)\b",
+    re.IGNORECASE,
+)
+
+# "Shall I check whether I can disable it?", "Soll ich prüfen, ob ich es deaktivieren kann?": an
+# offer to look first, the change only as its topic
+_LOOK = re.compile(
+    r"\b(?:check\w*|look\w*|see|find\s+out|search\w*|investigat\w*|verify|"
+    r"pr[üu]f\w*|[üu]berpr[üu]f\w*|nachseh\w*|nachschau\w*|schau\w*|sieh\w*|such\w*|"
+    r"herausfind\w*|untersuch\w*|kontrollier\w*)\b",
+    re.I,
+)
 _WORD = re.compile(r"[a-zäöüß]+", re.I)
+
+
+def _closing_offer(text: str) -> str:
+    """The question the answer ends with when it is an offer, from the line its offer words
+    start on: the closing "sentence" runs back to the last full stop, and a list or a code block of
+    steps the person can follow stands before the offer's own line and is not part of it."""
+    sentence = chat_loop.last_sentence(text)
+    if not sentence.endswith("?"):
+        return ""
+    # the question after any earlier "?": what an offer's words must stand in
+    start = sentence.rfind("?", 0, len(sentence) - 1) + 1
+    found = _OFFER.search(sentence, start)
+    if found is None:
+        return ""
+    return sentence[sentence.rfind("\n", 0, found.start()) + 1 :].strip()
 
 
 def change_offer(text: str) -> tuple[str, set[str]]:
     """The offer to change something the answer ends with and the kinds of change it asks for;
     ``("", set())`` when it ends on no offer, or on one to explain or to look."""
-    offer = chat_loop.closing_offer(text)
-    if not offer or _EXPLAIN.search(offer):
+    offer = _closing_offer(text)
+    if not offer:
+        return "", set()
+    changes = [m.start() for _, words, _ in _KINDS if (m := words.search(offer))]
+    if not changes:
+        return "", set()
+    look = _LOOK.search(offer)
+    if _EXPLAIN.search(offer) or (look is not None and look.start() < min(changes)):
         return "", set()
     kinds = {kind for kind, words, _ in _KINDS if words.search(offer)}
-    return (offer, kinds) if kinds else ("", set())
+    return offer, kinds
 
 
 def _action_words(action: Mapping[str, Any]) -> set[str]:
