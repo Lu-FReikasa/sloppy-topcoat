@@ -402,7 +402,7 @@ def settings_change_hint(prompt: str, tools: list[dict[str, Any]]) -> str:
     """#224: the person changed a setting a moment ago and the event log is there: its missing
     events are "not confirmed yet", not "off" (``recent_change.py``)."""
     have = {str(t["capability"]) for t in tools}
-    if recent_change.EVENTS_LOG not in have or not recent_change.just_changed(prompt):
+    if recent_change.EVENTS_LOG not in have or not recent_change.just_changed_in_task(prompt):
         return ""
     return recent_change.hint()
 

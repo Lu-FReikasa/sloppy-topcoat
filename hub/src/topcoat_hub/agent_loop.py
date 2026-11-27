@@ -2348,7 +2348,7 @@ def _not_confirmed_yet(s: "_Run", diagnosis: dict[str, Any]) -> None:
     """#224: the person changed a setting a moment ago and the run read the event log: a summary
     or finding that says the setting is off becomes "not confirmed yet" (missing new events show
     nothing that soon), and the notes say why."""
-    if recent_change.EVENTS_LOG not in s.used or not recent_change.just_changed(s.prompt):
+    if recent_change.EVENTS_LOG not in s.used or not recent_change.just_changed_in_task(s.prompt):
         return
     language = hub_language("", s.prompt.split("\n\n(", 1)[0])
     changed = False

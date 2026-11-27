@@ -39,26 +39,29 @@ _JUST_CHANGED = re.compile(
 # a statement that a setting or a log is off (what the absence of events cannot show)
 _OFF = re.compile(
     r"\b(?:is|are|was|were|seems? to be|appears? to be)\s+(?:still\s+)?(?:not|n't)\s+"
-    r"(?:yet\s+)?(?:enabled|activated|active|turned on|switched on|on|configured|set up)\b"
+    r"(?:yet\s+)?(?:enabled|activated|active|turned on|switched on|on\b(?!\s+\w)|configured|"
+    r"set up)\b"
     r"|\b(?:isn't|aren't|wasn't|weren't)\s+(?:yet\s+)?(?:enabled|activated|active|turned on|"
-    r"switched on|on|configured)\b"
+    r"switched on|on\b(?!\s+\w)|configured)\b"
     r"|\b(?:is|are|was|were|seems? to be)\s+(?:still\s+)?(?:disabled|deactivated|turned off|"
     r"switched off|off|inactive)\b"
     r"|\b(?:has|have)\s+not\s+been\s+(?:enabled|activated|turned on|switched on)\b"
     r"|\bnot\s+(?:been\s+)?(?:enabled|activated|switched on|turned on)\b"
     r"|\b(?:ist|sind|war|waren|scheint|scheinen)\s+(?:\w+\s+){0,5}?(?:noch\s+)?"
     r"(?:nicht|nie)\s+(?:\w+\s+){0,2}?(?:aktiviert|aktiv|eingeschaltet|angeschaltet|"
-    r"eingerichtet|an)\b"
+    r"eingerichtet|an\b(?!\s+\w))\b"
     r"|\b(?:ist|sind|war|waren|scheint|scheinen)\s+(?:\w+\s+){0,5}?(?:noch\s+)?"
     r"(?:deaktiviert|ausgeschaltet|abgeschaltet|aus|inaktiv)\b"
     r"|\bnicht\s+(?:aktiviert|eingeschaltet|angeschaltet)\b",
     re.IGNORECASE,
 )
-# ... about what is logged or set (not any "off": "the AP is not on the 5 GHz band")
+# ... about what is logged or set (not any "off": "the AP is not on the 5 GHz band", "the guest
+# network is disabled, so it cannot be joined"): a word for the log or the setting, or a pronoun
+# that is the subject of the sentence ("It seems to be disabled.")
 _ABOUT_SETTING = re.compile(
-    r"\b(?:log\w*|event\w*|record\w*|setting\w*|option|feature|switch|toggle|"
-    r"protokoll\w*|aufzeichn\w*|ereignis\w*|einstellung\w*|funktion\w*|schalter|"
-    r"erfass\w*|it|es|sie)\b",
+    r"\b(?:log\w*|event\w*|record\w*|setting\w*|option|"
+    r"protokoll\w*|aufzeichn\w*|ereignis\w*|einstellung\w*|erfass\w*)\b"
+    r"|^[\s>*•-]*(?:it|es|sie)\s",
     re.IGNORECASE,
 )
 # the sentence already says it cannot tell yet
@@ -95,6 +98,22 @@ CLAIM = {
 def just_changed(text: str) -> bool:
     """The person says they changed (switched on, set) something a moment ago."""
     return bool(_JUST_CHANGED.search(text))
+
+
+# a message of the person in the conversation note of a check's task, up to the next line of
+# the note (``chat_tools.conversation_for_task``)
+_USER_LINE = re.compile(r"^user: (.*?)(?=\n(?:assistant: |user: |\()|\)?\Z)", re.M | re.S)
+
+
+def just_changed_in_task(prompt: str) -> bool:
+    """A check's task (``chat_tools.task_prompt``): the person says so in the message or in their
+    message before it. The answers in the conversation note do not count: the hub's own German
+    "eben erst geändert" would otherwise make every later check in the chat read as one."""
+    question, _, rest = prompt.partition("\n\n(")
+    if just_changed(question):
+        return True
+    said = _USER_LINE.findall(rest)
+    return bool(said) and just_changed(said[-1])
 
 
 def says_off(sentence: str) -> bool:

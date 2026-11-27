@@ -11,7 +11,7 @@ from tests.test_agent import finish, use
 from tests.test_chat import new_conv, sent_messages, use_model
 from tests.test_chat_tools import ask_with
 from tests.test_tools import tools_node
-from topcoat_hub import agent_prompts, recent_change
+from topcoat_hub import agent_prompts, chat_tools, recent_change
 
 # what omada.events answers for a day with client events on the gateway only (the node's note)
 EVENTS = {
@@ -80,9 +80,14 @@ def test_a_sentence_that_says_the_setting_is_off(sentence: str) -> None:
 @pytest.mark.parametrize(
     "sentence",
     [
-        "The access point Lu AP is online.",
+        "The access point ap-1 is online.",
         "Not confirmed yet whether the logging is not enabled.",
         "The container web is not running.",
+        # a real "off" of something else stays, also in a check that read the event log
+        "The guest network is disabled, so it cannot be joined.",
+        "It is not on the 5 GHz band.",
+        "Die Firewall-Funktion ist deaktiviert.",
+        "Es ist nicht an das Netz angeschlossen.",
     ],
 )
 def test_other_sentences_stay(sentence: str) -> None:
@@ -108,6 +113,21 @@ def test_the_check_is_told_only_with_the_event_log_and_a_change_just_made() -> N
     assert "not confirmed yet" in hint and "cannot read" in hint
     assert agent_prompts.settings_change_hint("Is logging on?", tools) == ""
     assert agent_prompts.settings_change_hint(ASKED, [{"capability": "docker.ps"}]) == ""
+
+
+def test_the_task_counts_the_persons_messages_not_the_answers() -> None:
+    asked = [("user", ASKED), ("assistant", "Not confirmed yet."), ("user", "and now?")]
+    assert recent_change.just_changed_in_task(chat_tools.task_prompt("and now?", asked))
+    # the hub's own German paragraph says "eben erst geändert": it must not count as the person's
+    plain = [
+        ("user", "Ist das Client-Logging an?"),
+        ("assistant", recent_change.NOT_CONFIRMED["de"]),
+        ("user", "und jetzt?"),
+    ]
+    assert not recent_change.just_changed_in_task(chat_tools.task_prompt("und jetzt?", plain))
+    older = [("user", ASKED), ("assistant", "ok"), ("user", "thanks"), ("assistant", "-")]
+    later = chat_tools.task_prompt("Is logging on?", [*older, ("user", "Is logging on?")])
+    assert not recent_change.just_changed_in_task(later)  # only the message before counts
 
 
 @pytest.fixture
