@@ -284,7 +284,8 @@ async def _sign_in_token(ws: WebSocket) -> tuple[str | None, int]:
     text = frame.get("text") if frame.get("type") == "websocket.receive" else None
     if not isinstance(text, str):
         return None, CLOSE_UNAUTHORIZED
-    if len(text) > MAX_AUTH_FRAME:
+    # characters first (cheap on a huge frame), then the UTF-8 bytes the limit is stated in
+    if len(text) > MAX_AUTH_FRAME or len(text.encode()) > MAX_AUTH_FRAME:
         return None, CLOSE_TOO_BIG
     try:
         msg = json.loads(text)
