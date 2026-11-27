@@ -509,6 +509,9 @@ the faked hub it checks one, two and three programs, a maximised one and the ope
 screens (1920x1080, 2560x1440 at 150 %, 1366x768, 1280x800), three looks, German and English: overlay mode
 is on, the page paints no ground that covers the screen, nothing scrolls, the taskbar and the programs stay
 on the screen and off the taskbar, no text is cut in title bars, taskbar or navigation, no page errors.
+The faked hub sends the hub's security headers (`security_headers.py`), so every GUI check (overlay,
+shell, sheets, layout) also fails on a Content-Security-Policy refusal: a change that needs a script,
+picture or connection from somewhere else shows up here, not first on the hub.
 `SHOTS` keeps each step twice: see-through, and `-desk.png` over a busy desktop with the client's tint.
 
 ```

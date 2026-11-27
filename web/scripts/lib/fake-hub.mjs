@@ -6,6 +6,23 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 
+// The hub's security headers (hub/src/topcoat_hub/security_headers.py; a hub test keeps the policy
+// equal): the checks run the GUI under the same policy, so a change that needs another source fails
+// here, not on the hub.
+export const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+export const SECURITY_HEADERS = {
+  "content-security-policy": CSP,
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+};
+
+/** Collects the policy's refusals on a page (Chromium reports each one on the console). */
+export function watchCsp(page, sink) {
+  page.on("console", (m) => {
+    if (/Content Security Policy/i.test(m.text())) sink(m.text().split("\n")[0].slice(0, 300));
+  });
+}
+
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" };
 
 // --- the faked hub -----------------------------------------------------------------------------
@@ -239,10 +256,10 @@ export async function serve(dist) {
     const file = path === "/" ? "index.html" : normalize(path).replace(/^(\.\.[/\\])+/, "");
     try {
       const body = await readFile(join(dist, file));
-      res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" });
+      res.writeHead(200, { ...SECURITY_HEADERS, "content-type": MIME[extname(file)] ?? "application/octet-stream" });
       res.end(body);
     } catch {
-      res.writeHead(404).end();
+      res.writeHead(404, SECURITY_HEADERS).end();
     }
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
