@@ -230,3 +230,32 @@ func TestTheCapabilitiesRunOnlyWhatIsInstalledAndNeverDownload(t *testing.T) {
 		}
 	}
 }
+
+// sizedSpeaker answers every text with a WAV of exactly n bytes.
+type sizedSpeaker struct{ n int }
+
+func (sizedSpeaker) Voices() []string { return []string{"sized"} }
+func (s sizedSpeaker) Speak(context.Context, string, string) ([]byte, error) {
+	return SilentWAV((s.n - 44) / 2), nil
+}
+
+// The longest speech voice.speak accepts fits into its own output limit, and that limit stays
+// under the node's ceiling for any capability (#214).
+func TestTheLongestSpeechFitsTheOutputLimitOfVoiceSpeak(t *testing.T) {
+	reg := capability.NewRegistry()
+	if err := Register(reg, nil, sizedSpeaker{n: MaxSpeechBytes}); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := reg.Get("voice.speak")
+	limit := capability.InfoOf(c).MaxOutputBytes
+	if limit <= 0 || limit > capability.MaxOutputCeiling {
+		t.Fatalf("limit %d, ceiling %d", limit, capability.MaxOutputCeiling)
+	}
+	out, err := c.Invoke(context.Background(), json.RawMessage(`{"text":"Guten Abend"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) < 3_700_000 || len(out) > limit {
+		t.Fatalf("answer of %d bytes, limit %d", len(out), limit)
+	}
+}
