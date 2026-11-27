@@ -1570,9 +1570,11 @@ export class ApiClient {
   }
 
   /** The admin's click on the card of a large task's workshop scope (D110): the hub sets branch,
-   *  actions and duration, the request names nothing but the large task. */
-  giveWorkshopScope(nodeId: string): Promise<{ mandate: ProjectMandate }> {
-    return this.request("POST", `/api/project/nodes/${encodeURIComponent(nodeId)}/workshop-scope`, {});
+   *  actions and duration, the request names nothing but the large task and the language the card
+   *  was shown in (the hub stores its card text in that language, #190). */
+  giveWorkshopScope(nodeId: string, language?: "en" | "de"): Promise<{ mandate: ProjectMandate }> {
+    const query = language ? `?language=${language}` : "";
+    return this.request("POST", `/api/project/nodes/${encodeURIComponent(nodeId)}/workshop-scope${query}`, {});
   }
 
   /** One step of a large task's run: replan a stopped branch, start what is ready. */

@@ -15,6 +15,7 @@ from topcoat_hub import agent_contract, vorhaben
 from topcoat_hub.api.mandates import _person
 from topcoat_hub.api.project import _refused, _sets, _store
 from topcoat_hub.auth import CurrentUser, api_user
+from topcoat_hub.models import User
 from topcoat_hub.project_mandates import WORKSHOP, mandate_view
 from topcoat_hub.project_store import ProjectError
 
@@ -107,15 +108,23 @@ async def decompose_large_task(
 
 @router.post("/nodes/{node_id}/workshop-scope", status_code=201)
 async def give_workshop_scope(
-    node_id: uuid.UUID, request: Request, user: CurrentUser = Depends(api_user)
+    node_id: uuid.UUID,
+    request: Request,
+    language: str | None = None,
+    user: CurrentUser = Depends(api_user),
 ) -> dict[str, Any]:
     """The admin's click on the card of a large task's workshop scope (D110). The request names
-    nothing but the large task; branch, actions, duration and the missing push flag are the
-    hub's."""
+    nothing but the large task and the language the card was shown in (``en``/``de``; without it
+    the person's stored one, else English), so the stored text is the one the card showed (#190);
+    branch, actions, duration and the missing push flag are the hub's."""
     from topcoat_hub.issue_fixes import LIVE_REPO
 
     _person(user)
     store = _store(request)
+    if language not in vorhaben.LANGUAGES:
+        async with request.app.state.sessionmaker() as db:
+            row = await db.get(User, user.uuid)
+        language = (row.language if row else None) or "en"
     try:
         large = await store.get_node(user.uuid, node_id)
         if large.kind != "task":
@@ -127,7 +136,7 @@ async def give_workshop_scope(
             branch=vorhaben.branch_of(large.number),
             actions=[WORKSHOP],
             push=False,
-            text=vorhaben.scope_text(large.number, large.title, LIVE_REPO),
+            text=vorhaben.scope_text(large.number, large.title, LIVE_REPO, language),
             days=vorhaben.DAYS,
         )
     except ProjectError as exc:
