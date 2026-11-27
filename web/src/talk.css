@@ -12,6 +12,31 @@
   gap: 0.6rem;
 }
 
+/* the conversation's header: where it belongs and what it may use, pin and done, and the window's
+   actions ("Hand over"). It stays above the stream, which scrolls below its border and never under
+   it (#173) */
+.talk-head {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.9rem;
+  padding: 0 0.1rem 0.3rem;
+  border-bottom: 1px solid var(--border);
+}
+.talk-head .chat-origin {
+  flex: 1 1 18rem;
+  min-width: 0;
+  margin: 0;
+}
+.talk-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.9rem;
+  margin-left: auto;
+  padding: 0.25rem 0.3rem;
+}
+
 .talk-stream {
   flex: 1 1 auto;
   min-height: 0;
