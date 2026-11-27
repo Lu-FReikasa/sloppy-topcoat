@@ -59,6 +59,7 @@ from topcoat_hub.api import updates as updates_api
 from topcoat_hub.api import voice as voice_api
 from topcoat_hub.api import vorhaben as vorhaben_api
 from topcoat_hub.api import wiki as wiki_api
+from topcoat_hub.auth import sign_in_limiter
 from topcoat_hub.bench.service import BenchService
 from topcoat_hub.blocks.service import BlockService
 from topcoat_hub.chat_digest import ChatDigester
@@ -101,6 +102,7 @@ from topcoat_hub.project_tools import ProjectTools
 from topcoat_hub.proposals import ProposalService
 from topcoat_hub.protocol import PROTOCOL_VERSION, load_schema_sets
 from topcoat_hub.queue_watch import QueueWatch
+from topcoat_hub.ratelimit import AddressLimiter
 from topcoat_hub.releases import ReleaseService
 from topcoat_hub.report_knowledge import ReportIndex
 from topcoat_hub.resume_stuck import StuckTaskResumer
@@ -146,6 +148,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         app.state.sessions = NodeSessions()
         app.state.challenges = ChallengeStore()
+        # per-address limits before the caller is known (ratelimit.py)
+        app.state.sign_ins = sign_in_limiter()
+        app.state.pairings = AddressLimiter(node.PAIRINGS_PER_MINUTE, 60.0)
+        app.state.challenge_limit = AddressLimiter(node.CHALLENGES_PER_MINUTE, 60.0)
         app.state.updates = UpdateStore(
             settings.update_dir, parse_keys(settings.update_pubkeys), settings.update_keep
         )

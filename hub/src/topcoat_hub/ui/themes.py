@@ -56,21 +56,141 @@ def schema_text() -> str:
     return f"{text}\n\nJSON Schema:\n{schema}".strip()
 
 
+# Functions that load what a string or URL names (image-set("…") needs no url()); a theme may only
+# use url() with an inline data:image, and none of these.
+# Not after a name character (ASCII letter, digit, "_", "-" or anything from U+0080): there the
+# browser reads one longer name, not this function.
+_AFTER_NAME = r"(?<![0-9A-Za-z_\u0080-\U0010ffff-])"
+_LOADING_FUNCTIONS = re.compile(
+    _AFTER_NAME + r"(?:-webkit-)?(?:image-set|image|cross-fade|src|element)\(", re.I
+)
+_URL_FUNCTION = re.compile(_AFTER_NAME + r"url\(", re.I)
+_DATA_URL_START = re.compile(r"""\s*(['"]?)\s*(data:[^'")\s]*)""", re.I)
+_HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
+
+
+def _escape(css: str, i: int) -> tuple[str, int]:
+    """The character a CSS escape at ``css[i] == "\\"`` stands for and where the text goes on
+    (CSS Syntax 4.3.7: up to six hex digits and one white space after them, else the character)."""
+    j = i + 1
+    if j >= len(css):
+        return "\ufffd", j
+    if css[j] in _HEX_DIGITS:
+        k = j
+        while k < len(css) and k - j < 6 and css[k] in _HEX_DIGITS:
+            k += 1
+        code = int(css[j:k], 16)
+        if css.startswith("\r\n", k):
+            k += 2
+        elif k < len(css) and css[k] in " \t\n\r\f":
+            k += 1
+        if code == 0 or 0xD800 <= code <= 0xDFFF or code > 0x10FFFF:
+            return "\ufffd", k
+        return chr(code), k
+    return css[j], j + 1
+
+
+def _name_char(ch: str) -> bool:
+    """Whether a character continues a CSS name (ident, number unit, hash, at-keyword)."""
+    return (ch.isascii() and ch.isalnum()) or ch in "_-" or ord(ch) >= 0x80
+
+
+def _css_read(css: str) -> tuple[str, bool]:
+    """``css_plain`` and whether an unquoted ``url(`` holds a quote, a ``(`` or a ``/*``.
+
+    The browser reads an unquoted ``url(…)`` as one token up to ``)``: inside it ``/*`` starts no
+    comment and a quote no string (a quote or ``(`` makes it a bad url that runs to ``)``). Read
+    any other way, a comment or string seen there would hide what follows from the checks, so
+    such a sheet is refused instead of guessed at."""
+    out: list[str] = []
+    i, n = 0, len(css)
+    quote = ""
+    url = ""  # "" outside, "pending" after url( and white space, "open" inside an unquoted url
+    bad_url = False
+    while i < n:
+        c = css[i]
+        if c == "\\":
+            if i + 1 < n and css[i + 1] in "\n\r\f":
+                # inside a string the pair continues the line; outside one the backslash is a
+                # lone delimiter and the line break stays
+                if quote:
+                    i += 3 if css.startswith("\r\n", i + 1) else 2
+                else:
+                    out.append(c)
+                    i += 1
+                    url = "open" if url else ""
+                continue
+            ch, i = _escape(css, i)
+            # an escaped quote is a name character, never the start or end of a string
+            out.append("\ufffd" if ch in "\"'" else ch)
+            url = "open" if url else ""
+            continue
+        if quote:
+            if c == quote or c in "\n\r\f":  # an unescaped line break ends a (bad) string
+                quote = ""
+            out.append(c)
+            i += 1
+            continue
+        if url:
+            if c == ")":
+                url = ""
+            elif c in "\"'" and url == "pending":
+                url = ""  # url("…"): an ordinary string follows
+                continue
+            elif c in "\"'(" or css.startswith("/*", i):
+                bad_url = True
+            elif c not in " \t\n\r\f":
+                url = "open"
+            out.append(c)
+            i += 1
+            continue
+        if c in "\"'":
+            quote = c
+            out.append(c)
+            i += 1
+            continue
+        if css.startswith("/*", i):
+            end = css.find("*/", i + 2)
+            i = n if end < 0 else end + 2
+            out.append(" ")
+            continue
+        if (
+            c == "("
+            and "".join(out[-3:]).lower() == "url"
+            and (len(out) < 4 or not _name_char(out[-4]))
+        ):
+            url = "pending"
+        out.append(c)
+        i += 1
+    return "".join(out), bad_url
+
+
+def css_plain(css: str) -> str:
+    """The style sheet as the browser reads it: comments out, escapes decoded, in one pass that
+    knows strings (a ``/*`` inside a string starts no comment, an escaped ``\\/*`` none either)
+    and unquoted ``url(…)`` (``_css_read``). The checks look at this, so neither an escape nor a
+    comment can hide a name from them. An escaped quote reads as U+FFFD."""
+    return _css_read(css)[0]
+
+
 def css_problems(css: str) -> list[str]:
     """Why a style sheet may not be used: it loads nothing, runs nothing and cannot hide from the
-    check (comments and backslash escapes are removed before it looks)."""
+    check (it looks at the sheet as the browser reads it: comments out, escapes decoded)."""
     out: list[str] = []
     if len(css) > MAX_CSS:
         out.append(f"css: at most {MAX_CSS} characters")
-    flat = re.sub(r"/\*.*?\*/", "", css, flags=re.S).replace("\\", "")
+    flat, bad_url = _css_read(css)
     if re.search(r"@import", flat, re.I):
         out.append("css: @import is not allowed")
     if re.search(r"@charset|@namespace", flat, re.I):
         out.append("css: @charset and @namespace are not allowed")
-    for m in re.finditer(r"""url\(\s*(['"]?)([^'")]*)\1\s*\)""", flat, re.I):
-        if not _DATA_IMAGE.match(m.group(2).strip()):
+    for m in _URL_FUNCTION.finditer(flat):
+        start = _DATA_URL_START.match(flat, m.end())
+        if bad_url or start is None or not _DATA_IMAGE.match(start.group(2)):
             out.append("css: url() may only hold an inline data:image")
             break
+    if _LOADING_FUNCTIONS.search(flat):
+        out.append("css: image-set(), image(), cross-fade(), src() and element() are not allowed")
     if re.search(
         r"expression\s*\(|javascript:|behavior\s*:|-moz-binding|<\/?\s*style|<\s*script",
         flat,

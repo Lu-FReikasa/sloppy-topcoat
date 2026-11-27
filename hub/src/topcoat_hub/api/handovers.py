@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
-from topcoat_hub.auth import CurrentUser, api_user
+from topcoat_hub.auth import CurrentUser, api_user, person_user
 from topcoat_hub.handover import HandoverError, HandoverService, view
 
 router = APIRouter(prefix="/api/handovers")
@@ -96,8 +96,10 @@ async def file(
 
 @router.post("/{handover_id}/send")
 async def send(
-    handover_id: uuid.UUID, body: Send, request: Request, user: CurrentUser = Depends(api_user)
+    handover_id: uuid.UUID, body: Send, request: Request, user: CurrentUser = Depends(person_user)
 ) -> dict[str, Any]:
+    """The person's click: the dossier goes to the other application (with ``approve_critical``
+    also one that holds something critical). Not with an API key (auth.person_user)."""
     try:
         sent = await _service(request).send(
             user, handover_id, body.hash, approved_critical=body.approve_critical

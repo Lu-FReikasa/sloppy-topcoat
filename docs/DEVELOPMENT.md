@@ -101,7 +101,7 @@ Environment variables (prefix `TOPCOAT_`, see `hub/src/topcoat_hub/config.py`):
 | variable | default | meaning |
 |---|---|---|
 | `TOPCOAT_DATABASE_URL` | `postgresql+psycopg://topcoat:topcoat@localhost:5432/topcoat` | SQLAlchemy URL |
-| `TOPCOAT_DEV_ADMIN_TOKEN` | empty (= GUI API locked) | static bearer token of the seeded dev admin |
+| `TOPCOAT_DEV_ADMIN_TOKEN` | empty (= GUI API locked) | static bearer token of the seeded dev admin; at least 32 characters (`serve` refuses a shorter one or the example value). 30 failed sign-ins per address and minute answer 429 until the minute is over |
 | `TOPCOAT_PROTO_ROOT` | `<repo>/proto` | directory with the JSON Schemas of every protocol version (`v0/`, `v1/`) |
 | `TOPCOAT_CHAT_DEFAULT_CONTEXT_TOKENS` | `8192` | prompt budget base when the node does not report the loaded model's context length |
 | `TOPCOAT_EMBEDDING_MODEL` | empty | embedding model served through the gateway (`/v1/embeddings`, bge-m3 after E2-03); empty = the transitional model-free hashing embedder |

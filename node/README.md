@@ -39,11 +39,11 @@ Dependencies (binary): `github.com/coder/websocket` (hub session), `golang.org/x
 
 ## Develop
 
-Requires Go 1.27.1 (`go.mod` pins it; `GOTOOLCHAIN=auto` downloads it) and
+Requires Go 1.27.4 (`go.mod` pins it; `GOTOOLCHAIN=auto` downloads it) and
 golangci-lint v2.14.0 built with that Go version:
 
 ```sh
-GOTOOLCHAIN=go1.27.1 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
+GOTOOLCHAIN=go1.27.4 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
 make vet          # go vet ./...
 make test         # go test ./...
