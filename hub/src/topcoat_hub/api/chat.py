@@ -3561,10 +3561,13 @@ async def _secretary_events(
         except (ValueError, ProjectError) as exc:
             text = say["failed"].format(reason=str(exc)[:200], who=who)
         else:
-            text = say["handed"].format(who=who, topic=decision.topic)
-            text += say["report"] if decision.report_when_done else say["ask"]
-            if handed.reason:
-                text += say["held"].format(reason=handed.reason)
+            if handed.order.status == "failed":
+                text = say["failed"].format(reason=handed.reason[:200], who=who)
+            else:
+                text = say["handed"].format(who=who, topic=decision.topic)
+                text += say["report"] if decision.report_when_done else say["ask"]
+                if handed.reason:
+                    text += say["held"].format(reason=handed.reason)
     async with state.sessionmaker() as db:
         row = await ChatStore(db, user.uuid).update_message(
             turn.conversation_id, turn.message_id or 0, content=text, status="complete"
