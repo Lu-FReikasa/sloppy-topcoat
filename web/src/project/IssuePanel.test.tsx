@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "../api/client";
 import { IssuePanel } from "./IssuePanel";
@@ -173,23 +173,35 @@ describe("an issue's way to the fix", () => {
     expect(run.textContent).toContain("Kein fehlgeschlagener Test im Log");
   });
 
-  it("fixes that failed the same way in a row say how often", async () => {
+  it("fixes that failed the same way in a row are one row that says how often", async () => {
     const same = { failure_print: "AssertionError | test_x.py::test_x | assert # == #" };
-    setup([
-      fix("failed", { id: "f-1", ...same }),
-      fix("failed", { id: "f-2", ...same }),
-      fix("failed", { id: "f-3", failure_print: "KeyError | test_x.py::test_x | 'family'" }),
-      fix("failed", { id: "f-4", failure_print: "KeyError | test_x.py::test_x | 'family'" }),
-      fix("failed", { id: "f-5", failure_print: "KeyError | test_x.py::test_x | 'family'" }),
+    const key = { failure_print: "KeyError | test_x.py::test_x | 'family'" };
+    const api = setup([
+      fix("failed", { id: "f-1", summary: "erster", ...same }),
+      fix("failed", { id: "f-2", summary: "zweiter", ...same }),
+      fix("failed", { id: "f-3", summary: "dritter", ...key }),
+      fix("failed", { id: "f-4", summary: "vierter", ...key }),
+      fix("failed", { id: "f-5", summary: "fünfter", ...key, error: "Tests rot. Der Rest des Logs.\nTraceback" }),
     ]);
     expect(await screen.findByText("3× derselbe Fehler")).toBeTruthy();
-    // the 2nd and the 4th say 2×, the 5th 3×; the 1st and 3rd are a first failure
-    expect(screen.getAllByText("2× derselbe Fehler")).toHaveLength(2);
+    expect(screen.getByText("2× derselbe Fehler")).toBeTruthy();
+    expect(screen.getAllByTestId("fix-failed")).toHaveLength(2);
+    // the row shows the newest attempt, its fingerprint and the reason in one sentence
+    const row = screen.getAllByTestId("fix-failed")[1]!;
+    expect(row.textContent).toContain("fünfter");
+    expect(within(row).getByTestId("fix-why").textContent).toBe("KeyError | test_x.py::test_x | 'family' Tests rot.");
+    // the older attempts are folded in the row and can still be discarded one by one
+    const earlier = within(row).getByTestId("fix-earlier");
+    expect(earlier.textContent).toContain("Frühere Versuche mit demselben Ende: 2");
+    fireEvent.click(within(earlier).getAllByRole("button", { name: "Verwerfen" })[0]!);
+    await waitFor(() => expect(api.discardFix).toHaveBeenCalledWith("f-3"));
   });
 
   it("after a fix runs: 'does not work' starts the next fix with what still fails", async () => {
     const api = setup([fix("live", { rollout: { message: "the hub runs x", build: "abc+fix-2.1" } })]);
-    expect(await screen.findByText(/the hub runs x/)).toBeTruthy();
+    // a live fix's reason in view is the roll-out's message; the build is in the fold
+    expect((await screen.findByTestId("fix-why")).textContent).toBe("the hub runs x");
+    expect(screen.getByText(/abc\+fix-2\.1/)).toBeTruthy();
     fireEvent.change(screen.getByRole("textbox", { name: "Was geht noch nicht?" }), { target: { value: "springt noch" } });
     fireEvent.click(screen.getByRole("button", { name: "Geht nicht: nächster Fix" }));
     await waitFor(() => expect(api.confirmIssue).toHaveBeenCalledWith("t1", { works: false, feedback: "springt noch" }));

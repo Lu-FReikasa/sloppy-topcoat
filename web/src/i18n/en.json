@@ -4257,6 +4257,8 @@
     "firstFailure": "First failure:",
     "testOutput": "Full test output",
     "sameFailure": "{{count}}× the same failure",
+    "output": "Output",
+    "earlier": "Earlier attempts that ended the same way: {{count}}",
     "rollout": "Roll-out",
     "apply": "Apply and test",
     "rolloutButton": "Roll out to the hub",
