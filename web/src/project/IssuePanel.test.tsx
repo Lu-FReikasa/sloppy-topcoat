@@ -197,6 +197,16 @@ describe("an issue's way to the fix", () => {
     await waitFor(() => expect(api.discardFix).toHaveBeenCalledWith("f-3"));
   });
 
+  it("a shortened fingerprint is whole in the fold, not only in a hover title", async () => {
+    const long = `AssertionError | tests/${"deep/".repeat(12)}test_x.py::test_x | assert # == #`;
+    setup([fix("failed", { id: "f-1", failure_print: long }), fix("failed", { id: "f-2", failure_print: "KeyError | x" })]);
+    const rows = await screen.findAllByTestId("fix-failed");
+    expect(within(rows[0]!).getByTestId("fix-why").textContent).not.toContain(long);
+    expect(within(rows[0]!).getByTestId("fix-print").textContent).toBe(long);
+    // a fingerprint that fits the row is not repeated in the fold
+    expect(within(rows[1]!).queryByTestId("fix-print")).toBeNull();
+  });
+
   it("after a fix runs: 'does not work' starts the next fix with what still fails", async () => {
     const api = setup([fix("live", { rollout: { message: "the hub runs x", build: "abc+fix-2.1" } })]);
     // a live fix's reason in view is the roll-out's message; the build is in the fold

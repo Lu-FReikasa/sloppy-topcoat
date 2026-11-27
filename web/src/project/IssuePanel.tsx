@@ -272,6 +272,8 @@ function FixHistoryRow({
   const reason = fixReason(f);
   // the whole error goes into the fold only when the one sentence above leaves something out
   const fullError = f.error && f.error.trim() !== reason ? f.error : "";
+  // likewise the whole fingerprint when the row shows it shortened (the title alone needs a hover)
+  const fullPrint = !!f.failure_print && f.failure_print.trim() !== print;
   return (
     <li className="project-fix" data-testid={`fix-${f.state}`}>
       <p className="project-fix-head">
@@ -299,6 +301,11 @@ function FixHistoryRow({
       )}
       <details className="project-fix-output">
         <summary>{t("issues.output")}</summary>
+        {fullPrint && (
+          <p className="project-fix-why small" data-testid="fix-print">
+            <code>{f.failure_print}</code>
+          </p>
+        )}
         {fullError && <pre className="project-diff">{fullError}</pre>}
         <p className="small">
           <strong>{t("issues.changes", { count: f.edits.length + f.files.length })}</strong>
