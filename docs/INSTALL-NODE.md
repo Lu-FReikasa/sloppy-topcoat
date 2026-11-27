@@ -738,7 +738,7 @@ copy and run their tests. It never merges, signs or uploads anything.
 4. Register the repository (Repositories, mode `test-branch` to let the assistant change it) and
    ask in the chat; the group "workshop" appears next to the other tools.
 5. Optional, builds of the node (`repo.build_node`): add `"build-node": "golang:1.27"` to `images`
-   (pull it once by hand) and `"build-node"` to `network_templates` (Go downloads its modules). The
+   (pull it by hand, and again when `node/go.mod` asks for a newer Go: it holds 1.27.4 or newer) and `"build-node"` to `network_templates` (Go downloads its modules). The
    assistant then cross-builds Linux and Windows binaries from the worktree and keeps them,
    **unsigned**, under `<workshop dir>/out/<repo>/<version>/` on the dev node together with
    `SHA256SUMS` (`repo.build_list` shows them). Copy them to your PC, sign them there

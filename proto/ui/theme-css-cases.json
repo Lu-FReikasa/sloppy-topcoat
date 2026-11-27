@@ -18,6 +18,21 @@
     { "css": ".a { width: expression(alert(1)); }", "ok": false },
     { "css": ".a { -moz-binding: url(x); }", "ok": false },
     { "css": ".a { behavior: url(x.htc); }", "ok": false },
-    { "css": "</style><script>alert(1)</script>", "ok": false }
+    { "css": "</style><script>alert(1)</script>", "ok": false },
+    { "css": ".a { background: url( 'data:image/svg+xml;utf8,<svg/>' ); }", "ok": true },
+    { "css": ".a { content: \"\\201C\"; }", "ok": true },
+    { "css": ".a { background: linear-gradient(red, blue), color-mix(in srgb, red, blue); width: calc(100% - var(--w)); }", "ok": true },
+    { "css": ".a { background: ur/**/l(x); }", "ok": true },
+    { "css": ".a{background:\\75 rl(https://evil.example/x.png)}", "ok": false },
+    { "css": ".a{background:\\000055RL(https://evil.example/x.png)}", "ok": false },
+    { "css": ".a{background:u\\rl(https://evil.example/x.png)}", "ok": false },
+    { "css": "@\\69mport 'https://evil.example/x.css';", "ok": false },
+    { "css": ".a{background-image:image-set(\"https://evil.example/x.png\" 1x)}", "ok": false },
+    { "css": ".a{background-image:-webkit-image-set(\"https://evil.example/x.png\" 1x)}", "ok": false },
+    { "css": ".a{background-image:image(\"https://evil.example/x.png\")}", "ok": false },
+    { "css": ".a{background-image:src(\"https://evil.example/x.png\")}", "ok": false },
+    { "css": ".a{background:url(\"data:image/png,x\"), url(https://evil.example/x.png)}", "ok": false },
+    { "css": ".a{content:\"/*\"}.b{background:url(https://evil.example/x.png)}.c{content:\"*/\"}", "ok": false },
+    { "css": ".a{x:\\/*}.b{background:url(https://evil.example/x.png)}/**/}", "ok": false }
   ]
 }

@@ -17,8 +17,38 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from topcoat_hub.db import get_db
 from topcoat_hub.models import DEV_ADMIN_ID, ApiKey, User
+from topcoat_hub.ratelimit import AddressLimiter
 
 API_KEY_PREFIX = "tc_"
+
+# The admin token is the whole admin login until OIDC: the hub does not start with a short one or
+# with a value from an example file (serve.py).
+MIN_DEV_TOKEN_LENGTH = 32
+EXAMPLE_TOKENS = frozenset({"change-me", "change-me-too", "changeme", "secret", "admin"})
+
+# Failed sign-ins per client address before the hub answers 429 for a while.
+FAILED_SIGN_INS_PER_MINUTE = 30
+
+
+def dev_token_problem(token: str) -> str | None:
+    """Why the configured admin token may not be used, or None (empty is allowed: GUI locked)."""
+    if not token:
+        return None
+    if token.strip().lower() in EXAMPLE_TOKENS:
+        return "TOPCOAT_DEV_ADMIN_TOKEN still holds the value from the example file"
+    if len(token) < MIN_DEV_TOKEN_LENGTH:
+        return f"TOPCOAT_DEV_ADMIN_TOKEN is shorter than {MIN_DEV_TOKEN_LENGTH} characters"
+    return None
+
+
+def sign_in_limiter() -> AddressLimiter:
+    return AddressLimiter(FAILED_SIGN_INS_PER_MINUTE, 60.0)
+
+
+def client_address(client: object) -> str:
+    """The caller's address for the per-address limits ("?" when the server does not know it)."""
+    host = getattr(client, "host", None)
+    return host if isinstance(host, str) and host else "?"
 
 
 @dataclass(frozen=True)
@@ -54,10 +84,27 @@ async def api_user(request: Request, db: AsyncSession = Depends(get_db)) -> Curr
     token = bearer_token(request.headers)
     if token is None:
         raise _unauthorized()
+    limiter: AddressLimiter | None = getattr(request.app.state, "sign_ins", None)
+    address = client_address(request.client)
+    if limiter is not None and limiter.blocked(address):
+        raise _too_many(limiter.retry_after(address))
     user = await user_of_token(db, token, request.app.state.settings.dev_admin_token)
     if user is None:
+        if limiter is not None:
+            limiter.record(address)
         raise _unauthorized()
     return user
+
+
+def _too_many(retry_after: int) -> HTTPException:
+    return HTTPException(
+        status.HTTP_429_TOO_MANY_REQUESTS,
+        detail={
+            "code": "too_many_attempts",
+            "message": f"too many failed sign-ins from this address, try again in {retry_after} s",
+        },
+        headers={"Retry-After": str(retry_after)},
+    )
 
 
 async def user_of_token(db: AsyncSession, token: str, expected: str | None) -> CurrentUser | None:
@@ -96,6 +143,17 @@ async def require_admin(user: CurrentUser = Depends(api_user)) -> CurrentUser:
     it, not even the key of an admin: keys sit in editor configs and scripts."""
     if user.via_key or not user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail={"code": "forbidden"})
+    return user
+
+
+async def person_user(user: CurrentUser = Depends(api_user)) -> CurrentUser:
+    """Endpoints that stand for the person's own click (D15, D83): not an API key, which an agent
+    or a script could hold."""
+    if user.via_key:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail={"code": "person_only", "message": "only the signed-in person can do this"},
+        )
     return user
 
 

@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from topcoat_hub import core_rules, memory_scope
 from topcoat_hub.api.memory import item_view
-from topcoat_hub.auth import CurrentUser, api_user
+from topcoat_hub.auth import CurrentUser, api_user, person_user
 from topcoat_hub.chat_store import ChatStore
 from topcoat_hub.digest_store import DigestStore
 from topcoat_hub.memory_store import (
@@ -431,10 +431,10 @@ async def accept_proposal(
     request: Request,
     db: Db,
     body: AcceptBody | None = None,
-    user: CurrentUser = Depends(api_user),
+    user: CurrentUser = Depends(person_user),
 ) -> Any:
     """One click: the proposal takes effect as a version (undo it with ``revert`` / ``restore``);
-    with ``text`` / ``example`` the user edited it first."""
+    with ``text`` / ``example`` the user edited it first. Not with an API key (auth.person_user)."""
     store = MemoryStore(db, user.uuid)
     body = body or AcceptBody()
     try:

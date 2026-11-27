@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from topcoat_hub.auth import hash_secret
+from topcoat_hub.auth import client_address, hash_secret
 from topcoat_hub.db import get_db
 from topcoat_hub.gateway import spawn
 from topcoat_hub.house_residents import keep_house_resident
@@ -33,10 +33,18 @@ from topcoat_hub.protocol import (
     envelope,
     parse_ts,
 )
+from topcoat_hub.ratelimit import AddressLimiter
 from topcoat_hub.service import NodeService, utcnow
 
 log = logging.getLogger(__name__)
 router = APIRouter()
+
+# Requests per client address and minute on the two endpoints a node reaches before it is known
+# (ratelimit.py): pairing guesses one-time codes, a challenge flood would push out real nonces.
+PAIRINGS_PER_MINUTE = 10
+CHALLENGES_PER_MINUTE = 30
+# The two bodies are a few hundred bytes (proto pair_request, challenge_request).
+MAX_UNAUTHENTICATED_BODY = 8 * 1024
 
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O, 1/I lookalikes
 
@@ -68,14 +76,45 @@ def _http_error(status: int, code: str, message: str) -> HTTPException:
     return HTTPException(status, detail={"code": code, "message": message})
 
 
+def _limit(request: Request, name: str) -> None:
+    """429 when the caller's address has used up its requests on this endpoint for now."""
+    limiter: AddressLimiter | None = getattr(request.app.state, name, None)
+    address = client_address(request.client)
+    if limiter is not None and not limiter.take(address):
+        wait = limiter.retry_after(address)
+        raise HTTPException(
+            429,
+            detail={"code": "too_many_requests", "message": f"try again in {wait} s"},
+            headers={"Retry-After": str(wait)},
+        )
+
+
+async def small_json(request: Request, limit: int = MAX_UNAUTHENTICATED_BODY) -> Any:
+    """The JSON body of a request that is not signed in yet, read up to ``limit`` bytes: a larger
+    body is refused before it is held in memory (uvicorn sets no limit of its own)."""
+    declared = request.headers.get("content-length")
+    if declared is not None and (not declared.isdigit() or int(declared) > limit):
+        raise _http_error(413, "too_large", f"the body may hold at most {limit} bytes")
+    data = bytearray()
+    async for chunk in request.stream():
+        data += chunk
+        if len(data) > limit:
+            raise _http_error(413, "too_large", f"the body may hold at most {limit} bytes")
+    try:
+        return json.loads(data)
+    except ValueError as exc:
+        raise _http_error(400, "invalid_request", f"body is not JSON: {exc}") from exc
+
+
 @router.post("/api/node/pair")
 async def pair(request: Request, db: AsyncSession = Depends(get_db)) -> dict[str, str]:
     """Exchange a one-time pairing code for a node identity (the node keeps its private key)."""
+    _limit(request, "pairings")
     schemas = request.app.state.schemas
+    body = await small_json(request)
     try:
-        body = await request.json()
         schemas.validate("pair_request", body)
-    except (ValueError, ProtocolError) as exc:
+    except ProtocolError as exc:
         raise _http_error(400, "invalid_request", str(exc)) from exc
 
     code = await db.scalar(
@@ -131,11 +170,12 @@ async def pair(request: Request, db: AsyncSession = Depends(get_db)) -> dict[str
 @router.post("/api/node/challenge")
 async def challenge(request: Request) -> dict[str, Any]:
     """Hand out a single-use nonce for the WebSocket authentication (nodeauth.py)."""
+    _limit(request, "challenge_limit")
     schemas = request.app.state.schemas
+    body = await small_json(request)
     try:
-        body = await request.json()
         schemas.validate("challenge_request", body)
-    except (ValueError, ProtocolError) as exc:
+    except ProtocolError as exc:
         raise _http_error(400, "invalid_request", str(exc)) from exc
     store = request.app.state.challenges
     nonce = store.issue(uuid.UUID(body["node_id"]))

@@ -14,7 +14,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 
-from topcoat_hub.auth import CurrentUser, api_user, user_of_token
+from topcoat_hub.auth import CurrentUser, api_user, client_address, user_of_token
 from topcoat_hub.tools import Caller
 from topcoat_hub.voice import (
     LANGUAGE,
@@ -300,13 +300,21 @@ async def voice_ws(ws: WebSocket) -> None:
     state = ws.app.state
     token, close_code = await _sign_in_token(ws)
     user = None
-    if token:
+    # failed sign-ins count here as on every other endpoint (auth.py)
+    limiter = getattr(state, "sign_ins", None)
+    address = client_address(ws.client)
+    throttled = limiter is not None and limiter.blocked(address)
+    if token and not throttled:
         async with state.sessionmaker() as db:
             user = await user_of_token(db, token, state.settings.dev_admin_token)
+        if user is None and limiter is not None:
+            limiter.record(address)
     if user is None:
         with contextlib.suppress(Exception):
             if close_code == CLOSE_TOO_BIG:
                 await ws.close(CLOSE_TOO_BIG, "the sign-in frame is too large")
+            elif throttled:
+                await ws.close(CLOSE_UNAUTHORIZED, "too many failed sign-ins, try again later")
             else:
                 await ws.close(CLOSE_UNAUTHORIZED, "missing or invalid token")
         return

@@ -14,6 +14,7 @@ from alembic import command
 from alembic.config import Config
 
 from topcoat_hub import tls
+from topcoat_hub.auth import dev_token_problem
 from topcoat_hub.config import REPO_ROOT, get_settings
 from topcoat_hub.dbrevision import UnknownRevisionError, check_known
 
@@ -39,6 +40,10 @@ def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(
         level=logging.INFO, format="%(levelname)s %(name)s: %(message)s", force=True
     )
+    if problem := dev_token_problem(settings.dev_admin_token):
+        # until OIDC this token is the whole admin login (auth.py)
+        log.error("%s; the hub does not start. Make one with: openssl rand -base64 32", problem)
+        raise SystemExit(1)
     try:
         # also with --no-migrate: a build must not run against a database that is ahead of it
         check_known(alembic_config(), settings.database_url)

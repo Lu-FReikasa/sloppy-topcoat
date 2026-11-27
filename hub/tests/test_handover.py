@@ -244,7 +244,8 @@ def test_a_hand_over_is_the_callers_own(client: TestClient, clean_db: str) -> No
     _, other = make_user(clean_db, "stranger")
     assert client.get(f"/api/handovers/{view['id']}", headers=other).status_code == 404
     assert client.get("/api/handovers", headers=other).json()["handovers"] == []
-    assert send(client, view, who=other).status_code == 404
+    # other users sign in with keys until OIDC, and a key cannot send at all (auth.person_user)
+    assert send(client, view, who=other).status_code == 403
     assert client.post(f"/api/handovers/{view['id']}/cancel", headers=other).status_code == 404
 
 

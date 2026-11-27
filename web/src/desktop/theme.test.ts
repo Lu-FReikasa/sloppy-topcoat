@@ -164,6 +164,14 @@ describe("the style sheet of a theme", () => {
     expect(splitKeyframes(css).rest).not.toContain("keyframes");
   });
 
+  it("does not let moving the keyframes out join two halves of a name", () => {
+    const css = ".a { background: ur@keyframes k { from { opacity: 0 } }l(https://evil.example/x.png); }";
+    expect(cssProblems(css)).toEqual([]);
+    const { rest } = splitKeyframes(css);
+    expect(cssProblems(rest)).toEqual([]);
+    expect(safeCss({ ...CUSTOM, css })).not.toMatch(/url\(/i);
+  });
+
   it("lets :root mean the root of the theme (the variables a model writes there apply)", () => {
     const out = safeCss({ ...CUSTOM, css: ":root { --bg: #000; } .dt-task { color: red; }" });
     expect(out).toContain("& { --bg: #000; }");

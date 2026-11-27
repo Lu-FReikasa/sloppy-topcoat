@@ -263,21 +263,100 @@ export function themeProblems(value: unknown): string[] {
 
 const MAX_CSS = 40_000;
 
+const HEX = /[0-9a-fA-F]/;
+
+/** The character a CSS escape at `css[i] === "\\"` stands for and where the text goes on (CSS
+ *  Syntax 4.3.7: up to six hex digits and one white space after them, else the character). */
+function cssEscape(css: string, i: number): [string, number] {
+  const j = i + 1;
+  if (j >= css.length) return ["�", j];
+  if (HEX.test(css[j] ?? "")) {
+    let k = j;
+    while (k < css.length && k - j < 6 && HEX.test(css[k] ?? "")) k += 1;
+    const code = parseInt(css.slice(j, k), 16);
+    if (css.startsWith("\r\n", k)) k += 2;
+    else if (k < css.length && " \t\n\r\f".includes(css[k] ?? "")) k += 1;
+    if (code === 0 || (code >= 0xd800 && code <= 0xdfff) || code > 0x10ffff) return ["�", k];
+    return [String.fromCodePoint(code), k];
+  }
+  return [css.slice(j, j + 1), j + 1];
+}
+
+/** The style sheet as the browser reads it: comments out, escapes decoded, in one pass that knows
+ *  strings (a `/*` inside a string starts no comment, an escaped `\/*` none either). The checks
+ *  look at this, so neither an escape nor a comment can hide a name from them. The same as the
+ *  hub's `css_plain` (ui/themes.py). */
+export function cssPlain(css: string): string {
+  let out = "";
+  let i = 0;
+  let quote = "";
+  const n = css.length;
+  while (i < n) {
+    const c = css[i] ?? "";
+    if (c === "\\") {
+      if (i + 1 < n && "\n\r\f".includes(css[i + 1] ?? "")) {
+        // inside a string the pair continues the line; outside one the backslash is a lone
+        // delimiter and the line break stays
+        if (quote) i += css.startsWith("\r\n", i + 1) ? 3 : 2;
+        else {
+          out += c;
+          i += 1;
+        }
+        continue;
+      }
+      const [ch, next] = cssEscape(css, i);
+      out += ch;
+      i = next;
+      continue;
+    }
+    if (quote) {
+      if (c === quote || "\n\r\f".includes(c)) quote = ""; // an unescaped line break ends a (bad) string
+      out += c;
+      i += 1;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      quote = c;
+      out += c;
+      i += 1;
+      continue;
+    }
+    if (css.startsWith("/*", i)) {
+      const end = css.indexOf("*/", i + 2);
+      i = end < 0 ? n : end + 2;
+      out += " ";
+      continue;
+    }
+    out += c;
+    i += 1;
+  }
+  return out;
+}
+
+/** Functions that load what a string or URL names (`image-set("…")` needs no `url()`). */
+const LOADING_FUNCTIONS = /(?<![\w-])(?:-webkit-)?(?:image-set|image|cross-fade|src|element)\(/i;
+const DATA_IMAGE = /^data:image\/(png|jpeg|gif|webp|svg\+xml)[;,]/i;
+
 /** Why a style sheet may not be used. A theme's CSS can restyle everything it can reach, but it
- *  cannot load anything, run anything or hide from the check: no `@import`, no `url(` to anywhere
- *  but an inline `data:` image, no `expression(`, `javascript:`, `behavior`, `-moz-binding`. */
+ *  cannot load anything, run anything or hide from the check (it looks at the sheet as the browser
+ *  reads it, `cssPlain`): no `@import`, no `url(` to anywhere but an inline `data:` image, no
+ *  `image-set(`/`image(`/`cross-fade(`/`src(`/`element(`, no `expression(`, `javascript:`,
+ *  `behavior`, `-moz-binding`. */
 export function cssProblems(css: string): string[] {
   const out: string[] = [];
   if (css.length > MAX_CSS) out.push(`css: at most ${MAX_CSS} characters`);
-  const flat = css.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\\/g, "");
+  const flat = cssPlain(css);
   if (/@import/i.test(flat)) out.push("css: @import is not allowed");
   if (/@charset|@namespace/i.test(flat)) out.push("css: @charset and @namespace are not allowed");
-  for (const m of flat.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/gi)) {
-    if (!/^data:image\/(png|jpeg|gif|webp|svg\+xml)[;,]/i.test((m[2] ?? "").trim())) {
+  for (const m of flat.matchAll(/(?<![\w-])url\(/gi)) {
+    const start = /^\s*(['"]?)\s*(data:[^'")\s]*)/i.exec(flat.slice((m.index ?? 0) + m[0].length));
+    if (!start || !DATA_IMAGE.test(start[2] ?? "")) {
       out.push("css: url() may only hold an inline data:image");
       break;
     }
   }
+  if (LOADING_FUNCTIONS.test(flat))
+    out.push("css: image-set(), image(), cross-fade(), src() and element() are not allowed");
   if (/expression\s*\(|javascript:|behavior\s*:|-moz-binding|<\/?\s*style|<\s*script/i.test(flat))
     out.push("css: script-like constructs are not allowed");
   return out;
@@ -308,7 +387,8 @@ export function splitKeyframes(css: string): {
         if (depth === 0) break;
       }
     }
-    rest += css.slice(i, m.index);
+    // a space where the block stood: the parts around it must not join into one name (`ur` + `l(`)
+    rest += css.slice(i, m.index) + " ";
     keyframes += css.slice(m.index, j + 1) + "\n";
     i = j + 1;
   }
@@ -355,7 +435,9 @@ export function rootSelectors(css: string, key: string): string {
 export function safeCss(theme: ThemeManifest): string {
   if (!theme.css || cssProblems(theme.css).length > 0) return "";
   const { keyframes, rest } = splitKeyframes(theme.css);
-  return `${keyframes}.dt-theme-${theme.key}:is(.dt-root, #dt-theme) {\n${rootSelectors(rest, theme.key)}\n}`;
+  const out = `${keyframes}.dt-theme-${theme.key}:is(.dt-root, #dt-theme) {\n${rootSelectors(rest, theme.key)}\n}`;
+  // what goes on the page is checked again: moving the keyframes out must not make a name
+  return cssProblems(out).some((p) => !p.startsWith("css: at most")) ? "" : out;
 }
 
 /** The `dt-` classes the desktop really draws (the markup of ProgramWindow, Taskbar, Desktop and

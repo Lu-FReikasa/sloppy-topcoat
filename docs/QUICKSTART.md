@@ -234,6 +234,7 @@ Notes:
 | `pair`: `certificate is valid for …, not …` | the name/IP in `--hub` is missing in `TOPCOAT_TLS_HOSTNAMES` → add it in `deploy/hub.env`, `up -d` again (same CA, new certificate), pair again |
 | `pair`: `chain does not contain the CA with fingerprint …` | wrong fingerprint or another hub (or the hub lost its `hub-tls` volume) → copy the command from the GUI again |
 | `pair`: `hub URL uses plain http` | use the `https://…:8443` URL from the GUI |
+| hub log: `TOPCOAT_DEV_ADMIN_TOKEN is shorter than 32 characters` or `still holds the value from the example file`, the hub stops | make a token as above (`token_urlsafe(32)`), put it into `deploy/hub.env`, `up -d` again |
 | GUI login says the token is invalid | token must match `TOPCOAT_DEV_ADMIN_TOKEN` in `deploy/hub.env`; after editing the file run `up -d` again |
 | `docker compose pull`: `denied` / `unauthorized` | not logged in to `ghcr.io`, or the token lacks `read:packages` → `docker login ghcr.io` again |
 | node never connects, log says the hub rejected the node identity (403) | the hub no longer knows this node (e.g. database reset with `down -v`) → new code, `pair … --force` |
