@@ -139,6 +139,35 @@ describe("useWorkCards", () => {
     }
   });
 
+  it("keeps asking about an open task when one look fails", async () => {
+    vi.useFakeTimers();
+    try {
+      let down = false;
+      const mock = mockFetch({
+        "GET /api/conversations/c1/orders?language=de": () =>
+          down ? jsonResponse({ detail: "down" }, 500) : jsonResponse([card({ status: "running" })]),
+      });
+      const api = new ApiClient({ token: "t", fetchImpl: mock.fetch });
+      renderHook(() => useWorkCards(api, "c1", true, 0));
+      const looks = () => mock.calls.filter((c) => c.url.includes("/orders")).length;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      down = true;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CARD_REFRESH_MS);
+      });
+      expect(looks()).toBe(2); // this one failed
+      down = false;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CARD_REFRESH_MS * 2);
+      });
+      expect(looks()).toBe(3); // asked again all the same
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("asks nothing when it is off", () => {
     const mock = mockFetch({});
     const api = new ApiClient({ token: "t", fetchImpl: mock.fetch });

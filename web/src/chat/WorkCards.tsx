@@ -31,18 +31,23 @@ export function useWorkCards(
     let live = true;
     let timer: number | undefined;
     let wait = CARD_REFRESH_MS; // doubles on each look, up to CARD_REFRESH_MAX_MS
+    let open = false; // a task was open at the last look that got an answer
+    const again = (): void => {
+      timer = window.setTimeout(() => void look(), wait);
+      wait = Math.min(wait * 2, CARD_REFRESH_MAX_MS);
+    };
     const look = async (): Promise<void> => {
       try {
         const r = await api.conversationOrders(conversationId, language);
         if (!live) return;
         setLoaded({ of: conversationId, cards: r });
-        if (r.some((c) => OPEN.has(c.status))) {
-          timer = window.setTimeout(() => void look(), wait);
-          wait = Math.min(wait * 2, CARD_REFRESH_MAX_MS);
-        }
+        open = r.some((c) => OPEN.has(c.status));
       } catch {
-        // no cards is no failure of the conversation: they come with the next look
+        // no cards is no failure of the conversation: they come with the next look, and a
+        // task that was open is asked about again (a hub gone for a moment ends no card)
+        if (!live) return;
       }
+      if (open) again();
     };
     void look();
     return () => {
