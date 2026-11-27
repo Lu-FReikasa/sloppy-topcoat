@@ -1,11 +1,7 @@
 """The pipeline of one answer (issue #205, step 1): what a chat message turns into, from the
 reservation of a node to the stream of the model's answer, and how a failure before the first word
-reaches the request that waits for it.
-
-The steps it calls (the reaction, the issue command, the secretary, the check, the hand-over, the
-answer itself) still live in :mod:`topcoat_hub.api.chat`; they are looked up there when an answer
-runs, so this module and that one can import each other and a test that replaces a step there
-still reaches the pipeline. They move here in the next steps."""
+reaches the request that waits for it. The steps it picks are in
+:mod:`topcoat_hub.chat_engine.answer`."""
 
 import asyncio
 import contextlib
@@ -19,7 +15,10 @@ from fastapi.responses import Response
 
 from topcoat_hub import chat, chat_images, chat_tools, local_tools
 from topcoat_hub.auth import CurrentUser
-from topcoat_hub.chat_engine import router
+from topcoat_hub.chat_engine import answer as steps
+from topcoat_hub.chat_engine.common import (
+    _error,
+)
 from topcoat_hub.chat_engine.turn import Turn
 from topcoat_hub.gateway import CONTEXT_FULL_MESSAGE, GatewayError, Upstream, is_context_full
 from topcoat_hub.job_log import set_job_context
@@ -40,7 +39,6 @@ async def pipeline(
     """The answer's events. Until the model has started to answer, a failure is reported through
     ``outcome`` (an HTTP error response) and nothing is yielded; ``outcome`` is ``None`` once the
     answer starts."""
-    api = router()
     try:
         # (aclosing: a stop or a shutdown reaches the generators inside, which store the text)
         async with contextlib.aclosing(
@@ -54,7 +52,7 @@ async def pipeline(
         raise
     finally:
         if not outcome.done():  # a crash before the model answered: the request hears about it
-            outcome.set_result(api._error(500, "internal_error", "the answer could not be started"))
+            outcome.set_result(_error(500, "internal_error", "the answer could not be started"))
 
 
 async def reserve(state: Any, turn: Turn) -> Any:
@@ -89,21 +87,22 @@ async def pipeline_events(
     tools: str,
     outcome: "asyncio.Future[Response | None]",
 ) -> AsyncIterator[str]:
-    api = router()
     state = request.app.state
-    emoji = await api._reaction_for(request, turn)
+    emoji = await steps._reaction_for(request, turn)
     if emoji is not None:
         outcome.set_result(None)
-        async with contextlib.aclosing(api._reaction_events(request, user, turn, emoji)) as events:
+        async with contextlib.aclosing(
+            steps._reaction_events(request, user, turn, emoji)
+        ) as events:
             async for chunk in events:
                 yield chunk
         return
-    issue = api._issue_request(turn)
+    issue = steps._issue_request(turn)
     if issue is not None:
         # "Problem: …" files an issue (the person's own command, no model); a complaint in
         # Projekte gets a card that files it on a click (project_issues.py)
         outcome.set_result(None)
-        async with contextlib.aclosing(api._issue_events(request, user, turn, *issue)) as events:
+        async with contextlib.aclosing(steps._issue_events(request, user, turn, *issue)) as events:
             async for chunk in events:
                 yield chunk
         return
@@ -129,27 +128,27 @@ async def pipeline_events(
                 application=turn.application,
             )
         # The secretary decides who does the task, by the contracts (D112, issue #36).
-        decision = await api._secretary_route(request, user, turn, tools, bool(route.candidates))
+        decision = await steps._secretary_route(request, user, turn, tools, bool(route.candidates))
         if decision is not None:
             outcome.set_result(None)
             async with contextlib.aclosing(
-                api._secretary_events(request, user, turn, decision, recalled, context_length)
+                steps._secretary_events(request, user, turn, decision, recalled, context_length)
             ) as routed_events:
                 async for chunk in routed_events:
                     yield chunk
             return
         # A question about the user's servers is answered after a check (E3-01d).
-        checking, refusal = await api._plan_check(
+        checking, refusal = await steps._plan_check(
             request, user, turn, tools, bool(route.candidates)
         )
         if refusal is not None:
             outcome.set_result(refusal)
             return
-        handed = None if checking else await api._start_handoff(request, user, turn, tools, route)
+        handed = None if checking else await steps._start_handoff(request, user, turn, tools, route)
         if handed is not None:
             outcome.set_result(None)
             async with contextlib.aclosing(
-                api._handoff_events(
+                steps._handoff_events(
                     request, user, turn, route, handed[0], handed[1], recalled, context_length
                 )
             ) as handoff_events:
@@ -157,52 +156,52 @@ async def pipeline_events(
                     yield chunk
             return
         mode = (
-            api.research_mode(turn.application, turn.quality, turn.from_hub) if checking else None
+            steps.research_mode(turn.application, turn.quality, turn.from_hub) if checking else None
         )
         if mode is not None:
             # in Research a check is a research of its own (at "thorough") or the offer of one
             # (at "balanced"): the chat starts it or offers it, says so and goes on
             outcome.set_result(None)
             events = (
-                api._research_start_events(request, user, turn)
+                steps._research_start_events(request, user, turn)
                 if mode == "job"
-                else api._research_offer_events(request, user, turn)
+                else steps._research_offer_events(request, user, turn)
             )
             async with contextlib.aclosing(events) as started:
                 async for chunk in started:
                     yield chunk
             return
         if checking and turn.application == "project":
-            found = await api._iteration_target(request, user, turn)
+            found = await steps._iteration_target(request, user, turn)
             if found is not None:
                 # "make the next version of 1.8.2": a card that starts the next iteration with
                 # the message as feedback (project_iterations.py); the task text stays
                 outcome.set_result(None)
                 async with contextlib.aclosing(
-                    api._iteration_events(request, user, turn, *found)
+                    steps._iteration_events(request, user, turn, *found)
                 ) as offering:
                     async for chunk in offering:
                         yield chunk
                 return
         if checking and turn.application == "project":
-            target = await api._write_target(request, user, turn)
+            target = await steps._write_target(request, user, turn)
             if target is not None:
                 # "rewrite these tasks": the hub reads, the chat model writes, the hub builds the
                 # set (project_write.py); no agent loop
                 outcome.set_result(None)
                 async with contextlib.aclosing(
-                    api._write_events(request, user, turn, *target)
+                    steps._write_events(request, user, turn, *target)
                 ) as writing:
                     async for chunk in writing:
                         yield chunk
                 return
         if checking and not turn.handover_targets:
-            turn.handover_targets = await api._handover_targets(request, user, turn)
-        if checking and (owner := api.project_owner(turn)) is not None:
+            turn.handover_targets = await steps._handover_targets(request, user, turn)
+        if checking and (owner := steps.project_owner(turn)) is not None:
             # the check the hub would start has no project tools: the hand-over instead
             outcome.set_result(None)
             async with contextlib.aclosing(
-                api._handover_answer_events(request, user, turn, owner)
+                steps._handover_answer_events(request, user, turn, owner)
             ) as handing:
                 async for chunk in handing:
                     yield chunk
@@ -210,16 +209,16 @@ async def pipeline_events(
         if checking:
             outcome.set_result(None)
             async with contextlib.aclosing(
-                api._checked_answer(
+                steps._checked_answer(
                     request,
                     user,
                     turn,
                     route,
                     checking,
-                    api.notes_on_topic(recalled, turn.last_user_text),
+                    steps.notes_on_topic(recalled, turn.last_user_text),
                     context_length,
                     budget,
-                    order=api._order_of(turn, "{}")[
+                    order=steps._order_of(turn, "{}")[
                         0
                     ],  # a check the hub starts: one machine, or none
                 )
@@ -230,11 +229,11 @@ async def pipeline_events(
         # What changes with the question (the recalled notes) goes last, into the final user
         # turn, so the model can reuse its prompt cache for everything before it (D27).
         notes = chat.notes_context([n.prompt_line() for n in recalled])
-        notes = await api._brief_block(request, user, turn) + notes
+        notes = await steps._brief_block(request, user, turn) + notes
         if turn.segment_block:  # the hand-over comes first, capped by what the context allows
             cap = max(budget // 4, 0) * chat.CHARS_PER_TOKEN
             notes = turn.segment_block[:cap] + notes
-        notes = await api._second_look_block(request, user, turn) + notes
+        notes = await steps._second_look_block(request, user, turn) + notes
         notes += turn.accepted_hint  # last, next to the person's "ja": what it agreed to
         earlier = await chat_tools.earlier_check(
             request.app.state.sessionmaker, user.uuid, turn.conversation_id
@@ -242,7 +241,7 @@ async def pipeline_events(
         if earlier is not None:  # a follow-up without a check still sees what was read (1.3)
             room = min(max(budget // 3, 0) * chat.CHARS_PER_TOKEN, chat_tools.EARLIER_CHARS)
             notes = chat_tools.earlier_block(earlier, room) + notes
-        core_text = await api._core_text(request, user, turn, context_length)
+        core_text = await steps._core_text(request, user, turn, context_length)
         upstream: Upstream | None = None
         for attempt in (0, 1):
             # Small contexts get the short system prompt: the fixed rules must not eat the window.
@@ -252,7 +251,7 @@ async def pipeline_events(
                 turn.capabilities,
                 compact=context_length < chat.COMPACT_CONTEXT_TOKENS,
                 core=core_text,
-                where=await api._where(request, user, turn, route, context_length),
+                where=await steps._where(request, user, turn, route, context_length),
             )
             sent: list[dict[str, Any]] | None = None
             if turn.continues is None:
@@ -269,7 +268,7 @@ async def pipeline_events(
                 continued = chat.build_continue_prompt(system, turn.history, budget, notes)
                 if continued is None:
                     outcome.set_result(
-                        api._error(
+                        _error(
                             409,
                             "context_too_small",
                             f"The context of {turn.model} ({context_length} tokens) is too small "
@@ -322,17 +321,17 @@ async def pipeline_events(
                 # a server without --jinja refuses ``tools``: this model decides by the heuristic
                 # from now on, and this message is asked again without the function
                 upstream.close()
-                api._no_decider(request).add(turn.requested)
+                steps._no_decider(request).add(turn.requested)
                 turn.decide = False
                 turn.handover_targets = ()
                 turn.capabilities = replace(turn.capabilities, decider=False)
                 continue
             break
         if upstream is None:  # unreachable: the loop always forwards once
-            outcome.set_result(api._error(502, "model_error", "the model could not be asked"))
+            outcome.set_result(_error(502, "model_error", "the model could not be asked"))
             return
     except GatewayError as exc:
-        outcome.set_result(api._error(exc.status, exc.code, exc.message, exc.retry_after))
+        outcome.set_result(_error(exc.status, exc.code, exc.message, exc.retry_after))
         return
     try:
         if upstream.status != 200:
@@ -341,7 +340,7 @@ async def pipeline_events(
             log.warning("chat: model answered %s: %s", upstream.status, detail)
             if is_context_full(detail):
                 outcome.set_result(
-                    api._error(
+                    _error(
                         503,
                         "context_full",
                         CONTEXT_FULL_MESSAGE,
@@ -350,7 +349,7 @@ async def pipeline_events(
                 )
                 return
             outcome.set_result(
-                api._error(502, "model_error", f"the model refused the request ({upstream.status})")
+                _error(502, "model_error", f"the model refused the request ({upstream.status})")
             )
             return
         on_tool = None
@@ -358,7 +357,7 @@ async def pipeline_events(
 
             def on_tool(name: str, arguments: str) -> AsyncIterator[str]:
                 if name in local_tools.LOCAL:  # read-only functions of the hub itself (T3.6, T3.8)
-                    return api._local_answer(
+                    return steps._local_answer(
                         request,
                         user,
                         turn,
@@ -370,19 +369,19 @@ async def pipeline_events(
                         recalled,
                     )
                 # the model decided to look: in Research that is a research (or its offer), too
-                mode = api.research_mode(turn.application, turn.quality, turn.from_hub)
+                mode = steps.research_mode(turn.application, turn.quality, turn.from_hub)
                 if mode == "job":
-                    return api._research_start_events(request, user, turn)
+                    return steps._research_start_events(request, user, turn)
                 if mode == "offer":
-                    return api._research_offer_events(request, user, turn)
-                order, focus = api._order_of(turn, arguments)
-                return api._checked_answer(
+                    return steps._research_offer_events(request, user, turn)
+                order, focus = steps._order_of(turn, arguments)
+                return steps._checked_answer(
                     request,
                     user,
                     turn,
                     route,
                     "decided",
-                    api.notes_on_topic(recalled, turn.last_user_text),
+                    steps.notes_on_topic(recalled, turn.last_user_text),
                     context_length,
                     budget,
                     focus,
@@ -392,17 +391,17 @@ async def pipeline_events(
         after_done = None
         # a revision is asked with what the model was shown, the images included
         shown_prompt = replace(prompt, messages=sent) if sent is not None else prompt
-        held = api._held_for(turn, shown_prompt, on_tool, request.app.state.settings)
+        held = steps._held_for(turn, shown_prompt, on_tool, request.app.state.settings)
         if held is None and turn.second_look and turn.verify_model:
             # "thorough": a second look at every answer; without a check there is no evidence, the
             # reviewer marks what looks wrong or cannot be known without looking (quality.py)
 
             def after_done(message: dict[str, Any]) -> AsyncIterator[str]:
-                return api._verify_answer(request, user, turn, message, "")
+                return steps._verify_answer(request, user, turn, message, "")
 
         outcome.set_result(None)  # the model answers: the request becomes a reader of the run
         async with contextlib.aclosing(
-            api._answer(
+            steps._answer(
                 request,
                 user,
                 turn,

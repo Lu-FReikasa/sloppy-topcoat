@@ -3,7 +3,7 @@ chat does not flash "error" between the start line and the first progress line."
 
 from types import SimpleNamespace
 
-from topcoat_hub.api.chat import settled_state
+from topcoat_hub.chat_engine.answer import settled_state
 
 
 def turn(**over):

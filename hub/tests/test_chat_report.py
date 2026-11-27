@@ -15,7 +15,7 @@ from tests.test_chat import new_conv, sent_messages, use_model
 from tests.test_chat_tools import ask_with, script_check
 from tests.test_tools import tools_node
 from topcoat_hub import chat, report
-from topcoat_hub.api.chat import CONFIRMATIONS, REPORT_LEAD, history_pairs, hub_language
+from topcoat_hub.chat_engine.common import CONFIRMATIONS, REPORT_LEAD, history_pairs, hub_language
 from topcoat_hub.models import AgentEvidence, Message
 
 LONG_CLOSING = (
@@ -526,7 +526,7 @@ def test_the_checks_task_names_the_language_of_the_question() -> None:
 
 
 def test_after_a_check_only_notes_that_share_a_word_with_the_question_stay() -> None:
-    from topcoat_hub.api.chat import notes_on_topic
+    from topcoat_hub.chat_engine.answer import notes_on_topic
     from topcoat_hub.memory import Recalled
 
     def note(text: str) -> Recalled:

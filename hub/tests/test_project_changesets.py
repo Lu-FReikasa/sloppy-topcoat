@@ -16,7 +16,7 @@ from sqlalchemy import create_engine, text
 
 from tests.conftest import AUTH, TEST_DB_URL
 from tests.users import make_user
-from topcoat_hub.api import chat as chat_api
+from topcoat_hub.chat_engine import answer as chat_api
 from topcoat_hub.models import DEV_ADMIN_ID
 from topcoat_hub.project_changesets import (
     MAX_OPERATIONS,

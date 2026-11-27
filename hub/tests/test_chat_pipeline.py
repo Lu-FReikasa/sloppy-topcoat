@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from tests.fakenode import eventually, online_node
 from tests.test_chat import answer_text, ask, new_conv, use_model
-from topcoat_hub.api import chat as chat_api
+from topcoat_hub.chat_engine import answer as chat_api
 
 
 def test_a_crash_before_the_model_is_asked_is_a_500_not_a_wait(

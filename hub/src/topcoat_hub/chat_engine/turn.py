@@ -1,9 +1,5 @@
 """One answer's turn (issue #205, step 2): :class:`Turn`, everything the answer needs, and
-:func:`prepare`, which stores the person's message and reads that in one short transaction.
-
-The helpers it shares with the routes (the views of a message, the history, the defaults) still
-live in :mod:`topcoat_hub.api.chat` and are looked up there when a turn is prepared (see
-:func:`topcoat_hub.chat_engine.router`)."""
+:func:`prepare`, which stores the person's message and reads that in one short transaction."""
 
 import time
 import uuid
@@ -15,7 +11,14 @@ from fastapi import Request
 from topcoat_hub import app_scope, chat, chat_images, chat_policy, quality, tool_groups
 from topcoat_hub.activity import ActivityLog
 from topcoat_hub.auth import CurrentUser
-from topcoat_hub.chat_engine import router
+from topcoat_hub.chat_engine.common import (
+    _chain_ids,
+    _defaults,
+    _http,
+    history_pairs,
+    message_view,
+    task_pairs,
+)
 from topcoat_hub.chat_store import ChatStore, title_from
 from topcoat_hub.models import Message, User
 from topcoat_hub.segments import parse_breaks
@@ -143,13 +146,12 @@ async def prepare(
     truncated one to continue it) and collect what the model needs. ``hidden``: the hub speaks up
     (:func:`speak_up`) -- a note for the model that is not stored and not shown as a message of the
     user. Raises HTTPException for unknown conversations / nothing to answer."""
-    api = router()
     started = time.monotonic()
     async with request.app.state.sessionmaker() as db:
         store = ChatStore(db, user.uuid)
         conv = await store.get_conversation(conversation_id)
         if conv is None:
-            raise api._http(404, "not_found", "unknown conversation")
+            raise _http(404, "not_found", "unknown conversation")
         messages = await store.messages(conversation_id)
         new_user_message = None
         continues: Message | None = None
@@ -159,7 +161,7 @@ async def prepare(
                 or messages[-1].role != "assistant"
                 or messages[-1].status not in ("truncated", "interrupted")
             ):
-                raise api._http(409, "nothing_to_continue", "the last answer is not truncated")
+                raise _http(409, "nothing_to_continue", "the last answer is not truncated")
             continues = messages[-1]
         elif content is not None:
             if not messages and not conv.title:
@@ -171,25 +173,23 @@ async def prepare(
                 else []
             )
             messages.append(msg)
-            new_user_message = api.message_view(
+            new_user_message = message_view(
                 msg, [chat_images.image_view(r.id, r.width, r.height) for r in added]
             )
         elif hidden is not None:
             if not messages:
-                raise api._http(409, "nothing_to_answer", "the conversation is empty")
+                raise _http(409, "nothing_to_answer", "the conversation is empty")
         else:  # regenerate: everything the last question got — bubbles, progress line, report card
             while messages and messages[-1].role == "assistant":
                 await store.delete_message(conversation_id, messages[-1].id)
                 messages.pop()
             if not messages or messages[-1].role != "user":
-                raise api._http(
-                    409, "nothing_to_answer", "the conversation has no message to answer"
-                )
+                raise _http(409, "nothing_to_answer", "the conversation has no message to answer")
         pictures = await chat_images.ChatImageStore(db, user.uuid).of_messages(
             [m.id for m in messages if m.role == "user"]
         )
-        chain_ids = await api._chain_ids(store, conv)
-        d = await api._defaults(db, request, store)
+        chain_ids = await _chain_ids(store, conv)
+        d = await _defaults(db, request, store)
         account = await db.get(User, user.uuid)
         language = (account.language if account else None) or "en"
         # the application's tools are the most this conversation may use (app_scope.py)
@@ -228,7 +228,7 @@ async def prepare(
         messages = plan.messages  # only the current segment is replayed verbatim
     # D125: the images of the replayed messages; a model that cannot see reads that one was there
     shown = {m.id: pictures[m.id] for m in messages if m.role == "user" and m.id in pictures}
-    history = api.history_pairs(
+    history = history_pairs(
         messages,
         keep_last=continue_last,
         extra={k: chat_images.hidden(len(v)) for k, v in shown.items()},
@@ -249,7 +249,7 @@ async def prepare(
                 image_data = await chat_images.ChatImageStore(db, user.uuid).data(
                     chat_images.pick_for_prompt(newest_first)
                 )
-            vision_history = api.history_pairs(
+            vision_history = history_pairs(
                 messages,
                 extra={k: chat_images.marked([i["id"] for i in v]) for k, v in shown.items()},
             )
@@ -260,7 +260,7 @@ async def prepare(
             **({"routed_from": sight.routed_from} if sight.routed_from else {}),
             **({"node": sight.node} if sight.node else {}),
         }
-    for_task = api.task_pairs(messages)
+    for_task = task_pairs(messages)
     if hidden is not None:
         history.append(("user", hidden))
         for_task.append(("user", hidden))

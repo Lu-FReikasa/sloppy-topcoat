@@ -123,7 +123,7 @@ def test_only_a_project_question_without_project_tools_is_redirected() -> None:
     from types import SimpleNamespace
 
     from topcoat_hub import tool_groups
-    from topcoat_hub.api.chat import project_owner
+    from topcoat_hub.chat_engine.answer import project_owner
 
     targets = (("project", ", ".join(tool_groups.labels(["project", "notes"]))),)
 
@@ -145,7 +145,7 @@ def test_a_check_the_hub_would_start_for_a_project_question_becomes_a_hand_over(
 ) -> None:
     """The second way into a check: the hub starts it itself (live: Chat has notes and wiki, so it
     "detected" a check). Live 2026-11-14 the redirect of the model's own call did not cover it."""
-    from topcoat_hub.api import chat as chat_api
+    from topcoat_hub.chat_engine import answer as chat_api
 
     use_native_model(client)
     quiet_dossier(client)

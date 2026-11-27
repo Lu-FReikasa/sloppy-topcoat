@@ -104,7 +104,7 @@ def test_a_rewrite_in_projekte_goes_through_one_call_and_waits_as_a_set(
         return None
 
     fake.answer_fn = answer
-    from topcoat_hub.api.chat import _write_target
+    from topcoat_hub.chat_engine.answer import _write_target
 
     question = "Bitte arbeite 1.1 und 1.2 in Topcoat genauer aus"
     probe = SimpleNamespace(last_user_text=question, task_history=[("user", question)])

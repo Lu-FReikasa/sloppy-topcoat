@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from topcoat_hub.agent_loop import AgentLoop
-from topcoat_hub.api.chat import _change_facts, _task_proposals
+from topcoat_hub.chat_engine.answer import _change_facts, _task_proposals
 
 ALL = [
     {"capability": "docker.restart", "node": "vm"},
