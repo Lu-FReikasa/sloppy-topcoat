@@ -199,4 +199,57 @@ it("sends a dossier with a secret only after the explicit approval of that click
       }),
     );
   });
+
+  it("groups the list: waiting and running open, done and withdrawn folded, failed under done", async () => {
+    const { api } = hub([
+      handover({ id: "w", status: "proposed", dossier: { ...handover().dossier, question: "Frage W" } }),
+      handover({ id: "r", status: "sent", dossier: { ...handover().dossier, question: "Frage R" } }),
+      handover({ id: "d", status: "done", dossier: { ...handover().dossier, question: "Frage D" } }),
+      handover({ id: "f", status: "failed", error: "kein Knoten", dossier: { ...handover().dossier, question: "Frage F" } }),
+      handover({ id: "c", status: "cancelled", dossier: { ...handover().dossier, question: "Frage C" } }),
+    ]);
+    render(<HandoversPage api={api} />);
+    const waiting = await screen.findByTestId("handover-group-waiting");
+    expect(waiting.tagName).toBe("DIV");
+    expect(waiting.textContent).toContain("Wartet auf dich");
+    expect(waiting.textContent).toContain("Frage W");
+    expect(screen.getByTestId("handover-group-running").textContent).toContain("Frage R");
+    const done = screen.getByTestId("handover-group-done") as HTMLDetailsElement;
+    expect(done.tagName).toBe("DETAILS");
+    expect(done.open).toBe(false);
+    expect(done.textContent).toContain("Frage D");
+    expect(done.textContent).toContain("Frage F");
+    expect(done.textContent).toContain("fehlgeschlagen: kein Knoten");
+    const withdrawn = screen.getByTestId("handover-group-withdrawn") as HTMLDetailsElement;
+    expect(withdrawn.open).toBe(false);
+    expect(withdrawn.textContent).toContain("Frage C");
+    // the full request is folded in every row; the file can still be opened
+    const rows = screen.getAllByTestId("handover");
+    for (const r of rows) {
+      const full = r.querySelector("details.handover-full") as HTMLDetailsElement;
+      expect(full.open).toBe(false);
+      expect(full.textContent).toContain("Sieh in die Logs.");
+    }
+    expect(screen.getAllByRole("button", { name: "Akte öffnen" })).toHaveLength(5);
+  });
+
+  it("shows no group heading for an empty group", async () => {
+    const { api } = hub([handover({ status: "done" })]);
+    render(<HandoversPage api={api} />);
+    await screen.findByTestId("handover-group-done");
+    expect(screen.queryByTestId("handover-group-waiting")).toBeNull();
+    expect(screen.queryByTestId("handover-group-withdrawn")).toBeNull();
+  });
+
+  it("opens the folded group of the hand-over a link names (inbox answer)", async () => {
+    const { api } = hub([
+      handover({ id: "d1", status: "done" }),
+      handover({ id: "c1", status: "cancelled" }),
+    ]);
+    render(<HandoversPage api={api} id="d1" />);
+    const done = (await screen.findByTestId("handover-group-done")) as HTMLDetailsElement;
+    expect(done.open).toBe(true);
+    expect(done.querySelector('[aria-current="true"]')).not.toBeNull();
+    expect((screen.getByTestId("handover-group-withdrawn") as HTMLDetailsElement).open).toBe(false);
+  });
 });

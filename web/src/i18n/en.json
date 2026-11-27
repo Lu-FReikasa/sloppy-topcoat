@@ -2584,7 +2584,14 @@
     "fileCopy": "Copy as Markdown",
     "fileDownload": "Download (.md)",
     "filed": "Filed in the knowledge base: {{path}}",
-    "fileFailed": "The file could not be loaded."
+    "fileFailed": "The file could not be loaded.",
+    "fullText": "Full request",
+    "group": {
+      "waiting": "Waiting for you",
+      "running": "Running",
+      "done": "Done",
+      "withdrawn": "Withdrawn"
+    }
   },
   "project": {
     "title": "Projects",

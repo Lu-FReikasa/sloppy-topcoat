@@ -2584,7 +2584,14 @@
     "fileCopy": "Als Markdown kopieren",
     "fileDownload": "Herunterladen (.md)",
     "filed": "In der Wissensbasis abgelegt: {{path}}",
-    "fileFailed": "Die Akte konnte nicht geladen werden."
+    "fileFailed": "Die Akte konnte nicht geladen werden.",
+    "fullText": "Ganze Anfrage",
+    "group": {
+      "waiting": "Wartet auf dich",
+      "running": "Läuft",
+      "done": "Erledigt",
+      "withdrawn": "Zurückgezogen"
+    }
   },
   "project": {
     "title": "Projekte",
