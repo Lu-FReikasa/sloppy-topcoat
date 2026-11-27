@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ApiClient } from "../api/client";
+import de from "../i18n/de.json";
 import { parseRoute } from "../route";
 import { mockFetch } from "../test/mockFetch";
 import { artistsOf, flowLabel, groupSheets, kindClass, SheetsPage } from "./SheetsPage";
@@ -140,12 +141,16 @@ describe("Sheets", () => {
     expect(rows.map((r) => r.querySelector(".sheets-col-title a")?.textContent)).toEqual(["Example Song", "Zebra Song"]);
     expect(rows[0]!.querySelector(".sheets-col-title a")?.getAttribute("href")).toBe("#/sheets/s3");
     expect(rows[0]!.querySelector(".sheets-col-key")?.textContent).toBe("C");
-    expect(within(rows[0]!).getAllByRole("link").map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
-      ["Example Song", "#/sheets/s3"],
-      ["v1", "#/sheets/s1"],
-      ["v2", "#/sheets/s3"],
-    ]);
+    // v1 v2 sit in their own column on a wide page and under the title on a narrow one (CSS picks one)
+    for (const place of [".sheets-col-versions", ".sheets-row-versions"]) {
+      expect([...rows[0]!.querySelectorAll(`${place} a`)].map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+        ["v1", "#/sheets/s1"],
+        ["v2", "#/sheets/s3"],
+      ]);
+    }
     expect(rows[1]!.querySelector(".sheets-col-versions")?.textContent).toBe("");
+    expect(rows[1]!.querySelector(".sheets-row-versions")).toBeNull();
+
     // a finished research is its sheet in the list; a failed one stays with its reason
     const jobs = screen.getByTestId("sheets-jobs");
     expect(within(jobs).queryByText("Other Song")).toBeNull();
@@ -269,7 +274,7 @@ describe("Sheets", () => {
     expect(within(dialog).getByRole("button", { name: /Paste a sheet|Sheet einfügen/ })).toBeTruthy();
     const form = within(dialog).getByRole("form", { name: /Research a song|Song recherchieren/ });
     fireEvent.change(within(form).getByLabelText(/^Song$/), { target: { value: "Wonderwall" } });
-    fireEvent.change(within(form).getByLabelText(/Artist|Künstler/), { target: { value: "Oasis" } });
+    fireEvent.change(within(form).getByLabelText(/Artist|Interpret/), { target: { value: "Oasis" } });
     fireEvent.change(within(form).getByLabelText(/Instrument/), { target: { value: "piano" } });
     fireEvent.click(within(form).getByRole("button", { name: /Research|Recherchieren/ }));
     await waitFor(() => expect(calls.some((c) => c.method === "POST")).toBe(true));
@@ -512,5 +517,15 @@ describe("Sheets", () => {
     rerender(<SheetsPage key="s9b" api={api} id="s9" />);
     await screen.findByTestId("sheet");
     expect(screen.queryByTestId("setlists")).toBeNull();
+  });
+});
+
+describe("Sheets German wording", () => {
+  // the library had "Künstler" (column), "Interpret" (filter) and "Nach Artist" (sort) side by side (#168)
+  it("calls an artist \"Interpret\" everywhere", () => {
+    const texts = (o: unknown): string[] => (typeof o === "string" ? [o] : o && typeof o === "object" ? Object.values(o).flatMap(texts) : []);
+    const all = texts(de.sheets);
+    expect(all.filter((s) => /Künstler|\bArtist/.test(s))).toEqual([]);
+    expect(all.filter((s) => /Interpret/.test(s)).length).toBeGreaterThan(2);
   });
 });

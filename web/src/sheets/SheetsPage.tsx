@@ -358,6 +358,22 @@ function SheetTable({
   const { query, setQuery, artist, setArtist, sort, setSort } = filter;
   const artists = useMemo(() => artistsOf(list), [list]);
   const keyOf = (s: SheetSummary) => [s.key, s.capo ? t("sheets.capoN", { n: s.capo }) : ""].filter(Boolean).join(" · ");
+  // v1 v2 …: in their own column on a wide page, under the title (like the artist) on a narrow one
+  const versionLinks = (g: SheetGroup) =>
+    g.versions.length > 1 && (
+      <span className="sheets-versions">
+        {g.versions.map((v, i) => (
+          <a
+            key={v.id}
+            href={sheetsHref(v.id)}
+            onClick={onOpen}
+            title={[keyOf(v), t(`sheets.instrument.${v.instrument}`), v.version_note].filter(Boolean).join(" · ")}
+          >
+            {t("sheets.version", { n: i + 1 })}
+          </a>
+        ))}
+      </span>
+    );
   const openFirst = (e: React.KeyboardEvent) => {
     if (e.key !== "Enter") return;
     const s = groups[0] && newestOf(groups[0]);
@@ -408,10 +424,12 @@ function SheetTable({
             <tr>
               <th scope="col">{t("sheets.paste.songTitle")}</th>
               <th scope="col" className="sheets-col-artist">
-                {t("sheets.research.artist")}
+                {t("sheets.filter.artist")}
               </th>
               <th scope="col">{t("sheets.key")}</th>
-              <th scope="col">{t("sheets.versions")}</th>
+              <th scope="col" className="sheets-col-versions">
+                {t("sheets.versions")}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -424,25 +442,11 @@ function SheetTable({
                       {g.title}
                     </a>
                     {g.artist && <span className="sheets-row-artist muted small">{g.artist}</span>}
+                    {g.versions.length > 1 && <span className="sheets-row-versions small">{versionLinks(g)}</span>}
                   </td>
                   <td className="sheets-col-artist">{g.artist}</td>
                   <td className="sheets-col-key">{keyOf(s)}</td>
-                  <td className="sheets-col-versions">
-                    {g.versions.length > 1 && (
-                      <span className="sheets-versions">
-                        {g.versions.map((v, i) => (
-                          <a
-                            key={v.id}
-                            href={sheetsHref(v.id)}
-                            onClick={onOpen}
-                            title={[keyOf(v), t(`sheets.instrument.${v.instrument}`), v.version_note].filter(Boolean).join(" · ")}
-                          >
-                            {t("sheets.version", { n: i + 1 })}
-                          </a>
-                        ))}
-                      </span>
-                    )}
-                  </td>
+                  <td className="sheets-col-versions">{versionLinks(g)}</td>
                 </tr>
               );
             })}

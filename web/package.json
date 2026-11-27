@@ -11,7 +11,8 @@
     "test": "vitest run",
     "preview": "vite preview",
     "layout": "node scripts/layout-check.mjs",
-    "shell-layout": "node scripts/shell-check.mjs"
+    "shell-layout": "node scripts/shell-check.mjs",
+    "sheets-layout": "node scripts/sheets-check.mjs"
   },
   "dependencies": {
     "@xyflow/react": "12.12.0",
