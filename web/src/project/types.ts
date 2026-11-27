@@ -574,9 +574,10 @@ export interface LargeTaskView {
     branch: string;
     state: "planning" | "running" | "blocked" | "done";
     scope: { id: string; state: "active" | "ended"; expires_at: string } | null;
-    /** The card of the workshop scope in the hub's own words (hub vorhaben.scope_text, the text
-     *  the click stores in the mandate). Absent from an older hub: then the catalogue text. */
-    scope_text?: string;
+    /** The card of the workshop scope in the hub's own words, per GUI language (hub
+     *  vorhaben.scope_text; the click stores the text of the language it names). Absent from an
+     *  older hub: then the catalogue text. */
+    scope_text?: Partial<Record<"en" | "de", string>>;
   };
   subtasks: Subtask[];
   rollout: { ready: boolean };

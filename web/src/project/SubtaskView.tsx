@@ -185,6 +185,8 @@ export function SubtaskView({
     none: () => t("largeTask.scopeMissing"),
   };
   const scopeLine = scopeLines[large.scope?.state ?? "none"]();
+  // the card in the GUI's language; the click names it, so the hub stores the text that was read
+  const language = i18n.resolvedLanguage === "de" ? "de" : "en";
 
   return (
     <section className="large-task" aria-label={t("largeTask.title")} data-testid="large-task">
@@ -232,7 +234,7 @@ export function SubtaskView({
           </p>
           {!scopeActive && (
             <p className="small">
-              {large.scope_text ||
+              {large.scope_text?.[language] ||
                 t("largeTask.scopeText", { number: large.number, title: large.title, branch: large.branch, days: SCOPE_DAYS })}
             </p>
           )}
@@ -242,7 +244,7 @@ export function SubtaskView({
                 {t("largeTask.scopeRevoke")}
               </button>
             ) : (
-              <button type="button" disabled={busy} onClick={() => void actions.giveScope()}>
+              <button type="button" disabled={busy} onClick={() => void actions.giveScope(language)}>
                 {t("largeTask.scopeGive")}
               </button>
             )}

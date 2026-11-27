@@ -82,7 +82,7 @@ function fakeApi(first: LargeTaskView) {
       model: "m",
       large_task: view(PLAN),
     })),
-    giveWorkshopScope: vi.fn(async (_id: string) => ({ mandate: {} as never })),
+    giveWorkshopScope: vi.fn(async (_id: string, _language?: "en" | "de") => ({ mandate: {} as never })),
     tickLargeTask: vi.fn(async (_id: string) => ({
       tick: { started: ["s4"], replanned: [], blocked: [], stopped: "", done: false } as LargeTaskTick,
       large_task: first,
@@ -169,17 +169,36 @@ describe("SubtaskView", () => {
     expect(within(card).getByText(having("Theme- und Persona-Entwürfe ändern"))).toBeTruthy();
     expect(within(card).getByText(having("topcoat/live und main"))).toBeTruthy();
     fireEvent.click(within(card).getByRole("button", { name: "Werkstatt-Umfang erteilen" }));
-    await waitFor(() => expect(api.giveWorkshopScope).toHaveBeenCalledWith("lt"));
+    await waitFor(() => expect(api.giveWorkshopScope).toHaveBeenCalledWith("lt", "de"));
     await waitFor(() => expect(api.largeTask.mock.calls.length).toBeGreaterThan(1));
   });
 
-  it("shows the hub's own scope text when the hub sends one, not the catalogue's", async () => {
+  it("shows the hub's own scope text in the GUI's language, not the catalogue's, and the click names that language", async () => {
     const hubText = "Vorhaben 3.2.1 „Paging“: Der Hub darf genau das, was dieser Text sagt.";
-    const api = fakeApi(view(PLAN, { scope_text: hubText }));
+    const enText = "Large task 3.2.1 “Paging”: the hub may do exactly what this text says.";
+    const api = fakeApi(view(PLAN, { scope_text: { de: hubText, en: enText } }));
     render(<SubtaskView api={api} nodeId="lt" />);
     const card = await screen.findByTestId("workshop-scope");
     expect(within(card).getByText(hubText)).toBeTruthy();
+    expect(within(card).queryByText(enText)).toBeNull();
     expect(within(card).queryByText(having("Theme- und Persona-Entwürfe ändern"))).toBeNull();
+    fireEvent.click(within(card).getByRole("button", { name: "Werkstatt-Umfang erteilen" }));
+    await waitFor(() => expect(api.giveWorkshopScope).toHaveBeenCalledWith("lt", "de"));
+  });
+
+  it("shows the English hub text in an English GUI", async () => {
+    const enText = "Large task 3.2.1 “Paging”: the hub may do exactly what this text says.";
+    await i18n.changeLanguage("en");
+    try {
+      const api = fakeApi(view(PLAN, { scope_text: { de: "Vorhaben 3.2.1", en: enText } }));
+      render(<SubtaskView api={api} nodeId="lt" />);
+      const card = await screen.findByTestId("workshop-scope");
+      expect(within(card).getByText(enText)).toBeTruthy();
+      fireEvent.click(within(card).getByRole("button", { name: "Give the workshop scope" }));
+      await waitFor(() => expect(api.giveWorkshopScope).toHaveBeenCalledWith("lt", "en"));
+    } finally {
+      await i18n.changeLanguage("de");
+    }
   });
 
   it("offers to revoke an active scope and hides the card when nothing left writes", async () => {
