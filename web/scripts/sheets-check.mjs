@@ -3,7 +3,8 @@
 // - the library table: no column title breaks inside a word, the key ("B · Capo 2") stays on one
 //   line, the versions (v1 v2) do not stack, and the table fits its column (no sideways scroll);
 // - the stage: every tool, "Leave" last, ends inside the window (German "Verlassen" ended at
-//   453 px on a 320-430 px phone), and on a touch screen the tools are not dimmed.
+//   453 px on a 320-430 px phone) and is not covered (the windows shell's taskbar lay over it),
+//   and on a touch screen the tools are not dimmed.
 // Both shells, English and German, phone widths up to 430 and desktop widths.
 //
 //   npm run build && npm run sheets-layout      (needs the `playwright` package and a Chromium)
@@ -128,6 +129,16 @@ function measureStage() {
       .map((b) => ({ text: b.textContent.trim(), r: b.getBoundingClientRect() }))
       .filter(({ r }) => r.right > window.innerWidth + 0.5 || r.left < -0.5 || r.bottom > window.innerHeight + 0.5)
       .map(({ text, r }) => `"${text}" ends at ${Math.round(r.right)}`),
+    // inside the window but under something else (the windows shell's taskbar covered "Leave")
+    covered: [...tools.querySelectorAll("button")]
+      .filter((b) => {
+        const r = b.getBoundingClientRect();
+        const x = Math.min(r.left + r.width / 2, window.innerWidth - 1);
+        const y = Math.min(r.top + r.height / 2, window.innerHeight - 1);
+        const hit = document.elementFromPoint(x, y);
+        return !hit || !b.contains(hit);
+      })
+      .map((b) => b.textContent.trim()),
   };
 }
 
@@ -195,6 +206,7 @@ try {
       if (!st) fail(`${where} stage`, "no tools");
       else {
         for (const o of st.out) fail(`${where} stage`, `${o}, the window at ${st.vw}`);
+        for (const c of st.covered) fail(`${where} stage`, `"${c}" is covered by another element`);
         if (touch && st.opacity < 1) fail(`${where} stage`, `the tools are dimmed (${st.opacity}) on a touch screen`);
       }
       await ctx.close();

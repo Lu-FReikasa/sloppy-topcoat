@@ -525,6 +525,19 @@
   container: sheet-stage / inline-size;
 }
 
+/* the windows shell keeps its windows in one layer under the taskbar (.dt-stage isolates them), so
+   the taskbar covered the stage's bottom row ("Leave" in every look without a window transform).
+   The stage is the whole screen: while it is open, the windows' layer goes above the taskbar */
+.dt-stage:has(.sheet-stage) {
+  z-index: 1;
+}
+
+/* the Leitstand look cuts its windows' corners with a clip-path, which clips a fixed child too:
+   the stage showed only inside the window's shape (the look's rule has the same weight and loads later) */
+.dt-root .dt-program:has(.sheet-stage) {
+  clip-path: none;
+}
+
 /* at the bottom, under the sheet: the arrows sit where a hand holding a turned laptop reaches them */
 .sheet-stage-head {
   order: 1;
