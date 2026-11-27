@@ -323,6 +323,11 @@ describe("the desk's paper", () => {
     expect(worst(pairs)).toEqual([]);
   });
 
+  it("writes the grey lettering (rail labels, table headings) readable on every paper", () => {
+    const muted = colour("var(--muted)", vars);
+    expect(worst(papers.map(([name, paper]) => ({ what: `muted on ${name}`, fg: muted, bg: paper })))).toEqual([]);
+  });
+
   it("writes an application's name in its hue as an ink readable on every paper, whatever the hue", () => {
     const name = decls(sheet, ".dt-look-schreibtisch .dt-program .open-chats-app, .dt-look-schreibtisch .dt-program .chat-origin-app");
     const pairs = ALL_HUES.flatMap((hue) =>
