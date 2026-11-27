@@ -7,6 +7,8 @@
 > `proto/v1/` are the source of truth for the node messages.
 
 Transport: one WebSocket per node, opened **by the node** to `wss://<hub>/api/node/ws`.
+A message is at most 8 MiB in the node-to-hub direction (the hub's limit for every WebSocket; a
+larger one closes the socket with `1009`) and at most 4 MiB in the other (the node's read limit).
 Messages are JSON objects. The JSON Schemas in `proto/` are the source of truth; this file
 explains them. Every message has:
 
