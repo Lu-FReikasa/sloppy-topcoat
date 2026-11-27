@@ -222,8 +222,9 @@ export function SubtaskView({
       )}
 
       {large.state !== "planning" && writes && (
-        // the card of the workshop scope (D110): the whole scope is shown before the click, and
-        // only the signed-in admin's click gives it; the hub sets branch, actions and duration
+        // the card of the workshop scope (D110): the whole scope is shown before the click, in the
+        // hub's own words (#190; the catalogue text only for an older hub), and only the signed-in
+        // admin's click gives it; the hub sets branch, actions and duration
         <div className="project-form large-task-scope" data-testid="workshop-scope">
           <p>
             <strong>{t("largeTask.scopeTitle")}</strong>{" "}
@@ -231,7 +232,8 @@ export function SubtaskView({
           </p>
           {!scopeActive && (
             <p className="small">
-              {t("largeTask.scopeText", { number: large.number, title: large.title, branch: large.branch, days: SCOPE_DAYS })}
+              {large.scope_text ||
+                t("largeTask.scopeText", { number: large.number, title: large.title, branch: large.branch, days: SCOPE_DAYS })}
             </p>
           )}
           <div className="project-actions">

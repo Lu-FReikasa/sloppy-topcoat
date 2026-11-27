@@ -574,6 +574,9 @@ export interface LargeTaskView {
     branch: string;
     state: "planning" | "running" | "blocked" | "done";
     scope: { id: string; state: "active" | "ended"; expires_at: string } | null;
+    /** The card of the workshop scope in the hub's own words (hub vorhaben.scope_text, the text
+     *  the click stores in the mandate). Absent from an older hub: then the catalogue text. */
+    scope_text?: string;
   };
   subtasks: Subtask[];
   rollout: { ready: boolean };

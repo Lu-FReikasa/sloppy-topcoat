@@ -159,7 +159,7 @@ describe("SubtaskView", () => {
     expect(await screen.findByText(having("wartet unter Änderungssätze"))).toBeTruthy();
   });
 
-  it("shows the whole workshop scope before the click and asks the hub for nothing else", async () => {
+  it("shows the whole workshop scope before the click (catalogue text for an older hub) and asks the hub for nothing else", async () => {
     const api = fakeApi(view(PLAN));
     render(<SubtaskView api={api} nodeId="lt" />);
     const card = await screen.findByTestId("workshop-scope");
@@ -171,6 +171,15 @@ describe("SubtaskView", () => {
     fireEvent.click(within(card).getByRole("button", { name: "Werkstatt-Umfang erteilen" }));
     await waitFor(() => expect(api.giveWorkshopScope).toHaveBeenCalledWith("lt"));
     await waitFor(() => expect(api.largeTask.mock.calls.length).toBeGreaterThan(1));
+  });
+
+  it("shows the hub's own scope text when the hub sends one, not the catalogue's", async () => {
+    const hubText = "Vorhaben 3.2.1 „Paging“: Der Hub darf genau das, was dieser Text sagt.";
+    const api = fakeApi(view(PLAN, { scope_text: hubText }));
+    render(<SubtaskView api={api} nodeId="lt" />);
+    const card = await screen.findByTestId("workshop-scope");
+    expect(within(card).getByText(hubText)).toBeTruthy();
+    expect(within(card).queryByText(having("Theme- und Persona-Entwürfe ändern"))).toBeNull();
   });
 
   it("offers to revoke an active scope and hides the card when nothing left writes", async () => {

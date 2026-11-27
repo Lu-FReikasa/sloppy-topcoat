@@ -233,8 +233,12 @@ def next_step(item: Item) -> str:
     return "startet, wenn die Abhängigkeiten fertig sind"
 
 
-def view(large: Any, project_title: str, items: Sequence[Item], mandate: Any | None) -> dict:
-    """The API shape the view of issue #33 reads (agreed in the PR of #32)."""
+def view(
+    large: Any, project_title: str, items: Sequence[Item], mandate: Any | None, repo: str
+) -> dict:
+    """The API shape the view of issue #33 reads (agreed in the PR of #32). ``scope_text`` is the
+    card of the workshop scope in the hub's own words (:func:`scope_text`, the same text the click
+    stores in the mandate), so the card cannot drift from what the click grants (issue #190)."""
     by_node = {str(i.node.id): i.spec.id for i in items}
     subtasks = [
         {
@@ -281,6 +285,7 @@ def view(large: Any, project_title: str, items: Sequence[Item], mandate: Any | N
             "branch": branch_of(large.number),
             "state": overall,
             "scope": scope,
+            "scope_text": scope_text(large.number, large.title, repo),
         },
         "subtasks": subtasks,
         "rollout": {"ready": overall == "done"},
@@ -504,6 +509,8 @@ class Coordinator:
         )
 
     async def view(self, user_id: uuid.UUID, large_id: uuid.UUID) -> dict[str, Any]:
+        from topcoat_hub.issue_fixes import LIVE_REPO  # the repository the scope's click names
+
         large = await self.store.get_node(user_id, large_id)
         project = await self.store.get_project(user_id, large.project_id)
         items = await self.items(user_id, large)
@@ -512,7 +519,7 @@ class Coordinator:
             for m in await self.store.mandates_of(user_id, large.project_id)
             if m.branch == branch_of(large.number) and WORKSHOP in (m.actions or [])
         ]
-        return view(large, project.title, items, mandates[0] if mandates else None)
+        return view(large, project.title, items, mandates[0] if mandates else None, LIVE_REPO)
 
     async def tick(
         self,

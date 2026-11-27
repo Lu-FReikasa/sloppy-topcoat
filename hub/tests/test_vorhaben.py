@@ -270,6 +270,8 @@ async def test_a_workshop_scope_never_pushes_and_covers_nothing_else(client: Tes
 async def test_the_card_makes_the_scope_and_the_view_shows_it(client: TestClient) -> None:
     _, large, _, _ = await _setup(client)
     _, admin_key = make_user(TEST_DB_URL, "vorhaben key", role="admin")
+    before = client.get(f"/api/project/nodes/{large.id}/large-task", headers=AUTH).json()
+    assert before["large_task"]["scope"] is None
     url = f"/api/project/nodes/{large.id}/workshop-scope"
     assert client.post(url, headers=admin_key).status_code in (401, 403)
     made = client.post(url, headers=AUTH)
@@ -284,3 +286,5 @@ async def test_the_card_makes_the_scope_and_the_view_shows_it(client: TestClient
         body["large_task"]["scope"]["id"] == m["id"] and body["large_task"]["state"] == "planning"
     )
     assert body["subtasks"] == [] and body["rollout"] == {"ready": False}
+    # the card shows the hub's words before the click, and they are what the click stored (#190)
+    assert before["large_task"]["scope_text"] == m["text"] == body["large_task"]["scope_text"]
