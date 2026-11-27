@@ -19,7 +19,7 @@ Every rule leaves a sheet it has cleaned as it is, so running them twice changes
 import re
 from dataclasses import dataclass, field
 
-from topcoat_hub.sheets.chordpro import Line, Section, Sheet, kind_of, parse_line
+from topcoat_hub.sheets.chordpro import Line, Section, Segment, Sheet, kind_of, parse_line
 from topcoat_hub.sheets.chords import Key, parse_chord, uses_german_names
 from topcoat_hub.sheets.plaintext import _FILLER, _TAB, _without_remark
 
@@ -36,10 +36,13 @@ class Applied:
     removed: list[str] = field(default_factory=list)  # header lines dropped or made facts
 
 
-def apply(sheet: Sheet) -> Applied:
-    """Clean ``sheet`` in place; what was done, for the report."""
+def apply(sheet: Sheet, german: bool = False, shapes: int = 0) -> Applied:
+    """Clean ``sheet`` in place; what was done, for the report. ``german``: the source writes German
+    note names (its ``[...]`` chords had an ``H``), so a plain ``B`` is a B flat. ``shapes``: the
+    source's ``{capo}`` (its chords are shapes, ``chordpro.shape_capo``); under ``{x_capo}`` they
+    sound as written."""
     done = Applied()
-    _chord_lines(sheet, done)
+    _chord_lines(sheet, done, german, shapes)
     _tab_blocks(sheet, done)
     _header(sheet, done)
     _accents(sheet)
@@ -116,8 +119,19 @@ def _german(sheet: Sheet) -> bool:
     return uses_german_names(names)
 
 
-def _chord_lines(sheet: Sheet, done: Applied) -> None:
-    german = _german(sheet)
+def _sounding(ln: Line, capo: int) -> Line:
+    """Plain chords are written as the source wrote them: the shapes when it plays with a capo (the
+    chords in ``[...]`` were moved to sounding pitch already, ``chordpro.parse``)."""
+    if not capo:
+        return ln
+    segs = [
+        Segment(g.text, g.chord.transpose(capo) if g.chord else None, g.raw) for g in ln.segments
+    ]
+    return Line(segs, ln.comment)
+
+
+def _chord_lines(sheet: Sheet, done: Applied, german: bool, shapes: int) -> None:
+    german = german or _german(sheet)
     out: list[Section] = []
     for sec in sheet.sections:
         out.append(sec)
@@ -144,7 +158,7 @@ def _chord_lines(sheet: Sheet, done: Applied) -> None:
                 part.kind, part.label = kind_of(label) or "other", label
             elif label:
                 chords = f"{label}: {chords}"
-            part.lines.append(parse_line(chords, german))
+            part.lines.append(_sounding(parse_line(chords, german), shapes))
             done.chord_lines += 1
     _replace(sheet, out)
 
@@ -234,15 +248,19 @@ _RIFF_NAMES = re.compile(
 # "Standard tuning", "Drop D tuning", "Eb tuning (half step down)"
 _HERTZ = re.compile(r"\b(4[0-9]{2}(?:[.,][0-9]+)?)\s*hz\b", re.I)
 _TUNING = re.compile(r"^(\S+(?:\s+\S+){0,3})\s+tuning\s*((?:[:(\-].*)?)$", re.I)
+# the words in front of "tuning" ("we keep on tuning" is lyrics; "Drop-D", "1/2 step down" are not)
+_TUNING_WORD = re.compile(
+    r"^(?:standard|drop|open|half|whole|step|down|1/2|[a-g][#b]?|[a-g#b]{4,8})$", re.I
+)
 _SOURCE = re.compile(
     r"^(?:source|quelle|from|taken from|found (?:at|on))\s*:|https?://|www\.|"
     r"^\S+\.(?:com|net|org|de|at|ch|info|co\.uk|fr|it|es|nl)(?:/\S*)?$",
     re.I,
 )
 _CREDIT = re.compile(
-    r"^(?:album|difficulty|author|composer|written by|words and music|words & music|lyrics by|"
-    r"music by|chords? by|tab(?:bed)? by|transcribed by|arranged by|submitted by|corrected by)\b|"
-    r"@",
+    r"^(?:album|difficulty|author|composer)\s*:|"  # "Album of the year…" is lyrics
+    r"^(?:written by|words and music|words & music|lyrics by|music by|chords? by|tab(?:bed)? by|"
+    r"transcribed by|arranged by|submitted by|corrected by)\b|@",
     re.I,
 )
 _FILLER_WORDS = {"by", "von", "feat", "ft", "and", "the", "und", "chords", "tab", "akkorde"}
@@ -286,7 +304,7 @@ def _header_line(text: str, sheet: Sheet) -> bool:
         sheet.meta.setdefault("x_tuning", f"{m.group(1)} Hz")
         return True
     m = _TUNING.match(t)
-    if m:
+    if m and all(_TUNING_WORD.match(w) for w in re.split(r"[\s-]+", m.group(1)) if w):
         sheet.meta.setdefault("x_tuning", (m.group(1) + m.group(2)).strip())
         return True
     return bool(

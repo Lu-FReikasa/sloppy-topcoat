@@ -1,6 +1,8 @@
 """The rules that clean one sheet on its own (sheets/rules.py): chords written as text get real
 chords, tab staves go, header lines go. All sheets here are made up."""
 
+import pytest
+
 from topcoat_hub.sheets import chordpro, plaintext, rules, store, tidy
 from topcoat_hub.sheets.chordpro import Sheet
 
@@ -63,6 +65,24 @@ def test_german_plain_chords_are_read_as_german() -> None:
     assert [c.name() for c in s.sections[0].lines[0].chords] == ["B", "E", "A#"]
 
 
+def test_german_bracket_chords_make_the_plain_ones_german_too() -> None:
+    s = store.read("{start_of_verse}\n[H]wir [E]singen\n{comment: B  E}\n{end_of_verse}\n")
+    assert names(s) == ["B", "E", "A#", "E"]  # the plain B is a B flat
+
+
+def test_plain_chords_with_a_capo_are_shapes() -> None:
+    s = store.read("{capo: 2}\n{start_of_verse}\n{comment: C  G}\n[C]boats [G]sail\n"
+                   "{end_of_verse}\n")  # fmt: skip
+    assert names(s) == ["D", "A", "D", "A"]  # sounding, like the chords in brackets
+
+
+def test_plain_chords_of_a_stored_sheet_already_sound() -> None:
+    # the stored form ({x_capo}, the editor's text) is in sounding pitch: nothing is moved
+    s = store.read("{x_capo: 2}\n{start_of_verse}\n{comment: D  A}\n[D]boats [A]sail\n"
+                   "{end_of_verse}\n")  # fmt: skip
+    assert names(s) == ["D", "A", "D", "A"]
+
+
 def test_a_remark_after_plain_chords_stays_text() -> None:
     s = cp("{start_of_outro}\nC  G  (to fade)\n{end_of_outro}\n")
     rules.apply(s)
@@ -92,13 +112,15 @@ def test_tab_staves_from_a_plain_page_go() -> None:
 def test_tab_lines_inside_a_part_go_and_its_lyrics_stay() -> None:
     text = "\n".join(
         ["{start_of_chorus}", "[C]sail away", *STAFF, "[G]sail back home", "{end_of_chorus}",
-         "{chorus}"]
+         "{start_of_verse}", "[D]a verse", "{end_of_verse}", "{chorus}"]
     )  # fmt: skip
     s = cp(text)
     rules.apply(s)
-    assert [x.kind for x in s.sections] == ["chorus", "chorus"]
-    assert s.sections[1].repeat_of == 0  # {chorus} still repeats the first part
-    assert lyric_lines(s) == ["sail away", "sail back home"]
+    assert [x.kind for x in s.sections] == ["chorus", "verse", "chorus"]
+    assert lyric_lines(s)[:2] == ["sail away", "sail back home"]
+    assert s.sections[2].repeat_of == 0  # {chorus} still repeats the whole chorus
+    stored = cp(chordpro.write(s))  # and still does once the sheet is stored and read again
+    assert stored.sections[2].repeat_of == 0
 
 
 def test_a_tab_part_and_its_repeat_go() -> None:
@@ -154,11 +176,24 @@ def test_a_line_with_the_title_and_artist_goes() -> None:
     assert lyric_lines(s) == ["paper boat on the water"]
 
 
+@pytest.mark.parametrize(
+    ("line", "tuning"),
+    [("Drop-D tuning", "Drop-D"), ("Half-step down tuning", "Half-step down"),
+     ("1/2 step down tuning", "1/2 step down"), ("DADGAD tuning", "DADGAD")],
+)  # fmt: skip
+def test_tuning_lines_with_hyphens_and_halves_are_facts(line: str, tuning: str) -> None:
+    s = cp(f"{line}\n\n[G]paper boats\n")
+    assert rules.apply(s).removed == [line]
+    assert s.meta["x_tuning"] == tuning
+
+
 def test_lyrics_before_the_first_chord_stay() -> None:
-    s = cp("by the river we sing\nthe radio tuning in\n\n[G]paper boats\n")
+    lines = ["by the river we sing", "the radio tuning in", "we keep on tuning",
+             "Album of the year"]  # fmt: skip
+    s = cp("\n".join(lines) + "\n\n[G]paper boats\n")
     done = rules.apply(s)
-    assert done.removed == []
-    assert lyric_lines(s)[:2] == ["by the river we sing", "the radio tuning in"]
+    assert done.removed == [] and "x_tuning" not in s.meta
+    assert lyric_lines(s)[:4] == lines
 
 
 def test_header_words_after_the_first_chord_stay() -> None:
