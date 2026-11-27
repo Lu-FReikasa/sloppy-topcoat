@@ -33,6 +33,14 @@
     { "css": ".a{background-image:src(\"https://evil.example/x.png\")}", "ok": false },
     { "css": ".a{background:url(\"data:image/png,x\"), url(https://evil.example/x.png)}", "ok": false },
     { "css": ".a{content:\"/*\"}.b{background:url(https://evil.example/x.png)}.c{content:\"*/\"}", "ok": false },
-    { "css": ".a{x:\\/*}.b{background:url(https://evil.example/x.png)}/**/}", "ok": false }
+    { "css": ".a{x:\\/*}.b{background:url(https://evil.example/x.png)}/**/}", "ok": false },
+    { "css": ".a { background: url( data:image/png;base64,AAAA ) /* a note */; content: \"\\\"\"; }", "ok": true },
+    { "css": ".a{background:url(data:image/png,/*)}.b{background:url(https://evil.example/x.png)}.c{x:*/)}", "ok": false },
+    { "css": ".a{background:url(data:image/png,/*)}.b{background-image:image-set(\"https://evil.example/x.png\" 1x)}.c{x:*/)}", "ok": false },
+    { "css": ".a{background:\\75 rl(data:image/png,/*)}.b{background:url(https://evil.example/x.png)}.c{x:*/)}", "ok": false },
+    { "css": ".a{background:url(data:image/png,')}.c{color:\"'/*\"}.b{background:url(https://evil.example/x.png)}.c{color:\"*/\"}", "ok": false },
+    { "css": ".a{background:url( /*x*/data:image/png,x)}", "ok": false },
+    { "css": ".a{background:url(\\\"data:image/png,x\\\")}", "ok": false },
+    { "css": ".a{background:éurl(x)} .b{background:x\\75 rl(x)}", "ok": true }
   ]
 }

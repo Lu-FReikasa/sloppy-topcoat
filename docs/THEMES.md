@@ -156,7 +156,7 @@ Refused, as a whole: `@import`, `@charset`, `@namespace`, any `url()` that is no
 `data:image`, `image-set()`, `image()`, `cross-fade()`, `src()`, `element()`, `expression(`,
 `javascript:`, `behavior`, `-moz-binding`, anything that looks like markup. The check reads the
 sheet as the browser does (comments out, backslash escapes decoded), so an escape such as `\75 rl(`
-counts as `url(`. The same check runs in the hub before a theme is stored and in the web build before it is
+counts as `url(`. An unquoted `url(…)` may not hold a quote, a `(` or `/*` (write `url("data:…")` then). The same check runs in the hub before a theme is stored and in the web build before it is
 drawn (`cssProblems`). The hub also names, before a theme is used, every class the desktop does not
 draw and every variable that is set nowhere (`theme_lint`).
 

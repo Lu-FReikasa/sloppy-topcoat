@@ -282,14 +282,23 @@ function cssEscape(css: string, i: number): [string, number] {
   return [css.slice(j, j + 1), j + 1];
 }
 
-/** The style sheet as the browser reads it: comments out, escapes decoded, in one pass that knows
- *  strings (a `/*` inside a string starts no comment, an escaped `\/*` none either). The checks
- *  look at this, so neither an escape nor a comment can hide a name from them. The same as the
- *  hub's `css_plain` (ui/themes.py). */
-export function cssPlain(css: string): string {
-  let out = "";
+/** Whether a character continues a CSS name (ident, number unit, hash, at-keyword). */
+function nameChar(ch: string): boolean {
+  return /^[A-Za-z0-9_-]$/.test(ch) || (ch.codePointAt(0) ?? 0) >= 0x80;
+}
+
+/** `cssPlain` and whether an unquoted `url(` holds a quote, a `(` or a `/*`. The browser reads an
+ *  unquoted `url(…)` as one token up to `)`: inside it `/*` starts no comment and a quote no string
+ *  (a quote or `(` makes it a bad url that runs to `)`). Read any other way, a comment or string
+ *  seen there would hide what follows from the checks, so such a sheet is refused instead of
+ *  guessed at. The same as the hub's `_css_read` (ui/themes.py). */
+function cssRead(css: string): { flat: string; badUrl: boolean } {
+  const out: string[] = [];
   let i = 0;
   let quote = "";
+  // "" outside, "pending" after url( and white space, "open" inside an unquoted url
+  let url: "" | "pending" | "open" = "";
+  let badUrl = false;
   const n = css.length;
   while (i < n) {
     const c = css[i] ?? "";
@@ -299,42 +308,70 @@ export function cssPlain(css: string): string {
         // delimiter and the line break stays
         if (quote) i += css.startsWith("\r\n", i + 1) ? 3 : 2;
         else {
-          out += c;
+          out.push(c);
           i += 1;
+          if (url) url = "open";
         }
         continue;
       }
       const [ch, next] = cssEscape(css, i);
-      out += ch;
+      // an escaped quote is a name character, never the start or end of a string
+      out.push(ch === '"' || ch === "'" ? "\uFFFD" : ch);
       i = next;
+      if (url) url = "open";
       continue;
     }
     if (quote) {
       if (c === quote || "\n\r\f".includes(c)) quote = ""; // an unescaped line break ends a (bad) string
-      out += c;
+      out.push(c);
+      i += 1;
+      continue;
+    }
+    if (url) {
+      if (c === ")") url = "";
+      else if ((c === '"' || c === "'") && url === "pending") {
+        url = ""; // url("…"): an ordinary string follows
+        continue;
+      } else if (c === '"' || c === "'" || c === "(" || css.startsWith("/*", i)) badUrl = true;
+      else if (!" \t\n\r\f".includes(c)) url = "open";
+      out.push(c);
       i += 1;
       continue;
     }
     if (c === '"' || c === "'") {
       quote = c;
-      out += c;
+      out.push(c);
       i += 1;
       continue;
     }
     if (css.startsWith("/*", i)) {
       const end = css.indexOf("*/", i + 2);
       i = end < 0 ? n : end + 2;
-      out += " ";
+      out.push(" ");
       continue;
     }
-    out += c;
+    if (c === "(" && out.slice(-3).join("").toLowerCase() === "url") {
+      if (out.length < 4 || !nameChar(out[out.length - 4] ?? "")) url = "pending";
+    }
+    out.push(c);
     i += 1;
   }
-  return out;
+  return { flat: out.join(""), badUrl };
+}
+
+/** The style sheet as the browser reads it: comments out, escapes decoded, in one pass that knows
+ *  strings (a `/*` inside a string starts no comment, an escaped `\/*` none either) and unquoted
+ *  `url(…)` (`cssRead`). The checks look at this, so neither an escape nor a comment can hide a
+ *  name from them. An escaped quote reads as U+FFFD. The same as the hub's `css_plain`. */
+export function cssPlain(css: string): string {
+  return cssRead(css).flat;
 }
 
 /** Functions that load what a string or URL names (`image-set("…")` needs no `url()`). */
-const LOADING_FUNCTIONS = /(?<![\w-])(?:-webkit-)?(?:image-set|image|cross-fade|src|element)\(/i;
+// Not after a name character (ASCII letter, digit, "_", "-" or anything from U+0080): there the
+// browser reads one longer name, not this function. The same as the hub's `_AFTER_NAME`.
+const LOADING_FUNCTIONS =
+  /(?<![0-9A-Za-z_\u0080-\u{10FFFF}-])(?:-webkit-)?(?:image-set|image|cross-fade|src|element)\(/iu;
 const DATA_IMAGE = /^data:image\/(png|jpeg|gif|webp|svg\+xml)[;,]/i;
 
 /** Why a style sheet may not be used. A theme's CSS can restyle everything it can reach, but it
@@ -345,12 +382,12 @@ const DATA_IMAGE = /^data:image\/(png|jpeg|gif|webp|svg\+xml)[;,]/i;
 export function cssProblems(css: string): string[] {
   const out: string[] = [];
   if (css.length > MAX_CSS) out.push(`css: at most ${MAX_CSS} characters`);
-  const flat = cssPlain(css);
+  const { flat, badUrl } = cssRead(css);
   if (/@import/i.test(flat)) out.push("css: @import is not allowed");
   if (/@charset|@namespace/i.test(flat)) out.push("css: @charset and @namespace are not allowed");
-  for (const m of flat.matchAll(/(?<![\w-])url\(/gi)) {
+  for (const m of flat.matchAll(/(?<![0-9A-Za-z_\u0080-\u{10FFFF}-])url\(/giu)) {
     const start = /^\s*(['"]?)\s*(data:[^'")\s]*)/i.exec(flat.slice((m.index ?? 0) + m[0].length));
-    if (!start || !DATA_IMAGE.test(start[2] ?? "")) {
+    if (badUrl || !start || !DATA_IMAGE.test(start[2] ?? "")) {
       out.push("css: url() may only hold an inline data:image");
       break;
     }

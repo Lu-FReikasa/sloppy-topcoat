@@ -58,10 +58,13 @@ def schema_text() -> str:
 
 # Functions that load what a string or URL names (image-set("…") needs no url()); a theme may only
 # use url() with an inline data:image, and none of these.
+# Not after a name character (ASCII letter, digit, "_", "-" or anything from U+0080): there the
+# browser reads one longer name, not this function.
+_AFTER_NAME = r"(?<![0-9A-Za-z_\u0080-\U0010ffff-])"
 _LOADING_FUNCTIONS = re.compile(
-    r"(?<![\w-])(?:-webkit-)?(?:image-set|image|cross-fade|src|element)\(", re.I
+    _AFTER_NAME + r"(?:-webkit-)?(?:image-set|image|cross-fade|src|element)\(", re.I
 )
-_URL_FUNCTION = re.compile(r"(?<![\w-])url\(", re.I)
+_URL_FUNCTION = re.compile(_AFTER_NAME + r"url\(", re.I)
 _DATA_URL_START = re.compile(r"""\s*(['"]?)\s*(data:[^'")\s]*)""", re.I)
 _HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
 
@@ -87,13 +90,23 @@ def _escape(css: str, i: int) -> tuple[str, int]:
     return css[j], j + 1
 
 
-def css_plain(css: str) -> str:
-    """The style sheet as the browser reads it: comments out, escapes decoded, in one pass that
-    knows strings (a ``/*`` inside a string starts no comment, an escaped ``\\/*`` none either).
-    The checks look at this, so neither an escape nor a comment can hide a name from them."""
+def _name_char(ch: str) -> bool:
+    """Whether a character continues a CSS name (ident, number unit, hash, at-keyword)."""
+    return (ch.isascii() and ch.isalnum()) or ch in "_-" or ord(ch) >= 0x80
+
+
+def _css_read(css: str) -> tuple[str, bool]:
+    """``css_plain`` and whether an unquoted ``url(`` holds a quote, a ``(`` or a ``/*``.
+
+    The browser reads an unquoted ``url(…)`` as one token up to ``)``: inside it ``/*`` starts no
+    comment and a quote no string (a quote or ``(`` makes it a bad url that runs to ``)``). Read
+    any other way, a comment or string seen there would hide what follows from the checks, so
+    such a sheet is refused instead of guessed at."""
     out: list[str] = []
     i, n = 0, len(css)
     quote = ""
+    url = ""  # "" outside, "pending" after url( and white space, "open" inside an unquoted url
+    bad_url = False
     while i < n:
         c = css[i]
         if c == "\\":
@@ -105,13 +118,29 @@ def css_plain(css: str) -> str:
                 else:
                     out.append(c)
                     i += 1
+                    url = "open" if url else ""
                 continue
             ch, i = _escape(css, i)
-            out.append(ch)
+            # an escaped quote is a name character, never the start or end of a string
+            out.append("\ufffd" if ch in "\"'" else ch)
+            url = "open" if url else ""
             continue
         if quote:
             if c == quote or c in "\n\r\f":  # an unescaped line break ends a (bad) string
                 quote = ""
+            out.append(c)
+            i += 1
+            continue
+        if url:
+            if c == ")":
+                url = ""
+            elif c in "\"'" and url == "pending":
+                url = ""  # url("…"): an ordinary string follows
+                continue
+            elif c in "\"'(" or css.startswith("/*", i):
+                bad_url = True
+            elif c not in " \t\n\r\f":
+                url = "open"
             out.append(c)
             i += 1
             continue
@@ -125,9 +154,23 @@ def css_plain(css: str) -> str:
             i = n if end < 0 else end + 2
             out.append(" ")
             continue
+        if (
+            c == "("
+            and "".join(out[-3:]).lower() == "url"
+            and (len(out) < 4 or not _name_char(out[-4]))
+        ):
+            url = "pending"
         out.append(c)
         i += 1
-    return "".join(out)
+    return "".join(out), bad_url
+
+
+def css_plain(css: str) -> str:
+    """The style sheet as the browser reads it: comments out, escapes decoded, in one pass that
+    knows strings (a ``/*`` inside a string starts no comment, an escaped ``\\/*`` none either)
+    and unquoted ``url(…)`` (``_css_read``). The checks look at this, so neither an escape nor a
+    comment can hide a name from them. An escaped quote reads as U+FFFD."""
+    return _css_read(css)[0]
 
 
 def css_problems(css: str) -> list[str]:
@@ -136,14 +179,14 @@ def css_problems(css: str) -> list[str]:
     out: list[str] = []
     if len(css) > MAX_CSS:
         out.append(f"css: at most {MAX_CSS} characters")
-    flat = css_plain(css)
+    flat, bad_url = _css_read(css)
     if re.search(r"@import", flat, re.I):
         out.append("css: @import is not allowed")
     if re.search(r"@charset|@namespace", flat, re.I):
         out.append("css: @charset and @namespace are not allowed")
     for m in _URL_FUNCTION.finditer(flat):
         start = _DATA_URL_START.match(flat, m.end())
-        if start is None or not _DATA_IMAGE.match(start.group(2)):
+        if bad_url or start is None or not _DATA_IMAGE.match(start.group(2)):
             out.append("css: url() may only hold an inline data:image")
             break
     if _LOADING_FUNCTIONS.search(flat):
