@@ -4536,5 +4536,20 @@
       "setting": "eine Einstellung durch dich",
       "dependencies": "startet, wenn die Teilaufgaben davor fertig sind"
     }
+  },
+  "workCard": {
+    "label": "Aufgabe für {{employee}}",
+    "status": {
+      "sent": "Verschickt",
+      "queued": "Wartet in der Warteschlange",
+      "running": "Arbeitet daran",
+      "waiting": "Hat eine Rückfrage",
+      "done": "Fertig",
+      "failed": "Fehlgeschlagen",
+      "stopped": "Gestoppt"
+    },
+    "reportWhenDone": "Ich sage dir hier Bescheid, wenn es fertig ist.",
+    "talkDirectly": "Direkt mit {{employee}} sprechen",
+    "openFailed": "Das Gespräch ließ sich nicht öffnen. Bitte versuch es noch einmal."
   }
 }

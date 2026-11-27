@@ -317,6 +317,23 @@ export interface Conversation {
   message_count?: number;
 }
 
+/** A task the secretary handed on, as its card in the conversation shows it (D112, #37). */
+export interface WorkCard {
+  id: string;
+  employee: string;
+  employee_title: string;
+  topic: string;
+  status: "sent" | "queued" | "running" | "waiting" | "done" | "failed" | "stopped";
+  report_when_done: boolean;
+  created_at: string | null;
+  /** The secretary's message that said it was handed on; the card stands under it. */
+  chat_message_id: number | null;
+  /** A finished task's result, as it may enter the secretary's conversation. */
+  summary: string | null;
+  withheld: string[];
+  direct_conversation_id: string | null;
+}
+
 export interface ChatMessage {
   /** Server id; negative numbers are messages that only exist in this browser so far. */
   id: number;

@@ -231,6 +231,7 @@ class OrderStore:
         topic: str,
         status: str,
         report_when_done: bool,
+        chat_message_id: int | None = None,
     ) -> Order:
         order = Order(
             user_id=self.user_id,
@@ -240,10 +241,15 @@ class OrderStore:
             topic=topic[:TOPIC_CHARS],
             status=status,
             report_when_done=report_when_done,
+            chat_message_id=chat_message_id,
         )
         self.db.add(order)
         await self.db.flush()
         return order
+
+    async def get(self, order_id: uuid.UUID, lock: bool = False) -> Order | None:
+        stmt = select(Order).where(Order.user_id == self.user_id, Order.id == order_id)
+        return await self.db.scalar(stmt.with_for_update() if lock else stmt)
 
     async def of_message(self, message_id: uuid.UUID) -> Order | None:
         return await self.db.scalar(
@@ -265,6 +271,21 @@ class OrderStore:
             .order_by(ProjectNode.created_at.desc())
             .limit(1)
         )
+
+    async def replies_to(self, order: Order) -> list[ProjectNode]:
+        """Every message filed in reply to the order's request (results, questions back),
+        oldest first."""
+        if order.message_id is None or order.user_id != self.user_id:
+            return []
+        rows = await self.db.scalars(
+            select(ProjectNode)
+            .where(
+                ProjectNode.user_id == self.user_id,
+                ProjectNode.in_reply_to == order.message_id,
+            )
+            .order_by(ProjectNode.created_at)
+        )
+        return list(rows)
 
     async def listed(
         self, conversation_id: uuid.UUID | None = None, open_only: bool = False, limit: int = 20
@@ -311,6 +332,7 @@ async def hand_on(
     admin: bool,
     conversation_id: uuid.UUID | None,
     decision: Route,
+    chat_message_id: int | None = None,
 ) -> HandedOn:
     """Hand a routed reading task on: an ``assistant.request`` in the Secretary project, queued
     for the employee at once (no click: the contract hands on only to reading, D112), and an
@@ -344,6 +366,7 @@ async def hand_on(
             topic=decision.topic,
             status=STATUS_OF.get(node.msg_state or "sent", "sent"),
             report_when_done=decision.report_when_done,
+            chat_message_id=chat_message_id,
         )
         await db.commit()
         await db.refresh(order)
@@ -478,3 +501,153 @@ async def status_lines(
             line += f"\n  {briefs[o.id]}"
         out.append(line)
     return "\n".join(out)
+
+
+# --- work cards and "talk to … directly" (issue #37) ---------------------------------------------
+
+CARDS = 50  # the work cards one conversation shows at most (newest)
+
+
+def _card(order: Order, language: str, form: result_forms.ForSecretary | None) -> dict[str, Any]:
+    """One work card: the employee, the task, the state and, for a finished task, the result
+    summary as it may enter the secretary's conversation (through the filter of D65). No ids of
+    the project behind it: only the order's own id, for the button."""
+    return {
+        "id": str(order.id),
+        "employee": order.target,
+        "employee_title": _title(order.target, language),
+        "topic": order.topic,
+        "status": order.status,
+        "report_when_done": order.report_when_done,
+        "created_at": order.created_at.isoformat() if order.created_at else None,
+        "chat_message_id": order.chat_message_id,
+        "summary": form.summary if form is not None else None,
+        "withheld": list(form.withheld) if form is not None else [],
+        "direct_conversation_id": (
+            str(order.direct_conversation_id) if order.direct_conversation_id else None
+        ),
+    }
+
+
+async def cards(
+    sessionmaker: async_sessionmaker[AsyncSession],
+    user_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    language: str = "en",
+) -> list[dict[str, Any]]:
+    """The work cards of one of the person's conversations, oldest first: each task the secretary
+    handed on there. Another person's conversation has none (the orders are scoped by
+    ``user_id``)."""
+    lang = "de" if language == "de" else "en"
+    async with sessionmaker() as db:
+        store = OrderStore(db, user_id)
+        orders = await store.listed(conversation_id, limit=CARDS)
+        forms: dict[uuid.UUID, result_forms.ForSecretary] = {}
+        if any(o.status == "done" for o in orders):
+            hosts, users, domains = await _private_names(db)
+            for o in orders:
+                result = await store.result_of(o) if o.status == "done" else None
+                if result is not None:
+                    forms[o.id] = result_forms.for_secretary(
+                        result.message_type or "", result.payload or {}, hosts, users, domains, lang
+                    )
+    return [_card(o, lang, forms.get(o.id)) for o in reversed(orders)]
+
+
+_DIRECT = {
+    "en": {
+        "head": "The secretary handed me this task: “{topic}”.",
+        "questions": "What to find out:",
+        "result": "My result:",
+        "asked": "I have a question back:",
+        "open": "I am not done yet ({state}).",
+        "failed": "I could not finish it.",
+        "stopped": "The task was stopped.",
+        "more": "Ask me here about it.",
+    },
+    "de": {
+        "head": "Das Sekretariat hat mir diese Aufgabe gegeben: „{topic}“.",
+        "questions": "Was herauszufinden ist:",
+        "result": "Mein Ergebnis:",
+        "asked": "Ich habe eine Rückfrage:",
+        "open": "Ich bin noch nicht fertig ({state}).",
+        "failed": "Ich konnte sie nicht abschließen.",
+        "stopped": "Die Aufgabe wurde gestoppt.",
+        "more": "Frag mich hier dazu.",
+    },
+}
+
+
+async def _direct_text(store: OrderStore, order: Order, language: str) -> str:
+    """The first message of the employee's own conversation: the task and what came of it, in
+    the employee's words. It is the employee's own context (D74), so its summary is given as it
+    wrote it; the filter of D65 stands only in front of the secretary."""
+    say = _DIRECT[language]
+    request = (
+        await store.db.scalar(
+            select(ProjectNode).where(
+                ProjectNode.user_id == store.user_id, ProjectNode.id == order.message_id
+            )
+        )
+        if order.message_id is not None
+        else None
+    )
+    lines = [say["head"].format(topic=order.topic)]
+    questions = [str(q) for q in ((request.payload or {}) if request else {}).get("questions", [])]
+    if questions:
+        lines += ["", say["questions"], *[f"- {q}" for q in questions]]
+    replies = await store.replies_to(order)
+    result = next(
+        (r for r in reversed(replies) if (r.message_type or "") in result_forms.RESULT_TYPES), None
+    )
+    asked = next(
+        (r for r in reversed(replies) if (r.message_type or "").endswith(".clarification")), None
+    )
+    if result is not None:
+        summary = str((result.payload or {}).get("summary") or "").strip()
+        lines += ["", say["result"], "", summary or result_forms.brief_of(
+            result.message_type or "", result.payload or {}
+        )]  # fmt: skip
+    elif order.status == "waiting" and asked is not None:
+        back = [str(q) for q in (asked.payload or {}).get("questions", [])]
+        lines += ["", say["asked"], *[f"- {q}" for q in back]]
+    elif order.status == "failed":
+        lines += ["", say["failed"]]
+    elif order.status == "stopped":
+        lines += ["", say["stopped"]]
+    else:
+        lines += ["", say["open"].format(state=_SAY[language].get(order.status, order.status))]
+    lines += ["", say["more"]]
+    return "\n".join(lines)
+
+
+async def talk_directly(
+    sessionmaker: async_sessionmaker[AsyncSession],
+    user_id: uuid.UUID,
+    order_id: uuid.UUID,
+    language: str = "en",
+) -> tuple[uuid.UUID, str] | None:
+    """The employee's own conversation about an order (issue #37): made on the first click, in
+    the employee's application with its default persona, beginning with the task and the result
+    in the employee's words; the same one again on a later click while it exists. Returns its id
+    and the application, ``None`` for an order that is not the person's."""
+    from topcoat_hub.chat_store import ChatStore
+
+    lang = "de" if language == "de" else "en"
+    async with sessionmaker() as db:
+        store = OrderStore(db, user_id)
+        order = await store.get(order_id, lock=True)  # two quick clicks open one conversation
+        if order is None:
+            return None
+        chats = ChatStore(db, user_id)
+        if (
+            order.direct_conversation_id is not None
+            and await chats.get_conversation(order.direct_conversation_id) is not None
+        ):
+            return order.direct_conversation_id, order.target
+        text = await _direct_text(store, order, lang)
+        conv = await chats.create_conversation(order.topic, application=order.target)
+        await chats.add_message(conv.id, "assistant", text)
+        order.direct_conversation_id = conv.id
+        await db.commit()
+        return conv.id, order.target

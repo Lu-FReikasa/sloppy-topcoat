@@ -713,3 +713,25 @@ brief and references (`{"kind": "file" | "branch", "ref": …}`), each through t
 secret or an identifier of the operator's network becomes a pointer ("The result holds private details; they
 stay in Research. Open it there."), a reference that names one is left out, and `withheld` lists the kinds
 found. The findings and their quotes, and the content of files and records, never enter the secretary's text.
+
+### Work cards and "talk to the employee directly" (D112, issue #37)
+
+Migration `so02_order_cards` adds two links to `orders`: `chat_message_id` (the secretary's message that said the
+task was handed on) and `direct_conversation_id` (the employee's own conversation the button opened).
+
+`GET /api/conversations/{id}/orders?language=en|de` lists the work cards of one of the person's conversations,
+oldest first (at most 50; 404 for a conversation that is not the person's): `id` (the order), `employee` (`research`,
+`dev`, `admin`), `employee_title` (from the contract, in the language asked for, else the person's), `topic`,
+`status` (`sent`, `queued`, `running`, `waiting`, `done`, `failed`, `stopped`), `report_when_done`, `created_at`,
+`chat_message_id` (the GUI shows the card under that message; `null` for an order from before the migration, which
+stands after the last message written before it), `summary` (a finished order's result as `result_forms.for_secretary`
+lets it into the secretary's conversation, else `null`), `withheld` (the private kinds the filter found) and
+`direct_conversation_id`.
+
+`POST /api/orders/{id}/direct?language=en|de` is the button "talk to … directly": it returns
+`{conversation_id, application}`, the employee's own conversation about the order. The first click makes it in the
+employee's application (title: the task; persona: the person's default, else the contract's) with one assistant
+message in the employee's words: the task, what to find out, and its result as it wrote it (the employee's own
+context, D74: the filter of D65 stands only in front of the secretary), its question back, or that it is not done
+yet. A later click returns the same conversation while it exists, else makes a new one. 404 for an order that is not
+the person's. The button is the person's own click and changes nothing but the person's conversations.

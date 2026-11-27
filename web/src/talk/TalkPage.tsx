@@ -7,6 +7,7 @@ import { ActivityTimeline } from "../chat/ActivityTimeline";
 import { CheckControls } from "../chat/CheckControls";
 import { ExportButtons } from "../chat/ExportButtons";
 import { HandoffCard } from "../chat/HandoffCard";
+import { placeCards, useWorkCards, WorkCardView } from "../chat/WorkCards";
 import { InternetSwitch, internetOn } from "../chat/InternetSwitch";
 import { ScopeHint } from "../chat/ScopeHint";
 import { ChatOrigin } from "../chat/ChatOrigin";
@@ -294,6 +295,14 @@ export function TalkPage({
   const history = wantBreak
     ? []
     : [...(showEarlier ? earlier.flatMap((e) => e.messages) : []), ...messages];
+  // the secretary's work cards (D112, #37): only Chat's own conversations hand tasks on
+  const cards = useWorkCards(
+    api,
+    id,
+    detail !== undefined && (detail.application ?? DEFAULT_APPLICATION) === DEFAULT_APPLICATION,
+    messageCount * 2 + (running ? 1 : 0),
+  );
+  const cardsUnder = placeCards(history, cards);
   const breaks = new Map<number, SectionBreak>();
   let offset = 0;
   (showEarlier ? earlier : []).forEach((e, i) => {
@@ -606,6 +615,9 @@ export function TalkPage({
                     )}
                 </MessageLine>
               )}
+              {cardsUnder.get(m.id)?.map((card) => (
+                <WorkCardView key={card.id} card={card} api={api} />
+              ))}
               {m.role === "assistant" && notes?.[m.id] && id && (
                 <RememberedNotes
                   notes={notes[m.id]!}
