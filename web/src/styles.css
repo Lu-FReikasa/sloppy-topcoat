@@ -4413,3 +4413,61 @@ button.tag-chip {
   font-family: var(--mono, monospace);
   font-size: 0.85em;
 }
+
+/* Node page tabs (issue #176) */
+.node-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 1rem 0 0.75rem;
+}
+
+.node-panel > :first-child {
+  margin-top: 0.5rem;
+}
+
+.node-model-filter {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.node-model-filter input {
+  font-size: 16px;
+}
+
+.models tr.model-split td {
+  padding: 0;
+  border-top: 2px solid var(--border);
+}
+
+/* one menu per model row instead of a pair of buttons: it opens in place, so the scrolling table
+   cannot clip it */
+.row-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.row-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.row-menu[open] > summary {
+  border-color: var(--accent);
+}
+
+.row-menu-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}

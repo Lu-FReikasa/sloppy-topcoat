@@ -6,6 +6,7 @@ import { formatDateTime, formatDecimal } from "../format";
 import { benchmarkFromEvents, bestTgPerModel, rowKey } from "../nodeActivity";
 import type { NodeDetail } from "../types";
 import { Dialog } from "./Dialog";
+import { HISTORY_SHOWN } from "./nodeTabs";
 
 interface Props {
   api: ApiClient;
@@ -17,6 +18,7 @@ export function BenchmarkSection({ api, node }: Props) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const [open, setOpen] = useState(false);
+  const [allRows, setAllRows] = useState(false);
   const [now] = useState(() => Date.now());
   const activity = useMemo(() => benchmarkFromEvents(node.events, now), [node.events, now]);
   const best = useMemo(() => bestTgPerModel(node.benchmarks), [node.benchmarks]);
@@ -49,14 +51,20 @@ export function BenchmarkSection({ api, node }: Props) {
       {activity.stale && <p className="muted">{t("benchmark.stale")}</p>}
       {!activity.running && activity.error !== undefined && (
         <p className="error">
-          {t("benchmark.failed", { message: activity.error || t("node.unknown") })}
+          {t("benchmark.failed", {
+            message: activity.error || t("node.unknown"),
+          })}
         </p>
       )}
       {activity.failures.length > 0 && (
         <ul className="error-list" data-testid="benchmark-failures">
           {activity.failures.map((f, i) => (
             <li key={i} className="notice-line">
-              {t("benchmark.runFailed", { model: f.model, backend: f.backend, message: f.error })}
+              {t("benchmark.runFailed", {
+                model: f.model,
+                backend: f.backend,
+                message: f.error,
+              })}
             </li>
           ))}
         </ul>
@@ -64,53 +72,62 @@ export function BenchmarkSection({ api, node }: Props) {
       {node.benchmarks.length === 0 ? (
         <p className="muted">{t("benchmark.empty")}</p>
       ) : (
-        <div className="table-wrap">
-          <table className="models benchmarks">
-            <thead>
-              <tr>
-                <th>{t("benchmark.colModel")}</th>
-                <th>{t("benchmark.colBackend")}</th>
-                <th>{t("benchmark.colThreads")}</th>
-                <th>{t("benchmark.colGpuLayers")}</th>
-                <th>{t("benchmark.colPp")}</th>
-                <th>{t("benchmark.colTg")}</th>
-                <th>{t("benchmark.colTime")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {node.benchmarks.map((r) => {
-                const key = rowKey(r);
-                const isBest = best.has(key);
-                return (
-                  <tr key={key} className={isBest ? "best" : undefined}>
-                    <td className="model-name">{r.model}</td>
-                    <td>{t(`backend.${r.backend}`, { defaultValue: r.backend })}</td>
-                    <td className="num">{r.threads}</td>
-                    <td className="num">{r.n_gpu_layers ?? "–"}</td>
-                    <td className="num">{formatDecimal(r.pp_tps, locale)}</td>
-                    <td className="num">
-                      {formatDecimal(r.tg_tps, locale)}
-                      {isBest && (
-                        <>
-                          {" "}
-                          <span
-                            className="best-mark"
-                            role="img"
-                            aria-label={t("benchmark.bestTitle")}
-                            title={t("benchmark.bestTitle")}
-                          >
-                            ★
-                          </span>
-                        </>
-                      )}
-                    </td>
-                    <td>{formatDateTime(r.ts, locale)}</td>
-                  </tr>
-                );
+        <>
+          <div className="table-wrap">
+            <table className="models benchmarks">
+              <thead>
+                <tr>
+                  <th>{t("benchmark.colModel")}</th>
+                  <th>{t("benchmark.colBackend")}</th>
+                  <th>{t("benchmark.colThreads")}</th>
+                  <th>{t("benchmark.colGpuLayers")}</th>
+                  <th>{t("benchmark.colPp")}</th>
+                  <th>{t("benchmark.colTg")}</th>
+                  <th>{t("benchmark.colTime")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(allRows ? node.benchmarks : node.benchmarks.slice(0, HISTORY_SHOWN)).map((r) => {
+                  const key = rowKey(r);
+                  const isBest = best.has(key);
+                  return (
+                    <tr key={key} className={isBest ? "best" : undefined}>
+                      <td className="model-name">{r.model}</td>
+                      <td>{t(`backend.${r.backend}`, { defaultValue: r.backend })}</td>
+                      <td className="num">{r.threads}</td>
+                      <td className="num">{r.n_gpu_layers ?? "–"}</td>
+                      <td className="num">{formatDecimal(r.pp_tps, locale)}</td>
+                      <td className="num">
+                        {formatDecimal(r.tg_tps, locale)}
+                        {isBest && (
+                          <>
+                            {" "}
+                            <span
+                              className="best-mark"
+                              role="img"
+                              aria-label={t("benchmark.bestTitle")}
+                              title={t("benchmark.bestTitle")}
+                            >
+                              ★
+                            </span>
+                          </>
+                        )}
+                      </td>
+                      <td>{formatDateTime(r.ts, locale)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {!allRows && node.benchmarks.length > HISTORY_SHOWN && (
+            <button type="button" onClick={() => setAllRows(true)}>
+              {t("nodeTabs.showMore", {
+                count: node.benchmarks.length - HISTORY_SHOWN,
               })}
-            </tbody>
-          </table>
-        </div>
+            </button>
+          )}
+        </>
       )}
       {open && <BenchmarkDialog api={api} node={node} onClose={() => setOpen(false)} />}
     </>
@@ -142,7 +159,10 @@ function BenchmarkDialog({
     try {
       // Keep the inventory order, not the click order.
       const models = node.models.map((m) => m.name).filter((n) => selected.includes(n));
-      const res = await api.runAction(node.id, "node.benchmark", { models, quick });
+      const res = await api.runAction(node.id, "node.benchmark", {
+        models,
+        quick,
+      });
       if (res.ok) {
         onClose();
         return;

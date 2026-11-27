@@ -25,7 +25,13 @@ function Harness({ api, nodeId }: { api: ApiClient; nodeId: string }) {
 afterEach(() => {
   vi.restoreAllMocks();
   bus = createHubEvents();
+  window.localStorage.clear(); // the page remembers the last tab
 });
+
+/** The node page shows one tab at a time (issue #176). */
+async function openTab(name: string) {
+  fireEvent.click(await screen.findByRole("tab", { name }));
+}
 
 function setup(detail: NodeDetail, actionRoute?: unknown, extra: Record<string, unknown> = {}) {
   const routes: Record<string, unknown> = { "GET /api/nodes/n1": detail, ...extra };
@@ -85,18 +91,22 @@ describe("NodeDetailView", () => {
 
   it("shows the free space of the model drive and warns when it is low", async () => {
     setup(makeDetail({ disk_total_mb: 953_000, disk_free_mb: 412_000 }));
-    const disk = await screen.findByTestId("node-disk");
+    // under Maintenance; the header stays quiet while there is room
+    const disk = await screen.findByTestId("node-disk-storage");
     expect(disk.textContent).toBe("402,3 GB frei von 930,7 GB");
     expect(disk.className).toBe("");
+    expect(screen.queryByTestId("node-disk")).toBeNull();
     cleanup();
     setup(makeDetail({ disk_total_mb: 953_000, disk_free_mb: 15_000 }));
     const low = await screen.findByTestId("node-disk");
     expect(low.textContent).toContain("knapp: ein Download kann abgelehnt werden");
     expect(low.className).toBe("warn-text");
+    expect(screen.getByTestId("node-disk-storage").className).toBe("warn-text");
     cleanup();
-    setup(makeDetail()); // nothing reported: no row
+    setup(makeDetail()); // nothing reported: no row, Maintenance says so
     await screen.findByRole("heading", { name: "node-nvidia" });
     expect(screen.queryByTestId("node-disk")).toBeNull();
+    expect(screen.queryByTestId("node-disk-storage")).toBeNull();
   });
 
   it("posts models.load when clicking Laden", async () => {
@@ -200,6 +210,7 @@ describe("NodeDetailView", () => {
       });
     });
     expect(screen.getByText("Spielt")).toBeTruthy();
+    await openTab("Verlauf");
     const items = screen.getAllByRole("listitem").filter((li) => li.closest("ol.events"));
     expect(items[0]?.textContent).toContain("Spiel erkannt");
   });
@@ -325,6 +336,7 @@ describe("NodeDetailView", () => {
     const mock = setup(makeDetail({ config }), undefined, {
       "PUT /api/nodes/n1/config": { config: { ...config, roles: ["tools"] }, config_hash: "h" },
     });
+    await openTab("Rechte & Fähigkeiten");
     const box = (await screen.findByRole("checkbox", {
       name: /Rechen-Node/,
     })) as HTMLInputElement;
@@ -385,6 +397,7 @@ describe("NodeDetailView", () => {
       }),
     );
     await screen.findByRole("heading", { name: "node-nvidia" });
+    await openTab("Verlauf");
     const items = screen.getAllByRole("listitem").filter((li) => li.closest("ol.events"));
     expect(items[0]?.textContent).toContain("Laden des Modells abgebrochen");
     expect(items[0]?.textContent).toContain("big: alles wurde entladen");
@@ -414,6 +427,7 @@ describe("NodeDetailView", () => {
     );
     await screen.findByRole("heading", { name: "node-nvidia" });
     expect(screen.getByText("Pausiert (wird genutzt)")).toBeTruthy();
+    await openTab("Verlauf");
     const items = screen.getAllByRole("listitem").filter((li) => li.closest("ol.events"));
     expect(items[0]?.textContent).toContain("Nach lokaler Nutzung fortgesetzt");
     expect(items[1]?.textContent).toContain("Für lokale Nutzung pausiert");
@@ -443,6 +457,7 @@ describe("NodeDetailView", () => {
       }),
     );
     await screen.findByRole("heading", { name: "node-nvidia" });
+    await openTab("Verlauf");
     const items = screen.getAllByRole("listitem").filter((li) => li.closest("ol.events"));
     expect(items[0]?.textContent).toContain("Laden des Modells fehlgeschlagen");
     expect(items[0]?.textContent).toContain("big: load big: failed to allocate");
@@ -548,6 +563,7 @@ describe("NodeDetailView", () => {
         "Von anderen Programmen belegt: 6.800 MB · GPU-Last anderer Programme: 97 % · Anderes Programm weicht in den Systemspeicher aus: 7.743 MB",
       ),
     ).toBeTruthy();
+    await openTab("Verlauf");
     const items = screen.getAllByRole("listitem").filter((li) => li.closest("ol.events"));
     expect(items[0]?.textContent).toContain("Automatisches Laden pausiert");
     expect(items[0]?.textContent).toMatch(/bis .*\(zu oft freigegeben\)/);
@@ -672,6 +688,7 @@ describe("NodeDetailView", () => {
     expect(screen.queryByRole("heading", { name: "Modelle" })).toBeNull();
     expect(screen.queryByRole("heading", { name: /Benchmark/ })).toBeNull();
     expect(screen.queryByRole("heading", { name: "GPUs" })).toBeNull();
+    await openTab("Wartung");
     expect(screen.getByRole("heading", { name: "Konfiguration" })).toBeTruthy();
   });
 
@@ -710,6 +727,7 @@ describe("NodeDetailView", () => {
     await screen.findByRole("heading", { name: "node-nvidia" });
     expect(onLoaded).toHaveBeenCalledTimes(1);
 
+    await openTab("Wartung");
     fireEvent.click(screen.getByRole("button", { name: "Umbenennen" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Neuer Name" }), {
       target: { value: "office-pc" },

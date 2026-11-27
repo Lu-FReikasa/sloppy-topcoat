@@ -77,6 +77,7 @@ describe("i18n catalogue", () => {
       ...["available", "busy_gaming", "degraded", "yielded", "offline"].map((s) => `state.${s}`),
       ...["connecting", "live", "lost"].map((s) => `connection.${s}`),
       ...["llamaserver", "fake"].map((s) => `runnerType.${s}`),
+      ...["models", "history", "rights", "maintenance"].map((s) => `nodeTabs.${s}`),
       ...[
         "model_loaded",
         "model_unloaded",
