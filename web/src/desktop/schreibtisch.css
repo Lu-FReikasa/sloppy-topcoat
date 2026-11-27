@@ -58,7 +58,7 @@
   --bg: transparent;
   --surface: rgba(255, 255, 255, 0.55);
   --text: #1b2230;
-  --muted: #5b6470;
+  --muted: #4f5864; /* 4.5:1 even on the carbon slip's darker lines (#174) */
   --border: rgba(27, 34, 48, 0.32);
   --accent: #a61e1e;
   --accent-text: #fbfbf7;

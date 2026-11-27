@@ -24,6 +24,19 @@ export function matches(entry: PaletteEntry, query: string): boolean {
     .every((word) => hay.includes(word));
 }
 
+/** How well an entry fits a query it matches, lower is better: each query word counts 0 when it
+ *  is in the label, 1 when only in the further words, 2 when only in the hint. So for "memo",
+ *  "Memory on or off" comes before an entry that only lists "memory" among its words (#174). */
+export function rank(entry: PaletteEntry, query: string): number {
+  const label = entry.label.toLowerCase();
+  const words = (entry.words ?? "").toLowerCase();
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .reduce((sum, word) => sum + (label.includes(word) ? 0 : words.includes(word) ? 1 : 2), 0);
+}
+
 const MAX_SHOWN = 12;
 
 /** The command palette (Ctrl+K, docs/DESKTOP.md): programs, views, settings and actions by name. */
@@ -33,7 +46,14 @@ export function CommandPalette({ entries, onClose }: { entries: PaletteEntry[]; 
   const [index, setIndex] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const found = useMemo(
-    () => entries.filter((e) => (query.trim() || !e.quiet) && matches(e, query)).slice(0, MAX_SHOWN),
+    () =>
+      entries
+        .filter((e) => (query.trim() || !e.quiet) && matches(e, query))
+        // best fit first; entries that fit equally well keep their order (sort is stable)
+        .map((e) => ({ e, r: rank(e, query) }))
+        .sort((a, b) => a.r - b.r)
+        .map(({ e }) => e)
+        .slice(0, MAX_SHOWN),
     [entries, query],
   );
   const current = Math.min(index, Math.max(0, found.length - 1));

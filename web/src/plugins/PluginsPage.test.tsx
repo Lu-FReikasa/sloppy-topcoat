@@ -152,6 +152,24 @@ describe("PluginsPage", () => {
       expect(mock.calls.find((c) => c.url === "/api/plugins/board/rollback")?.body).toEqual({ version: "1.0.0" }),
     );
   });
+  it("brings the versions into view and moves focus to their heading", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const mock = setup(() => [chat, row("board", { version: "1.1.0" })], { "GET /api/plugins/board": board });
+    fireEvent.click(await screen.findByRole("button", { name: "board" }));
+    const heading = await screen.findByRole("heading", { name: /board/ });
+    expect(document.activeElement).toBe(heading);
+    expect(scroll.mock.contexts).toContain(heading);
+    // a live reload of the same plug-in does not pull the page back again
+    const calls = scroll.mock.calls.length;
+    const loads = mock.calls.filter((c) => c.url === "/api/plugins/board").length;
+    act(() => bus.publish({ event: "ui_plugins", data: JSON.stringify({ key: "board" }) }));
+    await waitFor(() =>
+      expect(mock.calls.filter((c) => c.url === "/api/plugins/board").length).toBeGreaterThan(loads),
+    );
+    expect(scroll.mock.calls.length).toBe(calls);
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
+  });
 });
 
 describe("parseManifest", () => {
