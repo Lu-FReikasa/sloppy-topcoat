@@ -551,3 +551,29 @@ def test_a_function_call_written_as_text_is_cut_from_the_end_of_an_answer() -> N
     text = "Ich lese die Datei jetzt.\n\n<|tool_call>call:repo.read{path:'a.py'}<tool_call|>"
     assert chat.strip_tool_call_text(text) == "Ich lese die Datei jetzt."
     assert chat.strip_tool_call_text("Nichts zu entfernen.") == "Nichts zu entfernen."
+
+
+def test_advice_under_a_report_that_no_evidence_holds_is_marked_not_checked(
+    client: TestClient, world
+) -> None:
+    """#222: the report keeps findings and proposals apart; the answer under it named a menu path
+    of another product that no tool result held. It reaches the person marked as not checked."""
+    _, _, model = world
+    script_check(client)
+    model.stream_text_fn = lambda body: (
+        "web ran out of memory. To log it, go to Settings → Client event logging → Log Events."
+    )
+    conv = new_conv(client)
+    status, events, _ = ask_with(client, conv, "What is wrong with web?", "on")
+    assert status == 200 and events[-1][0] == "done"
+    stored = client.get(f"/api/conversations/{conv}", headers=AUTH).json()["messages"]
+    assert stored[-1]["content"] == (
+        "web ran out of memory. *Not checked:* To log it, go to Settings → Client event logging "
+        "→ Log Events."
+    )
+    assert events[-1][1]["message"]["content"] == stored[-1]["content"]
+    # the browser drops what streamed and shows the marked text
+    kinds = [e for e, _ in events]
+    assert "discard" in kinds and kinds.index("discard") > kinds.index("report")
+    # and the model was told to mark such advice itself
+    assert 'starts with "not checked:"' in sent_messages(model)[0]["content"]

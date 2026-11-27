@@ -484,7 +484,11 @@ REPORT_SHOWN_RULES = (
     "was written or a test passed only if the report shows exactly that, never write tool calls "
     "or an imagined result, and if the check was cut off say what is therefore still unknown. "
     'Refer to earlier turns ("as before", "last time") only if the words are in this '
-    "conversation or the notes, and name a file path only if a result shows it."
+    "conversation or the notes, and name a file path only if a result shows it. Say only what "
+    "the block supports (#222): advice the block does not hold, such as a menu path or a "
+    "setting in another product, or what Topcoat itself can or cannot change, starts with "
+    '"not checked:" or is left out; never fill such a gap from general knowledge as if it had '
+    "been seen."
 )
 # the model must not write the hub's report card itself or announce a search that did not start
 NO_FAKE_ACTION_RULES = (
@@ -496,7 +500,8 @@ NO_FAKE_ACTION_RULES = (
 REPORT_SHOWN_RULES_COMPACT = (
     'The block "Result of the server check" is already available to the user as a report card. '
     "Do not repeat it: answer what the user asked, directly and completely; no tables. "
-    "Claim a change or a test result only if the block shows it; never write tool calls."
+    "Claim a change or a test result only if the block shows it; never write tool calls. "
+    'Advice the block does not hold (a menu path, a setting) starts with "not checked:".'
 )
 # E3-13: the user runs commands themselves (their own shell next to the chat). The assistant gives
 # them as blocks the GUI can copy, and asks for the output, which it then reads as data.

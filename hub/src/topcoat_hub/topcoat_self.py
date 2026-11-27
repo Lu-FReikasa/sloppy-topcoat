@@ -198,7 +198,11 @@ FEATURES: dict[str, dict[str, str]] = {
             "open no port), reports GPU, memory and models, and loads, unloads and downloads "
             "models on request; it yields its GPU when a game needs it. Machines lists every node "
             "live with what runs on it (Inventory tab) and has the button to add a node with a "
-            "pairing code; Models shows the models and which machine does which work."
+            "pairing code; Models shows the models and which machine does which work. Whether a "
+            "node is a compute node (holds and serves models) or a tool node is a switch, not a "
+            "choice at install time: an admin changes it on the node's page, tab 'Rights & "
+            "capabilities', switch 'Compute node'; topcoat.state (what=nodes) says per node "
+            "whether it can be switched (kind_switchable)."
         ),
     },
     "identity": {
@@ -366,6 +370,7 @@ def _machine_row(node: Any, view: dict[str, Any], tools: int, *, full: bool) -> 
     values per machine, so ten machines stay inside the tool's excerpt (an excerpt that is cut made
     the agent repeat the call and then state numbers it never read); with ``id`` the machine comes
     back in full."""
+    kind = _kind(node)
     if full:
         return {
             "node": node.name,
@@ -396,8 +401,12 @@ def _machine_row(node: Any, view: dict[str, Any], tools: int, *, full: bool) -> 
             "loading": [m if isinstance(m, str) else m.get("name") for m in view["loading"]],
             "models": [m.get("name") for m in view.get("models") or []],
             "tools_you_may_run": tools,
+            **kind,
+            "kind_switch": KIND_SWITCH_WHERE if kind["kind_switchable"] else None,
         }
-    row: dict[str, Any] = {"node": node.name, "state": view["state"]}
+    row: dict[str, Any] = {"node": node.name, "state": view["state"], "kind": kind["kind"]}
+    if not kind["kind_switchable"]:  # the short row names only the exception (the note says so)
+        row["kind_switchable"] = False
     if view["state"] != "available":
         row["last_seen"] = view["last_seen"]
     row["cpu_percent"] = _round(view["cpu_util"])
@@ -419,6 +428,23 @@ def _machine_row(node: Any, view: dict[str, Any], tools: int, *, full: bool) -> 
     if view.get("models"):
         row["models"] = [m.get("name") for m in view["models"]]
     return row
+
+
+# where an admin switches a node between compute node and tool node (#222: asked whether that is
+# possible after the install, the assistant guessed "remove and re-add the node")
+KIND_SWITCH_WHERE = (
+    "Administration > Nodes > the node's page > tab 'Rights & capabilities' > switch 'Compute node'"
+)
+
+
+def _kind(node: Any) -> dict[str, Any]:
+    """What the node is (``compute``: it holds and serves models; ``tools``: only capabilities) and
+    whether an admin can switch that in the GUI. The node page shows the switch for every node
+    whose config carries a ``roles`` list (``NodeKindSwitch`` in ``web/src/components``)."""
+    roles = (getattr(node, "config", None) or {}).get("roles")
+    if not isinstance(roles, list):
+        return {"kind": "tools", "kind_switchable": False}
+    return {"kind": "compute" if "gpu" in roles else "tools", "kind_switchable": True}
 
 
 def _round(value: Any) -> Any:
@@ -623,6 +649,10 @@ class TopcoatService:
                 "leaves them out; the person can add them there",
             }
         if not caller.admin:
+            out["note"] += (
+                "; a node's kind (compute node or tool node) and its rights are changed by an "
+                "admin on the node's page, without reinstalling the node"
+            )
             return out
         # An admin also sees every machine of the hub, with or without tools: a model node has
         # no tools, so it is absent from the list above although it is connected and working.
@@ -658,7 +688,10 @@ class TopcoatService:
             "for logs or containers. connected_servers_with_tools_you_may_run lists only servers "
             "that offer tools. Without an id the rows are short so that all machines fit "
             "(cpu_percent, ram_mb used/total, gpu_vram used/total, loaded models); with id set to "
-            "a machine's name that machine comes back in full (CPU model, last seen)."
+            "a machine's name that machine comes back in full (CPU model, last seen). kind: "
+            "compute (serves models) or tools; an admin switches it on the node's page (tab "
+            "'Rights & capabilities'), no reinstall or re-adding, except where kind_switchable "
+            "is false."
         )
         return out
 
