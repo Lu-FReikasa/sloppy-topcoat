@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type FormEvent,
-} from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, type ApiClient } from "../api/client";
 import { describeError, toActionError } from "../errors";
@@ -27,7 +21,6 @@ import { TodayView } from "./TodayView";
 import { browserZone, formatDue } from "./time";
 import {
   PROJECT_GRANTS,
-  type ProjectDetail,
   type ProjectGrant,
   type ProjectNode,
   type ProjectNodeCreate,
@@ -38,11 +31,18 @@ import {
   type ProjectTaskStatus,
 } from "./types";
 import "./project.css";
-import { onProjectChanged } from "./liveProject";
 import { askConfirm } from "../components/askConfirm";
+import { useProjectDetail } from "./useProjectDetail";
+import {
+  LAYOUTS,
+  SETTINGS,
+  TEMPLATES,
+  TODAY,
+  TRASH,
+  useProjectTree,
+} from "./useProjectTree";
 
-// changes that come in a burst (three new tasks) are one reload
-const LIVE_RELOAD_MS = 300;
+export { visibleNodes } from "./useProjectTree";
 
 const REPORT_KINDS: readonly ProjectReportKind[] = [
   "note",
@@ -50,21 +50,6 @@ const REPORT_KINDS: readonly ProjectReportKind[] = [
   "decision",
   "document",
   "fact",
-];
-const TODAY = "today";
-const TRASH = "trash";
-const TEMPLATES = "templates";
-const SETTINGS = "settings";
-
-type Tab = "tree" | "timeline" | "sets" | "chains";
-
-type Layout = "list" | "table" | "board" | "calendar" | "gantt";
-const LAYOUTS: readonly Layout[] = [
-  "list",
-  "table",
-  "board",
-  "calendar",
-  "gantt",
 ];
 
 interface Props {
@@ -78,7 +63,8 @@ interface Props {
 /** The Projekte page. Projects (and "Today", across all of them) on the left; the selected project
  *  in the middle as a list, a table or a board, with a filter, a sort rule and saved views; the
  *  selected node below it. Each project has its own grants for the project agent. Every write
- *  carries the revision it was read at; a conflict reloads and says so, it never overwrites. */
+ *  carries the revision it was read at; a conflict reloads and says so, it never overwrites.
+ *  The tree's state lives in useProjectTree, the detail's (tab, open node) in useProjectDetail. */
 export function ProjectPage({
   api,
   project: openProject,
@@ -88,31 +74,8 @@ export function ProjectPage({
   const [zone, setZone] = useState(() => browserZone());
   const [ownZone, setOwnZone] = useState<string | null>(null);
   const [hubZone, setHubZone] = useState("UTC");
-  const [projects, setProjects] = useState<Project[] | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [detail, setDetail] = useState<ProjectDetail | null>(null);
-  const [nodeId, setNodeId] = useState<string | null>(null);
-  const [opened, setOpened] = useState<Set<string>>(new Set());
-  const [closed, setClosed] = useState<Set<string>>(new Set());
-  const [showScope, setShowScope] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [layout, setLayout] = useState<Layout>("list");
-  const [tab, setTab] = useState<Tab>("tree");
-  const [showReplaced, setShowReplaced] = useState(false);
-  const [pendingSets, setPendingSets] = useState(0);
-  const [naming, setNaming] = useState(false);
-  const [templateName, setTemplateName] = useState("");
-  const [filter, setFilter] = useState("");
-  const [sort, setSort] = useState("");
-  const [filterError, setFilterError] = useState<string | null>(null);
-  const [found, setFound] = useState<ProjectNode[] | null>(null);
-  const [views, setViews] = useState<ProjectSavedView[]>([]);
-  const [limits, setLimits] = useState<
-    Partial<Record<ProjectTaskStatus, number>>
-  >({});
-  const [tick, setTick] = useState(0);
-  const [now, setNow] = useState(() => new Date());
 
   const fail = useCallback(
     (err: unknown) => {
@@ -125,67 +88,50 @@ export function ProjectPage({
     [t, i18n],
   );
 
-  const loadList = useCallback(async () => {
-    try {
-      setProjects((await api.projectProjects()).projects);
-    } catch (err) {
-      fail(err);
-    }
-  }, [api, fail]);
-
-  const isProject =
-    selected !== null &&
-    !([TODAY, TRASH, TEMPLATES, SETTINGS] as string[]).includes(selected);
-
-  const loadDetail = useCallback(
-    async (id: string) => {
-      try {
-        setDetail(await api.projectProject(id));
-        setNow(new Date());
-      } catch (err) {
-        fail(err);
-      }
-    },
-    [api, fail],
-  );
-
-  useEffect(() => {
-    let alive = true;
-    api.projectProjects().then(
-      (r) => {
-        if (alive) setProjects(r.projects);
-      },
-      (err) => {
-        if (alive) fail(err);
-      },
-    );
-    return () => {
-      alive = false;
-    };
-  }, [api, fail]);
-
-  useEffect(() => {
-    if (!selected || !isProject) return;
-    let alive = true;
-    api.projectProject(selected).then(
-      (d) => {
-        if (alive) {
-          setDetail(d);
-          setNow(new Date());
-        }
-      },
-      (err) => {
-        if (alive) fail(err);
-      },
-    );
-    api.projectViews(selected).then(
-      (r) => alive && setViews(r.views),
-      () => undefined,
-    );
-    return () => {
-      alive = false;
-    };
-  }, [api, fail, selected, isProject]);
+  const tree = useProjectTree(api, fail);
+  const {
+    projects,
+    selected,
+    isProject,
+    nodes,
+    loadList,
+    loadDetail,
+    tick,
+    bump,
+    now,
+    collapsed,
+    layout,
+    setLayout,
+    showReplaced,
+    setShowReplaced,
+    hasReplaced,
+    pendingSets,
+    filter,
+    sort,
+    filterError,
+    applyFilter,
+    views,
+    pickView,
+    limits,
+    shown,
+    tasks,
+    listRows,
+  } = tree;
+  const current = tree.project;
+  const detail = useProjectDetail(nodes);
+  const {
+    nodeId,
+    setNodeId,
+    node,
+    tab,
+    setTab,
+    showScope,
+    setShowScope,
+    naming,
+    setNaming,
+    templateName,
+    setTemplateName,
+  } = detail;
 
   // the person's own time zone drives the dates of the page, as it drives "today" on the hub
   useEffect(() => {
@@ -207,113 +153,21 @@ export function ProjectPage({
   }, [api]);
 
   // opened from an inbox item: in the project, on the entry
+  const { setSelected } = tree;
+  const { open } = detail;
   useEffect(() => {
     if (!openProject) return;
     void Promise.resolve().then(() => {
       setSelected(openProject);
-      setNodeId(openNode ?? null);
-      setTab("tree");
+      open(openNode ?? null);
     });
-  }, [openProject, openNode]);
-
-  // a change made elsewhere (the agent, a batch, a click in the chat) shows at once: the open
-  // project reloads, the list too (titles, counts); a burst of changes is one reload
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const off = onProjectChanged((projectId) => {
-      if (timer !== undefined) clearTimeout(timer);
-      timer = setTimeout(() => {
-        void loadList();
-        if (isProject && selected === projectId) {
-          void loadDetail(projectId);
-          setTick((n) => n + 1);
-        }
-      }, LIVE_RELOAD_MS);
-    });
-    return () => {
-      off();
-      if (timer !== undefined) clearTimeout(timer);
-    };
-  }, [isProject, selected, loadDetail, loadList]);
-
-  // how many change sets wait for the person, shown on their tab
-  useEffect(() => {
-    if (!isProject || !selected) return;
-    let alive = true;
-    api.projectChangeSets({ project: selected }).then(
-      (r) =>
-        alive &&
-        setPendingSets(
-          r.change_sets.filter((c) => c.status === "pending").length,
-        ),
-      () => undefined,
-    );
-    return () => {
-      alive = false;
-    };
-  }, [api, isProject, selected, tick]);
-
-  // a filter or a sort rule is answered by the hub (its query language), the plain tree is not
-  useEffect(() => {
-    if (!isProject || (!filter && !sort)) return;
-    let alive = true;
-    api
-      .searchProjectNodes({
-        filter,
-        sort,
-        project: selected ?? undefined,
-        limit: 200,
-      })
-      .then(
-        (r) => {
-          if (!alive) return;
-          setFound(r.nodes);
-          setFilterError(null);
-        },
-        (err) => {
-          if (!alive) return;
-          if (err instanceof ApiError && err.status === 422)
-            setFilterError(err.message);
-          else fail(err);
-        },
-      );
-    return () => {
-      alive = false;
-    };
-  }, [api, fail, isProject, selected, filter, sort, tick]);
-
-  const expandNode = (id: string) => {
-    setClosed((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    setOpened((prev) => new Set(prev).add(id));
-  };
-
-  const collapseNode = (id: string) => {
-    setOpened((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    setClosed((prev) => new Set(prev).add(id));
-  };
+  }, [openProject, openNode, setSelected, open]);
 
   const select = (id: string) => {
-    setSelected(id);
-    setNodeId(null);
-    setShowScope(false);
-    setOpened(new Set());
-    setClosed(new Set());
+    tree.select(id);
+    detail.reset();
     setError(null);
     setMessage(null);
-    setFilter("");
-    setSort("");
-    setFound(null);
-    setFilterError(null);
-    setLimits({});
-    setTab("tree");
   };
 
   /** Run a write, then reload what it touched. A stale revision reloads and says so. */
@@ -325,7 +179,7 @@ export function ProjectPage({
       if (done) setMessage(done);
       await loadList();
       if (isProject && selected) await loadDetail(selected);
-      setTick((n) => n + 1);
+      bump();
     } catch (err) {
       fail(err);
       if (isProject && selected) await loadDetail(selected);
@@ -398,23 +252,6 @@ export function ProjectPage({
     }, t("project.created"));
   };
 
-  const applyFilter = (nextFilter: string, nextSort: string) => {
-    setFilter(nextFilter);
-    setSort(nextSort);
-    setFilterError(null);
-    if (!nextFilter && !nextSort) setFound(null);
-  };
-
-  const pickView = (view: ProjectSavedView) => {
-    if ((LAYOUTS as readonly string[]).includes(view.type))
-      setLayout(view.type as Layout);
-    const wip = (view.config?.wip ?? {}) as Partial<
-      Record<ProjectTaskStatus, number>
-    >;
-    setLimits(wip);
-    applyFilter(view.filter, view.sort);
-  };
-
   const saveView = (title: string) =>
     write(async () => {
       await api.createProjectView({
@@ -425,29 +262,17 @@ export function ProjectPage({
         config: { wip: limits },
         project_id: selected,
       });
-      setViews((await api.projectViews(selected ?? undefined)).views);
+      tree.setViews((await api.projectViews(selected ?? undefined)).views);
     }, t("project.viewSaved"));
 
   const deleteView = (view: ProjectSavedView) =>
     write(async () => {
       await api.deleteProjectView(view.id);
-      setViews((await api.projectViews(selected ?? undefined)).views);
+      tree.setViews((await api.projectViews(selected ?? undefined)).views);
     });
 
-  const nodes = useMemo(() => detail?.nodes ?? [], [detail]);
-
-const collapsed = useMemo(() => {
-  const out = new Set<string>();
-  for (const n of nodes) {
-    if (nodes.filter((c) => c.parent_id === n.id).length >= 3 && !opened.has(n.id))
-      out.add(n.id);
-  }
-  for (const id of closed) out.add(id);
-  return out;
-}, [nodes, opened, closed]);
-
-  // A task's run (project_runs.py): start it, approve a batch of the open tasks, and keep the page
-  // current while a run is in progress (the node's status and the batch change on the hub).
+  // A task's run (project_runs.py): start it, approve a batch of the open tasks; the tree keeps
+  // the page current while a run is in progress.
   const runNode = async (node: ProjectNode) => {
     try {
       await api.runProjectNode(node.id);
@@ -476,34 +301,6 @@ const collapsed = useMemo(() => {
       fail(err);
     }
   };
-
-  const running = nodes.some((n) => n.status === "in_progress");
-  useEffect(() => {
-    if (!running || !selected) return;
-    const timer = window.setInterval(() => void loadDetail(selected), 4000);
-    return () => window.clearInterval(timer);
-  }, [running, selected, loadDetail]);
-  const node = nodes.find((n) => n.id === nodeId) ?? null;
-  // a report that was replaced by a newer one is greyed and left out unless asked for
-  const current_ = useMemo(
-    () => (showReplaced ? nodes : nodes.filter((n) => n.current !== false)),
-    [nodes, showReplaced],
-  );
-  const hasReplaced = nodes.some((n) => n.current === false);
-  const visible = useMemo(
-    () => visibleNodes(current_, collapsed),
-    [current_, collapsed],
-  );
-  const current = isProject
-    ? (projects?.find((p) => p.id === selected) ?? detail?.project ?? null)
-    : null;
-  const filtering = !!(filter || sort);
-  // what the table and the board show: the hub's answer to a filter, else the tasks of the tree
-  const shown = filtering ? (found ?? []) : current_;
-  const tasks = shown.filter((n) => n.kind === "task");
-  const listRows = filtering
-    ? (found ?? []).map((n) => ({ node: n, depth: 0, hasChildren: false, childCount: 0 }))
-    : visible;
 
   return (
     // the project and task in view, for Clipper's conversation (persona/ClipperDock.tsx, placeOf):
@@ -721,8 +518,7 @@ const collapsed = useMemo(() => {
                   onClick={() =>
                     write(async () => {
                       await api.trashProject(current.id);
-                      setSelected(null);
-                      setDetail(null);
+                      tree.unselect();
                     }, t("project.trashed"))
                   }
                 >
@@ -822,7 +618,7 @@ const collapsed = useMemo(() => {
                 onError={fail}
                 onChanged={() => {
                   void loadDetail(current.id);
-                  setTick((n) => n + 1);
+                  bump();
                 }}
               />
             ) : tab === "sets" ? (
@@ -836,7 +632,7 @@ const collapsed = useMemo(() => {
                   setMessage(m);
                   void loadDetail(current.id);
                   void loadList();
-                  setTick((n) => n + 1);
+                  bump();
                 }}
               />
             ) : showScope ? (
@@ -923,7 +719,7 @@ const collapsed = useMemo(() => {
                       selectedId={nodeId}
                       now={now}
                       zone={zone}
-                      onToggle={(id) => (collapsed.has(id) ? expandNode(id) : collapseNode(id))}
+                      onToggle={tree.toggleNode}
                       onOpen={setNodeId}
                       onComplete={(n) => void complete(n)}
                     />
@@ -985,14 +781,7 @@ const collapsed = useMemo(() => {
                     zone={zone}
                     onMove={moveTo}
                     onOpen={setNodeId}
-                    onLimit={(status, limit) =>
-                      setLimits((prev) => {
-                        const next = { ...prev };
-                        if (limit === null) delete next[status];
-                        else next[status] = limit;
-                        return next;
-                      })
-                    }
+                    onLimit={tree.setLimit}
                   />
                 )}
                 {node && (
@@ -1040,7 +829,7 @@ const collapsed = useMemo(() => {
                     onRestored={() => {
                       setMessage(t("project.versionRestored"));
                       void (selected && loadDetail(selected));
-                      setTick((n) => n + 1);
+                      bump();
                     }}
                     onError={fail}
                   />
@@ -1063,35 +852,6 @@ const collapsed = useMemo(() => {
 }
 
 
-/** The nodes in their order, with the ones under a collapsed node left out. */
-export function visibleNodes(nodes: ProjectNode[], collapsed: Set<string>) {
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const depthOf = (n: ProjectNode): number => {
-    let depth = 0;
-    let parent = n.parent_id ? byId.get(n.parent_id) : undefined;
-    while (parent) {
-      depth += 1;
-      parent = parent.parent_id ? byId.get(parent.parent_id) : undefined;
-    }
-    return depth;
-  };
-  const hidden = (n: ProjectNode): boolean => {
-    let parent = n.parent_id ? byId.get(n.parent_id) : undefined;
-    while (parent) {
-      if (collapsed.has(parent.id)) return true;
-      parent = parent.parent_id ? byId.get(parent.parent_id) : undefined;
-    }
-    return false;
-  };
-  return nodes
-    .filter((n) => !hidden(n))
-    .map((n) => ({
-      node: n,
-      depth: depthOf(n),
-      hasChildren: nodes.some((c) => c.parent_id === n.id),
-      childCount: nodes.filter((c) => c.parent_id === n.id).length,
-    }));
-}
 
 function NewProject({
   onCreate,
