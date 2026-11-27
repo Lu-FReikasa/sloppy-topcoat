@@ -72,6 +72,7 @@
 }
 
 .sheets-table th {
+  white-space: nowrap;
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -113,7 +114,8 @@
 
 .sheets-versions {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
   gap: 0.15rem 0.6rem;
 }
 
@@ -122,23 +124,21 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* the artist under the title on narrow screens, in its own column on wide ones */
+/* the artist and the versions under the title on narrow screens, in their own columns on wide ones */
 .sheets-row-artist {
   display: block;
   overflow-wrap: anywhere;
 }
 
-/* on a narrow page the key ("A · Capo 2") may break and the column titles get small, or the
-   versions column is pushed out of the page at 320 px (or at 390 with a long artist name) */
-@container (max-width: 559.98px) {
-  .sheets-col-key {
-    white-space: normal;
-  }
+.sheets-row-versions {
+  display: block;
+}
 
+/* on a narrow page the column titles lose their letter spacing; they and the key ("B · Capo 2")
+   never break inside a word: only the title column gives way (#168) */
+@container (max-width: 559.98px) {
   .sheets-table th {
     letter-spacing: 0;
-    hyphens: auto;
-    overflow-wrap: anywhere;
   }
 
   .sheets-table th,
@@ -147,16 +147,19 @@
   }
 }
 
-.sheets-col-artist {
+.sheets-col-artist,
+.sheets-col-versions {
   display: none;
 }
 
 @container (min-width: 560px) {
-  .sheets-row-artist {
+  .sheets-row-artist,
+  .sheets-row-versions {
     display: none;
   }
 
-  .sheets-col-artist {
+  .sheets-col-artist,
+  .sheets-col-versions {
     display: table-cell;
   }
 }
@@ -519,6 +522,7 @@
   padding: 0.4rem 1rem 0.6rem;
   background: var(--bg, Canvas);
   color: var(--text, CanvasText);
+  container: sheet-stage / inline-size;
 }
 
 /* at the bottom, under the sheet: the arrows sit where a hand holding a turned laptop reaches them */
@@ -585,6 +589,46 @@
 .sheet-stage-tools:hover,
 .sheet-stage-tools:focus-within {
   opacity: 1;
+}
+
+/* a touch screen has no hover: the tools stay at full strength there, or their text sits at ~3.8:1 */
+@media (hover: none) {
+  .sheet-stage-tools {
+    opacity: 1;
+  }
+}
+
+/* a narrow stage (a phone, or a narrow window in the windows shell): the info on its own line and
+   the tools on a second one, or "Leave" ends off the screen (German "Verlassen" at 453 px) */
+@container sheet-stage (max-width: 599.98px) {
+  .sheet-stage-head {
+    flex-wrap: wrap;
+    row-gap: 0.3rem;
+  }
+
+  .sheet-stage-info {
+    flex: 1 1 100%;
+  }
+
+  /* the arrows and "Collapse repeats" on one row (its words may go on two lines), "Leave" in the
+     corner below them: the order on screen stays the order of the keyboard */
+  .sheet-stage-tools {
+    flex: 1 1 100%;
+    margin-left: 0;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: 0.3rem;
+  }
+
+  .sheet-stage-tools > :nth-child(3) {
+    justify-self: end;
+    white-space: normal;
+  }
+
+  .sheet-stage-tools > :nth-child(4) {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
 }
 
 .sheet-stage-box {
