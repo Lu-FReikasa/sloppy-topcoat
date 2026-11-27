@@ -144,6 +144,48 @@ def test_without_a_token_the_socket_closes(client: TestClient) -> None:
     assert closed.value.code == 4401
 
 
+def _auth_frame(size: int) -> str:
+    """A sign-in frame with the right token, padded to ``size`` characters."""
+    frame = json.dumps({"type": "auth", "token": DEV_TOKEN, "pad": ""})
+    return frame.replace('"pad": ""', '"pad": "' + "x" * (size - len(frame)) + '"')
+
+
+def test_a_sign_in_frame_of_a_few_kilobytes_is_read(client: TestClient) -> None:
+    with client.websocket_connect("/api/voice/ws") as ws:
+        ws.send_text(_auth_frame(4000))
+        assert ws.receive_json()["type"] == "ready"
+
+
+def test_an_oversized_first_frame_closes_the_socket_even_with_a_valid_token(
+    client: TestClient,
+) -> None:
+    with client.websocket_connect("/api/voice/ws") as ws:
+        ws.send_text(_auth_frame(5000))
+        with pytest.raises(WebSocketDisconnect) as closed:
+            ws.receive_text()
+    assert closed.value.code == 1009
+
+
+def test_a_binary_first_frame_signs_nobody_in(client: TestClient) -> None:
+    with client.websocket_connect("/api/voice/ws") as ws:
+        ws.send_bytes(json.dumps({"type": "auth", "token": DEV_TOKEN}).encode())
+        with pytest.raises(WebSocketDisconnect) as closed:
+            ws.receive_text()
+    assert closed.value.code == 4401
+
+
+def test_a_client_that_never_signs_in_is_closed(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("topcoat_hub.api.voice.AUTH_TIMEOUT", 0.2)
+    with (
+        client.websocket_connect("/api/voice/ws") as ws,
+        pytest.raises(WebSocketDisconnect) as closed,
+    ):
+        ws.receive_text()
+    assert closed.value.code == 4401
+
+
 def test_the_status_says_whether_a_node_can_listen_and_speak(
     client: TestClient, connect: Any
 ) -> None:
