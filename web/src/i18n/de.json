@@ -2496,10 +2496,10 @@
   },
   "inbox": {
     "title": "Posteingang",
-    "tabInbox": "Inbox",
+    "tabInbox": "Posteingang",
     "all": "Alle",
     "empty": "Nichts wartet auf dich.",
-    "loadFailed": "Die Inbox konnte nicht geladen werden.",
+    "loadFailed": "Der Posteingang konnte nicht geladen werden.",
     "retry": "Noch einmal",
     "urgent": "dringend",
     "unresolved": "braucht deine Aufmerksamkeit",
@@ -2563,7 +2563,7 @@
     "context": "Zitate aus dem Chat",
     "withheld": "Zurückgehalten",
     "withheldNone": "Nichts wurde zurückgehalten.",
-    "sendHint": "Gesendet wird genau diese Anfrage. Die Antwort kommt als Zusammenfassung in deine Inbox; sie wird nicht in diesen Chat geschrieben.",
+    "sendHint": "Gesendet wird genau diese Anfrage. Die Antwort kommt als Zusammenfassung in deinen Posteingang; sie wird nicht in diesen Chat geschrieben.",
     "send": "Senden",
     "discard": "Verwerfen",
     "listTitle": "Übergaben",
@@ -4348,7 +4348,7 @@
     "research": {
       "title": "Song recherchieren",
       "song": "Song",
-      "artist": "Künstler",
+      "artist": "Interpret",
       "wish": "Wunsch (z. B. Original, einfach, live)",
       "start": "Recherchieren",
       "openSheet": "Sheet öffnen",
@@ -4380,7 +4380,7 @@
     "sort": {
       "label": "Sortierung",
       "title": "Nach Titel",
-      "artist": "Nach Artist",
+      "artist": "Nach Interpret",
       "added": "Neueste zuerst"
     },
     "stage": {
@@ -4464,6 +4464,77 @@
       "noNode": "Gerade kann keine Maschine zuhören: Sprache zu Text braucht einen Knoten, auf dem Sprache eingeschaltet ist.",
       "connection": "Die Verbindung zum Hub für Sprache ist abgerissen. Versuch es noch einmal.",
       "failed": "Sprache hat gerade nicht geklappt. Versuch es gleich noch einmal."
+    }
+  },
+  "largeTask": {
+    "title": "Teilaufgaben",
+    "loading": "Teilaufgaben werden geladen …",
+    "branch": "Zweig",
+    "progress": "{{done}} von {{count}} fertig",
+    "planningHint": "Noch nicht in Teilaufgaben zerlegt. Das Zerlegen fragt einmal ein Modell; der Hub prüft den Plan (höchstens 8 Teilaufgaben, vorhandene Dateien, keine Schleife).",
+    "decompose": "In Teilaufgaben zerlegen",
+    "decomposing": "Wird zerlegt …",
+    "filed": "{{count}} Teilaufgaben angelegt.",
+    "changeSet": "Die Zerlegung wartet unter Änderungssätze auf deine Bestätigung.",
+    "refused": "Der Hub hat die Zerlegung abgelehnt:",
+    "stage": "Schritt {{n}}",
+    "needs": "nach {{list}}",
+    "result": "Ergebnis",
+    "nextLabel": "Als Nächstes",
+    "details": "Dateien und Prüfungen",
+    "accept": "Fertig, wenn:",
+    "tickButton": "Weiter",
+    "tickHint": "Ein Schritt: neu planen, was gestoppt ist, starten, was bereit ist.",
+    "tick": {
+      "started": "Gestartet: {{ids}}.",
+      "replanned": "Neu geplant: {{ids}}.",
+      "blocked": "Wartet auf dich: {{ids}}.",
+      "stopped": "Nichts, was Dateien ändert, wurde gestartet: Der Werkstatt-Umfang ist nicht erteilt.",
+      "done": "Alle Teilaufgaben sind fertig.",
+      "nothing": "Gerade ist nichts zu starten."
+    },
+    "scopeTitle": "Werkstatt-Umfang.",
+    "scopeMissing": "Nicht erteilt: Teilaufgaben, die Dateien ändern, starten nicht.",
+    "scopeEnded": "Abgelaufen: Teilaufgaben, die Dateien ändern, starten nicht.",
+    "scopeActive": "Erteilt bis {{until}}.",
+    "scopeText": "Vorhaben {{number}} „{{title}}“: Der Hub darf in der Werkstatt auf genau dem Zweig {{branch}} die Entwürfe seiner Teilaufgaben anwenden (Änderungen und neue Dateien), dort committen, Tests, Lint, Typprüfung und Builds laufen lassen, Screenshots des Werkstatt-Builds mit Testdaten machen und Theme- und Persona-Entwürfe ändern, ohne Klick je Fix. Jeder Versuch wird geprüft (Umfang, Inhalt, Pfade, keine Geheimnisse, saubere Werkstatt, Stopp nach gleichem Fehler zweimal) und steht in der Akte. Nicht abgedeckt: Ausrollen auf den Hub (bleibt ein Klick), Themes oder Personas speichern oder aktivieren, andere Zweige oder Repositories, topcoat/live und main, Push, Merge, Deploy, Löschen. Gilt {{days}} Tage oder bis zum Widerruf.",
+    "scopeGive": "Werkstatt-Umfang erteilen",
+    "scopeRevoke": "Werkstatt-Umfang widerrufen",
+    "scopeGiven": "Werkstatt-Umfang erteilt.",
+    "scopeRevoked": "Werkstatt-Umfang widerrufen.",
+    "rolloutReady": "Alle Teilaufgaben sind fertig. Der ganze Zweig lässt sich mit einem Klick ausrollen.",
+    "rolloutButton": "Vorhaben ausrollen",
+    "rolloutLater": "Den Klick zum Ausrollen gibt es auf dem Hub noch nicht.",
+    "state": {
+      "waiting": "wartet",
+      "running": "läuft",
+      "failed": "fehlgeschlagen",
+      "blocked": "braucht dich",
+      "done": "fertig"
+    },
+    "overall": {
+      "planning": "in Planung",
+      "running": "läuft",
+      "blocked": "braucht dich",
+      "done": "fertig"
+    },
+    "layer": {
+      "store": "Speicher",
+      "api": "API",
+      "gui": "Oberfläche",
+      "proto": "Protokoll",
+      "docs": "Doku",
+      "admin": "Einstellung",
+      "research": "Recherche"
+    },
+    "next": {
+      "done": "fertig",
+      "you": "wartet auf dich",
+      "running": "läuft",
+      "replan": "wird neu geplant",
+      "draft": "nächster Entwurf",
+      "setting": "eine Einstellung durch dich",
+      "dependencies": "startet, wenn die Teilaufgaben davor fertig sind"
     }
   }
 }

@@ -152,7 +152,9 @@ export function SheetsPage({ api, id }: Props) {
     const at = Math.max(0, songs.findIndex((g) => Number(g.key) >= from));
     if (!songs[at]) return;
     setPlaying({ setlist, at });
-    setStage(true);
+    // not kept for the session: the setlist being played is not either, so a page mounted afresh
+    // (the window minimised and restored) shows the library and the next song opens normally
+    setStageState(true);
   };
 
   useEffect(() => {
@@ -358,6 +360,22 @@ function SheetTable({
   const { query, setQuery, artist, setArtist, sort, setSort } = filter;
   const artists = useMemo(() => artistsOf(list), [list]);
   const keyOf = (s: SheetSummary) => [s.key, s.capo ? t("sheets.capoN", { n: s.capo }) : ""].filter(Boolean).join(" · ");
+  // v1 v2 …: in their own column on a wide page, under the title (like the artist) on a narrow one
+  const versionLinks = (g: SheetGroup) =>
+    g.versions.length > 1 && (
+      <span className="sheets-versions">
+        {g.versions.map((v, i) => (
+          <a
+            key={v.id}
+            href={sheetsHref(v.id)}
+            onClick={onOpen}
+            title={[keyOf(v), t(`sheets.instrument.${v.instrument}`), v.version_note].filter(Boolean).join(" · ")}
+          >
+            {t("sheets.version", { n: i + 1 })}
+          </a>
+        ))}
+      </span>
+    );
   const openFirst = (e: React.KeyboardEvent) => {
     if (e.key !== "Enter") return;
     const s = groups[0] && newestOf(groups[0]);
@@ -408,10 +426,12 @@ function SheetTable({
             <tr>
               <th scope="col">{t("sheets.paste.songTitle")}</th>
               <th scope="col" className="sheets-col-artist">
-                {t("sheets.research.artist")}
+                {t("sheets.filter.artist")}
               </th>
               <th scope="col">{t("sheets.key")}</th>
-              <th scope="col">{t("sheets.versions")}</th>
+              <th scope="col" className="sheets-col-versions">
+                {t("sheets.versions")}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -424,25 +444,11 @@ function SheetTable({
                       {g.title}
                     </a>
                     {g.artist && <span className="sheets-row-artist muted small">{g.artist}</span>}
+                    {g.versions.length > 1 && <span className="sheets-row-versions small">{versionLinks(g)}</span>}
                   </td>
                   <td className="sheets-col-artist">{g.artist}</td>
                   <td className="sheets-col-key">{keyOf(s)}</td>
-                  <td className="sheets-col-versions">
-                    {g.versions.length > 1 && (
-                      <span className="sheets-versions">
-                        {g.versions.map((v, i) => (
-                          <a
-                            key={v.id}
-                            href={sheetsHref(v.id)}
-                            onClick={onOpen}
-                            title={[keyOf(v), t(`sheets.instrument.${v.instrument}`), v.version_note].filter(Boolean).join(" · ")}
-                          >
-                            {t("sheets.version", { n: i + 1 })}
-                          </a>
-                        ))}
-                      </span>
-                    )}
-                  </td>
+                  <td className="sheets-col-versions">{versionLinks(g)}</td>
                 </tr>
               );
             })}
@@ -876,6 +882,7 @@ function Stage({
   // default on: a repeat written out once saves lines when a song has to fit one screen
   const [collapse, setCollapseState] = useState(() => remembered(COLLAPSE_KEY) !== "0");
   const [fit, setFit] = useState<Fit | null>(null);
+  const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const setCollapse = (on: boolean) => {
@@ -908,14 +915,19 @@ function Stage({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // a dialog over the stage (the desktop's command palette) keeps its keys, and so does another
+      // window brought in front of this one (its text field's arrows, its own Esc)
+      if (e.defaultPrevented || !inFront(root.current)) return;
       if (e.key === "Escape") leave();
       else if (e.key === "ArrowRight" || e.key === "PageDown") go(next, 1);
       else if (e.key === "ArrowLeft" || e.key === "PageUp") go(prev, -1);
       else return;
       e.preventDefault();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // capture, before the desktop shell's Esc (minimise the window, which it skips for a key taken
+    // here): otherwise the window goes and the stage never sees its Esc
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   });
 
   // full screen where the browser allows it. Leaving full screen does not end the stage (some
@@ -981,7 +993,7 @@ function Stage({
   const v = sheet?.view;
   return (
     <>
-      <div className="sheet-stage" data-testid="sheet-stage">
+      <div ref={root} className="sheet-stage" data-testid="sheet-stage">
       <header className="sheet-stage-head">
         {/* one line: a long title or artist is cut short, the buttons keep their place */}
         <div className="sheet-stage-info">

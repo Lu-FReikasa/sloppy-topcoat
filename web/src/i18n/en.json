@@ -4465,5 +4465,76 @@
       "connection": "The connection to the hub for speech ended. Try again.",
       "failed": "Speech did not work just now. Try again in a moment."
     }
+  },
+  "largeTask": {
+    "title": "Sub-tasks",
+    "loading": "Loading the sub-tasks …",
+    "branch": "Branch",
+    "progress": "{{done}} of {{count}} done",
+    "planningHint": "Not split into sub-tasks yet. Splitting asks a model once; the hub checks its plan (at most 8 sub-tasks, files that exist, no loop).",
+    "decompose": "Split into sub-tasks",
+    "decomposing": "Splitting …",
+    "filed": "{{count}} sub-tasks filed.",
+    "changeSet": "The split waits for your confirmation under Change sets.",
+    "refused": "The hub refused the split:",
+    "stage": "Step {{n}}",
+    "needs": "after {{list}}",
+    "result": "Result",
+    "nextLabel": "Next",
+    "details": "Files and checks",
+    "accept": "Done when:",
+    "tickButton": "Go on",
+    "tickHint": "One step: replan what stopped, start what is ready.",
+    "tick": {
+      "started": "Started: {{ids}}.",
+      "replanned": "Replanned: {{ids}}.",
+      "blocked": "Waiting for you: {{ids}}.",
+      "stopped": "Nothing that changes files was started: the workshop scope is not given.",
+      "done": "Every sub-task is done.",
+      "nothing": "Nothing to start right now."
+    },
+    "scopeTitle": "Workshop scope.",
+    "scopeMissing": "Not given: sub-tasks that change files do not start.",
+    "scopeEnded": "Ended: sub-tasks that change files do not start.",
+    "scopeActive": "Given until {{until}}.",
+    "scopeText": "Large task {{number}} “{{title}}”: in the workshop, on exactly the branch {{branch}}, the hub may apply the drafts of its sub-tasks (changes and new files), commit there, run tests, lint, type checks and builds, take screenshots of the workshop build with test data, and change theme and persona drafts, without a click per fix. Every try is checked (scope, content, paths, no secrets, a clean workshop, a stop after the same failure twice) and written to the record. Not covered: rolling out to the hub (stays a click), saving or activating themes or personas, other branches or repositories, topcoat/live and main, push, merge, deploy, delete. For {{days}} days or until you revoke it.",
+    "scopeGive": "Give the workshop scope",
+    "scopeRevoke": "Revoke the workshop scope",
+    "scopeGiven": "Workshop scope given.",
+    "scopeRevoked": "Workshop scope revoked.",
+    "rolloutReady": "Every sub-task is done. The whole branch can be rolled out in one click.",
+    "rolloutButton": "Roll out the large task",
+    "rolloutLater": "The roll-out click is not built yet on the hub.",
+    "state": {
+      "waiting": "waiting",
+      "running": "running",
+      "failed": "failed",
+      "blocked": "needs you",
+      "done": "done"
+    },
+    "overall": {
+      "planning": "planning",
+      "running": "running",
+      "blocked": "needs you",
+      "done": "done"
+    },
+    "layer": {
+      "store": "store",
+      "api": "API",
+      "gui": "GUI",
+      "proto": "protocol",
+      "docs": "docs",
+      "admin": "setting",
+      "research": "research"
+    },
+    "next": {
+      "done": "done",
+      "you": "waits for you",
+      "running": "running",
+      "replan": "is being replanned",
+      "draft": "next draft",
+      "setting": "a setting by you",
+      "dependencies": "starts when the sub-tasks before it are done"
+    }
   }
 }

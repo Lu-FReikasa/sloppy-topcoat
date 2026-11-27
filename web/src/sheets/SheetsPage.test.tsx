@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ApiClient } from "../api/client";
+import de from "../i18n/de.json";
 import { parseRoute } from "../route";
 import { mockFetch } from "../test/mockFetch";
 import { artistsOf, flowLabel, groupSheets, kindClass, SheetsPage } from "./SheetsPage";
@@ -140,12 +141,16 @@ describe("Sheets", () => {
     expect(rows.map((r) => r.querySelector(".sheets-col-title a")?.textContent)).toEqual(["Example Song", "Zebra Song"]);
     expect(rows[0]!.querySelector(".sheets-col-title a")?.getAttribute("href")).toBe("#/sheets/s3");
     expect(rows[0]!.querySelector(".sheets-col-key")?.textContent).toBe("C");
-    expect(within(rows[0]!).getAllByRole("link").map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
-      ["Example Song", "#/sheets/s3"],
-      ["v1", "#/sheets/s1"],
-      ["v2", "#/sheets/s3"],
-    ]);
+    // v1 v2 sit in their own column on a wide page and under the title on a narrow one (CSS picks one)
+    for (const place of [".sheets-col-versions", ".sheets-row-versions"]) {
+      expect([...rows[0]!.querySelectorAll(`${place} a`)].map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+        ["v1", "#/sheets/s1"],
+        ["v2", "#/sheets/s3"],
+      ]);
+    }
     expect(rows[1]!.querySelector(".sheets-col-versions")?.textContent).toBe("");
+    expect(rows[1]!.querySelector(".sheets-row-versions")).toBeNull();
+
     // a finished research is its sheet in the list; a failed one stays with its reason
     const jobs = screen.getByTestId("sheets-jobs");
     expect(within(jobs).queryByText("Other Song")).toBeNull();
@@ -269,7 +274,7 @@ describe("Sheets", () => {
     expect(within(dialog).getByRole("button", { name: /Paste a sheet|Sheet einfügen/ })).toBeTruthy();
     const form = within(dialog).getByRole("form", { name: /Research a song|Song recherchieren/ });
     fireEvent.change(within(form).getByLabelText(/^Song$/), { target: { value: "Wonderwall" } });
-    fireEvent.change(within(form).getByLabelText(/Artist|Künstler/), { target: { value: "Oasis" } });
+    fireEvent.change(within(form).getByLabelText(/Artist|Interpret/), { target: { value: "Oasis" } });
     fireEvent.change(within(form).getByLabelText(/Instrument/), { target: { value: "piano" } });
     fireEvent.click(within(form).getByRole("button", { name: /Research|Recherchieren/ }));
     await waitFor(() => expect(calls.some((c) => c.method === "POST")).toBe(true));
@@ -398,6 +403,86 @@ describe("Sheets", () => {
     expect(window.location.hash).toBe("#/sheets/s2");
   });
 
+  it("keeps the stage's Esc from the desktop shell, and a played setlist's stage ends with the page", async () => {
+    const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song" };
+    const gig: Setlist = { id: "L1", name: "Gig", items: [{ sheet_id: "s9", newest: false }, { sheet_id: "s1", newest: false }], updated_at: null, created_at: null };
+    const { api } = client({
+      "GET /api/sheets": { sheets: [SUMMARY, zebra] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/setlists": { setlists: [gig] },
+      "GET /api/sheets/s1": detail(true, ["G", "D"]),
+      "GET /api/sheets/s9": { ...detail(true, ["G", "D"]), id: "s9" },
+    });
+    // the desktop shell minimises the window in front on an Esc nobody took (registered first,
+    // as the shell mounts before its pages)
+    const minimised: string[] = [];
+    const shell = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented) minimised.push("sheets");
+    };
+    window.addEventListener("keydown", shell);
+    try {
+      window.sessionStorage.clear();
+      window.localStorage.setItem("topcoat.sheets.setlist", "L1");
+      window.location.hash = "#/sheets/s1";
+      const first = render(<SheetsPage api={api} id="s1" />);
+      fireEvent.click(await screen.findByTestId("sheet-stage-open"));
+      await screen.findByTestId("sheet-stage");
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(screen.queryByTestId("sheet-stage")).toBeNull();
+      expect(minimised).toEqual([]);
+      expect(window.sessionStorage.getItem("topcoat.sheets.stage")).toBeNull();
+
+      // a setlist on the stage from the library: the window is minimised (the page unmounts)
+      first.unmount();
+      window.location.hash = "#/sheets";
+      const library = render(<SheetsPage api={api} />);
+      fireEvent.click(await within(await screen.findByTestId("setlists")).findByTestId("setlist-play"));
+      await screen.findByTestId("sheet-stage-set");
+      library.unmount();
+      // restored, the page shows the song, and the next song opened is not on the stage
+      window.location.hash = "#/sheets/s9";
+      render(<SheetsPage api={api} id="s9" />);
+      expect(await screen.findByTestId("sheet-stage-open")).toBeTruthy();
+      expect(screen.queryByTestId("sheet-stage")).toBeNull();
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(minimised).toEqual([]);
+    } finally {
+      window.removeEventListener("keydown", shell);
+    }
+  });
+
+  it("leaves the keys to another window in front of the stage's window", async () => {
+    const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song" };
+    const { api } = client({
+      "GET /api/sheets": { sheets: [SUMMARY, zebra] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/setlists": { setlists: [] },
+      "GET /api/sheets/s1": detail(true, ["G", "D"]),
+    });
+    // the desktop's windows: the Sheets window and another one in front of it
+    const sheetsWin = document.body.appendChild(document.createElement("div"));
+    sheetsWin.className = "dt-program dt-focused";
+    const other = document.body.appendChild(document.createElement("textarea"));
+    try {
+      window.sessionStorage.clear();
+      window.location.hash = "#/sheets/s1";
+      render(<SheetsPage api={api} id="s1" />, { container: sheetsWin.appendChild(document.createElement("div")) });
+      fireEvent.click(await screen.findByTestId("sheet-stage-open"));
+      await screen.findByTestId("sheet-stage");
+      sheetsWin.classList.remove("dt-focused");
+      const arrow = fireEvent.keyDown(other, { key: "ArrowRight" });
+      fireEvent.keyDown(other, { key: "Escape" });
+      expect(arrow).toBe(true); // not prevented: the caret in the other window's field moves
+      expect(screen.queryByTestId("sheet-stage")).not.toBeNull();
+      sheetsWin.classList.add("dt-focused");
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(screen.queryByTestId("sheet-stage")).toBeNull();
+    } finally {
+      sheetsWin.remove();
+      other.remove();
+    }
+  });
+
   it("plays in setlist order on the stage, from a song picked in the title view", async () => {
     const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song" };
     const gig: Setlist = { id: "L1", name: "Gig", items: [{ sheet_id: "s9", newest: false }, { sheet_id: "s1", newest: false }], updated_at: null, created_at: null };
@@ -512,5 +597,15 @@ describe("Sheets", () => {
     rerender(<SheetsPage key="s9b" api={api} id="s9" />);
     await screen.findByTestId("sheet");
     expect(screen.queryByTestId("setlists")).toBeNull();
+  });
+});
+
+describe("Sheets German wording", () => {
+  // the library had "Künstler" (column), "Interpret" (filter) and "Nach Artist" (sort) side by side (#168)
+  it("calls an artist \"Interpret\" everywhere", () => {
+    const texts = (o: unknown): string[] => (typeof o === "string" ? [o] : o && typeof o === "object" ? Object.values(o).flatMap(texts) : []);
+    const all = texts(de.sheets);
+    expect(all.filter((s) => /Künstler|\bArtist/.test(s))).toEqual([]);
+    expect(all.filter((s) => /Interpret/.test(s)).length).toBeGreaterThan(2);
   });
 });

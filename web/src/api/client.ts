@@ -1529,6 +1529,38 @@ export class ApiClient {
     return this.request("POST", "/api/project/issues/check-open", { project_id: projectId });
   }
 
+  /** A large task with its sub-tasks (hub api/vorhaben.py, D109, issue #33). The one call the
+   *  sub-task view reads; the actions below answer the same object under `large_task`. */
+  largeTask(nodeId: string): Promise<import("../project/types").LargeTaskView> {
+    return this.request("GET", `/api/project/nodes/${encodeURIComponent(nodeId)}/large-task`);
+  }
+
+  /** Cut a task into sub-tasks: filed at once under the grant `project: {decompose}` at level free,
+   *  otherwise a change set to confirm (`change_set`); 422 `refused` with all `problems`. */
+  decomposeLargeTask(nodeId: string): Promise<{
+    filed: unknown[];
+    change_set: string | null;
+    summary: string;
+    model: string;
+    large_task: import("../project/types").LargeTaskView;
+  }> {
+    return this.request("POST", `/api/project/nodes/${encodeURIComponent(nodeId)}/decompose`, {});
+  }
+
+  /** The admin's click on the card of a large task's workshop scope (D110): the hub sets branch,
+   *  actions and duration, the request names nothing but the large task. */
+  giveWorkshopScope(nodeId: string): Promise<{ mandate: ProjectMandate }> {
+    return this.request("POST", `/api/project/nodes/${encodeURIComponent(nodeId)}/workshop-scope`, {});
+  }
+
+  /** One step of a large task's run: replan a stopped branch, start what is ready. */
+  tickLargeTask(nodeId: string): Promise<{
+    tick: import("../project/types").LargeTaskTick;
+    large_task: import("../project/types").LargeTaskView;
+  }> {
+    return this.request("POST", `/api/project/nodes/${encodeURIComponent(nodeId)}/large-task/tick`, {});
+  }
+
   /** The fixes of an issue (hub issue_fixes.py, D103, D104). */
   issueFixes(
     nodeId: string,
