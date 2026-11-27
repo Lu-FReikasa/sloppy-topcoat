@@ -78,9 +78,9 @@
   --on-app: #fbfbf7;
 }
 
-/* on paper, a link in a chat window's bar is the look's red ink (the application's light accent
+/* on paper, a link in a chat window's header is the look's red ink (the application's light accent
    is not readable there), and an application's name is its hue as a dark ink (#75) */
-.dt-look-schreibtisch .dt-program .chat-window[data-app] .chat-window-bar .linklike {
+.dt-look-schreibtisch .dt-program .chat-window[data-app] .talk-head-actions .linklike {
   color: var(--accent);
 }
 

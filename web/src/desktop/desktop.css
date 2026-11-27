@@ -163,6 +163,19 @@
   background: var(--surface);
 }
 
+/* Start's rail holds the titles of the open conversations: it grows with the window, so a wide
+   window shows about twenty letters of a title instead of ten (#173). The views above share the
+   column and take the same width. Only while the rail stands beside the view: a narrow window or
+   screen turns it into rows (below). */
+@media (min-width: 761px) {
+  @container program (min-width: 641px) {
+    .dt-program-body:has(> .open-chats) > .dt-nav,
+    .dt-program-body > .open-chats {
+      width: clamp(11rem, 32cqi, 17rem);
+    }
+  }
+}
+
 .dt-nav button {
   text-align: left;
   border: 0;
