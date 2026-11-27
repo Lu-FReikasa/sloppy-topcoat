@@ -107,6 +107,7 @@ from topcoat_hub.resume_stuck import StuckTaskResumer
 from topcoat_hub.retention import Retention
 from topcoat_hub.scheduling_log import SchedulingLog
 from topcoat_hub.secretbox import SecretBox
+from topcoat_hub.security_headers import SecurityHeaders
 from topcoat_hub.segments import SegmentService
 from topcoat_hub.service import NodeService
 from topcoat_hub.sheets.service import SheetResearchService
@@ -516,6 +517,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await engine.dispose()
 
     app = FastAPI(title="sloppy-topcoat hub", version=__version__, lifespan=lifespan)
+    app.add_middleware(SecurityHeaders)
     app.include_router(node.router)
     app.include_router(updates_api.router)
     app.include_router(releases_api.router)
