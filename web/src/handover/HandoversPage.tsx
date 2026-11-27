@@ -4,6 +4,10 @@ import type { ApiClient } from "../api/client";
 import { Markdown, copyToClipboard } from "../chat/Markdown";
 import { APPLICATIONS, AppTag } from "../inbox/AppTag";
 import type { Handover } from "../types";
+import { HANDOVER_GROUPS, type HandoverGroup, groupHandovers } from "./groups";
+
+/** Groups that have ended start folded (issue #177). */
+const FOLDED: ReadonlySet<HandoverGroup> = new Set(["done", "withdrawn"]);
 
 interface Props {
   api: ApiClient;
@@ -144,6 +148,66 @@ export function HandoversPage({ api, from, incognito, id, tick = 0 }: Props) {
     reload();
   }
 
+  const shown = list.filter((h) => h.id !== draft?.id);
+  const groups = groupHandovers(shown);
+
+  const row = (h: Handover) => (
+    <li key={h.id} data-testid="handover">
+      <AppTag application={h.from_application} />
+      {" → "}
+      <AppTag application={h.to_application} />{" "}
+      <strong>{h.dossier.question}</strong>
+      <div className="muted small">
+        {t(`handover.status.${h.status}`)}
+        {h.result_summary ? `: ${h.result_summary}` : ""}
+        {h.error ? `: ${h.error}` : ""}
+      </div>
+      <details className="handover-full facts-more">
+        <summary>{t("handover.fullText")}</summary>
+        <DossierFields dossier={h.dossier} />
+      </details>
+      <div className="handover-actions">
+        <button
+          type="button"
+          aria-expanded={file?.id === h.id}
+          onClick={() => void openFile(h.id)}
+        >
+          {file?.id === h.id
+            ? t("handover.fileClose")
+            : t("handover.fileOpen")}
+        </button>
+        {(h.status === "proposed" || h.status === "sent") && (
+          <button type="button" onClick={() => void withdraw(h.id)}>
+            {t("handover.discard")}
+          </button>
+        )}
+      </div>
+      {file?.id === h.id && (
+        <div className="handover-file" data-testid="handover-file">
+          <div className="handover-actions">
+            <button
+              type="button"
+              onClick={() =>
+                void copyToClipboard(file.markdown).then(setCopied)
+              }
+            >
+              {copied ? t("chat.copied") : t("handover.fileCopy")}
+            </button>
+            <button type="button" onClick={() => download(file)}>
+              {t("handover.fileDownload")}
+            </button>
+            {file.path && (
+              <span className="muted small">
+                {t("handover.filed", { path: file.path })}
+              </span>
+            )}
+          </div>
+          <Markdown text={file.markdown} />
+        </div>
+      )}
+    </li>
+  );
+
   return (
     <section className="handovers" aria-label={t("handover.title")}>
       {error && (
@@ -196,34 +260,7 @@ export function HandoversPage({ api, from, incognito, id, tick = 0 }: Props) {
             {" → "}
             <AppTag application={draft.to_application} />
           </h3>
-          <dl>
-            <dt>{t("handover.question")}</dt>
-            <dd>{draft.dossier.question}</dd>
-            <dt>{t("handover.asked")}</dt>
-            <dd>{draft.dossier.asked}</dd>
-            <dt>{t("handover.expected")}</dt>
-            <dd>{draft.dossier.expected}</dd>
-            {draft.dossier.context.length > 0 && (
-              <>
-                <dt>{t("handover.context")}</dt>
-                <dd>
-                  <ul>
-                    {draft.dossier.context.map((q, i) => (
-                      <li key={i}>
-                        <em>{q.role}:</em> {q.text}
-                      </li>
-                    ))}
-                  </ul>
-                </dd>
-              </>
-            )}
-            <dt>{t("handover.withheld")}</dt>
-            <dd>
-              {draft.dossier.withheld.length > 0
-                ? draft.dossier.withheld.join("; ")
-                : t("handover.withheldNone")}
-            </dd>
-          </dl>
+          <DossierFields dossier={draft.dossier} />
           <p className="muted small" data-testid="dossier-class">
             {t("handover.class.label")}: {t(`handover.class.${draft.class ?? "public"}`)}
           </p>
@@ -259,63 +296,72 @@ export function HandoversPage({ api, from, incognito, id, tick = 0 }: Props) {
         </div>
       )}
       <h3>{t("handover.listTitle")}</h3>
-      {list.length === 0 && <p className="muted">{t("handover.empty")}</p>}
-      <ul className="handover-list">
-        {list
-          .filter((h) => h.id !== draft?.id)
-          .map((h) => (
-            <li key={h.id} data-testid="handover">
-              <AppTag application={h.from_application} />
-              {" → "}
-              <AppTag application={h.to_application} />{" "}
-              <strong>{h.dossier.question}</strong>
-              <div className="muted small">
-                {t(`handover.status.${h.status}`)}
-                {h.result_summary ? `: ${h.result_summary}` : ""}
-                {h.error ? `: ${h.error}` : ""}
-              </div>
-              <div className="handover-actions">
-                <button
-                  type="button"
-                  aria-expanded={file?.id === h.id}
-                  onClick={() => void openFile(h.id)}
-                >
-                  {file?.id === h.id
-                    ? t("handover.fileClose")
-                    : t("handover.fileOpen")}
-                </button>
-                {(h.status === "proposed" || h.status === "sent") && (
-                  <button type="button" onClick={() => void withdraw(h.id)}>
-                    {t("handover.discard")}
-                  </button>
-                )}
-              </div>
-              {file?.id === h.id && (
-                <div className="handover-file" data-testid="handover-file">
-                  <div className="handover-actions">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void copyToClipboard(file.markdown).then(setCopied)
-                      }
-                    >
-                      {copied ? t("chat.copied") : t("handover.fileCopy")}
-                    </button>
-                    <button type="button" onClick={() => download(file)}>
-                      {t("handover.fileDownload")}
-                    </button>
-                    {file.path && (
-                      <span className="muted small">
-                        {t("handover.filed", { path: file.path })}
-                      </span>
-                    )}
-                  </div>
-                  <Markdown text={file.markdown} />
-                </div>
-              )}
-            </li>
-          ))}
-      </ul>
+      {shown.length === 0 && <p className="muted">{t("handover.empty")}</p>}
+      {HANDOVER_GROUPS.map((g) => {
+        const items = groups[g];
+        if (items.length === 0) return null;
+        const heading = (
+          <h4 className="handover-group-title">
+            {t(`handover.group.${g}`)}{" "}
+            <span className="muted small">({items.length})</span>
+          </h4>
+        );
+        const body = <ul className="handover-list">{items.map(row)}</ul>;
+        return FOLDED.has(g) ? (
+          <details
+            key={g}
+            className="handover-group fold"
+            data-testid={`handover-group-${g}`}
+          >
+            <summary>{heading}</summary>
+            {body}
+          </details>
+        ) : (
+          <div
+            key={g}
+            className="handover-group"
+            data-testid={`handover-group-${g}`}
+          >
+            {heading}
+            {body}
+          </div>
+        );
+      })}
     </section>
+  );
+}
+
+/** The fields of a request: on the dossier before sending, and folded in each list row. */
+function DossierFields({ dossier }: { dossier: Handover["dossier"] }) {
+  const { t } = useTranslation();
+  return (
+    <dl>
+      <dt>{t("handover.question")}</dt>
+      <dd>{dossier.question}</dd>
+      <dt>{t("handover.asked")}</dt>
+      <dd>{dossier.asked}</dd>
+      <dt>{t("handover.expected")}</dt>
+      <dd>{dossier.expected}</dd>
+      {dossier.context.length > 0 && (
+        <>
+          <dt>{t("handover.context")}</dt>
+          <dd>
+            <ul>
+              {dossier.context.map((q, i) => (
+                <li key={i}>
+                  <em>{q.role}:</em> {q.text}
+                </li>
+              ))}
+            </ul>
+          </dd>
+        </>
+      )}
+      <dt>{t("handover.withheld")}</dt>
+      <dd>
+        {dossier.withheld.length > 0
+          ? dossier.withheld.join("; ")
+          : t("handover.withheldNone")}
+      </dd>
+    </dl>
   );
 }

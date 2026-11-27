@@ -2618,6 +2618,22 @@ details.fold > summary > h2 {
   display: inline;
   margin: 0;
 }
+/* the hand-over list in groups (issue #177): ended groups fold behind their heading */
+.handover-group {
+  margin: 0.75rem 0 0;
+}
+.handover-group-title {
+  margin: 0 0 0.25rem;
+}
+details.handover-group > summary > .handover-group-title {
+  display: inline;
+}
+.handover-list > li + li {
+  margin-top: 0.75rem;
+}
+.handover-full > dl {
+  margin: 0.25rem 0 0;
+}
 .node-kind {
   margin: 0.75rem 0;
 }
