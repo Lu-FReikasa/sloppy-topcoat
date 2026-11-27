@@ -4,7 +4,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import i18n from ".";
 import de from "./de.json";
 import en from "./en.json";
-import { blockProgramTitle, capabilityDescription, programTitle } from "./shipped";
+import { SHIPPED_TITLE_KEY, blockProgramTitle, capabilityDescription, programTitle } from "./shipped";
 
 const t = i18n.t.bind(i18n) as (key: string, o?: Record<string, unknown>) => string;
 const before = i18n.language;
@@ -60,6 +60,10 @@ describe("names the hub and the nodes send (issue #11)", () => {
     // a title_key the catalogue lacks (an older or newer hub) falls back to the key, too
     expect(programTitle({ ...w, title_key: "workspace.gone" }, t)).toBe("Recherche");
     expect(programTitle({ ...w, key: "chat", title: "Start", title_key: "workspace.start" }, t)).toBe("Start");
+    // the program `chat` is called Start (its seed's own title_key), not the application name "Chat"
+    for (const title_key of [null, "workspace.gone"]) {
+      expect(programTitle({ ...w, key: "chat", title: "Start", title_key }, t)).toBe("Start");
+    }
     await i18n.changeLanguage("en");
     expect(programTitle(w, t)).toBe("Research");
   });
@@ -80,6 +84,12 @@ describe("names the hub and the nodes send (issue #11)", () => {
     const seeds = readFileSync(resolve(process.cwd(), "../hub/src/topcoat_hub/ui/seeds.py"), "utf8");
     const keys = [...seeds.matchAll(/_program\(\s*(?:#[^\n]*\s*)*"([a-z0-9-]+)"/g)].map((m) => m[1] ?? "");
     const explicit = [...seeds.matchAll(/title_key="workspace\.([a-z0-9-]+)"/g)].map((m) => m[1] ?? "");
+    // a seed with its own title_key is in SHIPPED_TITLE_KEY, so a row without one reads the same
+    for (const call of seeds.split("_program(").slice(1)) {
+      const key = /^\s*(?:#[^\n]*\s*)*"([a-z0-9-]+)"/.exec(call)?.[1];
+      const own = /title_key="([^"]+)"/.exec(call.split(/\n\]/)[0] ?? "")?.[1];
+      if (key && own) expect(SHIPPED_TITLE_KEY[key], key).toBe(own);
+    }
     expect(keys.length).toBeGreaterThanOrEqual(6); // the pattern still finds the programs
     for (const key of [...keys, ...explicit]) {
       for (const [lang, cat] of [["en", en], ["de", de]] as const) {

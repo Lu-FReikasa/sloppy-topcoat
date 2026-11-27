@@ -39,13 +39,13 @@ describe("SettingsApp", () => {
     render(
       <SettingsApp
         api={api()}
-        workspaces={[ws("chat", "Chat"), ws("wiki", "Wiki"), ws("research", "Recherche")]}
+        workspaces={[ws("chat", "Start"), ws("wiki", "Wiki"), ws("research", "Recherche")]}
         section="apps"
         app="research"
       />,
     );
     const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
-    expect(tabs.map((b) => b.textContent)).toEqual(["Chat", "Recherche"]);
+    expect(tabs.map((b) => b.textContent)).toEqual(["Start", "Recherche"]);
     expect(tabs[1]!.getAttribute("aria-selected")).toBe("true");
   });
 });
