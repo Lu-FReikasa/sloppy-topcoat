@@ -139,7 +139,10 @@ func checkWebURL(raw string) (*url.URL, error) {
 	if !webPorts[u.Port()] {
 		return nil, inputErr("port %s is not allowed (80, 443, 8080 and 8443 are)", u.Port())
 	}
-	host := strings.ToLower(u.Hostname())
+	// sent in lower case: the origin rule (weborigin.go) ignores the case of the host, so the case
+	// a model chose must not reach the Host header and the TLS name, where it could spell out data
+	u.Host = strings.ToLower(u.Host)
+	host := u.Hostname()
 	if host == "localhost" || strings.HasSuffix(host, ".localhost") || strings.HasSuffix(host, ".local") ||
 		strings.HasSuffix(host, ".internal") || strings.HasSuffix(host, ".lan") || strings.HasSuffix(host, ".home.arpa") ||
 		(!strings.Contains(host, ".") && !strings.Contains(host, ":")) {

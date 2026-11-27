@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -129,5 +130,29 @@ func TestTheMemoryForgetsOldHitsAndStaysBounded(t *testing.T) {
 	}
 	if len(m.seen) > originMaxURLs || !m.Has(fmt.Sprintf("https://example.org/%d", originMaxURLs+9)) || m.Has("https://example.org/0") {
 		t.Fatalf("%d kept", len(m.seen))
+	}
+}
+
+func TestTheHostIsSentInTheFormTheOriginRuleCompared(t *testing.T) {
+	// the rule ignores the host's case, so the node must not send the case the model chose: in the
+	// Host header and the TLS name it could spell out what the run read, one bit per letter
+	var fetched []string
+	o := originOptions(&fetched)
+	resolve := o.Web.Resolve // like DNS, the name resolves whatever its case
+	o.Web.Resolve = func(ctx context.Context, host string) ([]netip.Addr, error) {
+		return resolve(ctx, strings.ToLower(host))
+	}
+	if _, err := invokeAs(plain, t, o, "web.search", `{"query":"public thing"}`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := invokeAs(plain, t, o, "web.fetch", `{"url":"https://eXaMPle.ORG/hit?id=7"}`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := invokeAs(plain, t, o, "web.image", `{"url":"https://EXAMPLE.org/walk.png"}`); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"https://example.org/hit?id=7", "https://example.org/walk.png"}
+	if fmt.Sprint(fetched) != fmt.Sprint(want) {
+		t.Fatalf("sent %v, want %v", fetched, want)
 	}
 }
