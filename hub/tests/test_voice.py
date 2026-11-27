@@ -166,6 +166,27 @@ def test_an_oversized_first_frame_closes_the_socket_even_with_a_valid_token(
     assert closed.value.code == 1009
 
 
+def test_the_sign_in_limit_is_4_kib_exactly(client: TestClient) -> None:
+    with client.websocket_connect("/api/voice/ws") as ws:
+        ws.send_text(_auth_frame(4096))
+        assert ws.receive_json()["type"] == "ready"
+    with client.websocket_connect("/api/voice/ws") as ws:
+        ws.send_text(_auth_frame(4097))
+        with pytest.raises(WebSocketDisconnect) as closed:
+            ws.receive_text()
+    assert closed.value.code == 1009
+
+
+def test_the_sign_in_limit_counts_bytes_not_characters(client: TestClient) -> None:
+    frame = _auth_frame(3000).replace("x" * 1500, "\u00e9" * 1500)  # 1500 two-byte characters
+    assert len(frame) < 4096 < len(frame.encode())
+    with client.websocket_connect("/api/voice/ws") as ws:
+        ws.send_text(frame)
+        with pytest.raises(WebSocketDisconnect) as closed:
+            ws.receive_text()
+    assert closed.value.code == 1009
+
+
 def test_a_binary_first_frame_signs_nobody_in(client: TestClient) -> None:
     with client.websocket_connect("/api/voice/ws") as ws:
         ws.send_bytes(json.dumps({"type": "auth", "token": DEV_TOKEN}).encode())
