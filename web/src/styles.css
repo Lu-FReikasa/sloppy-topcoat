@@ -161,6 +161,32 @@ optgroup {
   color: CanvasText;
 }
 
+/* In a look's typeface a select is as wide as its longest option, wider than the browser's own. In a
+   row of actions it gives way like the field beside it instead of squeezing that field to nothing, and
+   in a table cell it fills the cell instead of widening the table past its card (#172 review). */
+.dialog-actions > select {
+  min-width: 0;
+}
+
+/* The model name keeps room for a whole model id: the mode select (as wide as its longest
+   description) and the buttons wrap below it when the row is too narrow (#197 review). */
+.tool-modes .dialog-actions {
+  flex-wrap: wrap;
+}
+
+.tool-modes .dialog-actions > input {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.tool-modes .dialog-actions > select {
+  max-width: 100%;
+}
+
+table.plain td > select {
+  width: 100%;
+}
+
 .muted {
   color: var(--muted);
 }
@@ -3449,8 +3475,19 @@ pre.diff {
 
 .machine-edit-list li {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
+}
+
+/* the name keeps room to be read; a VM's kind and host selects wrap below it (#197 review) */
+.machine-edit-list li > input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.machine-edit-list li > select {
+  max-width: 100%;
 }
 
 /* Machines page (UI-01): one row per machine, each reading once */
