@@ -36,7 +36,16 @@ type Info struct {
 	// action workshop.manage, never by capability.invoke or capability.execute, so an assistant
 	// can never reach it. Never true together with ReadOnly or Scratch.
 	Manage bool
+	// MaxOutputBytes is the largest output this capability may send in one answer. 0 means the
+	// node's default limit for every capability (tools.HardMaxOutputBytes plus a margin). Only a
+	// capability whose output cannot be cut (voice.speak: one WAV) sets it; the node never sends
+	// more than MaxOutputCeiling, whatever it says.
+	MaxOutputBytes int
 }
+
+// MaxOutputCeiling bounds MaxOutputBytes: a result of this size plus its envelope stays well
+// below the hub's 8 MiB WebSocket message limit.
+const MaxOutputCeiling = 4 << 20
 
 // Describer is implemented by capabilities that describe themselves. A capability that does not
 // is listed without a description and as *not* read-only, so the safe default wins.

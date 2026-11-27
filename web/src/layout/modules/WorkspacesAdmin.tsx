@@ -4,6 +4,7 @@ import type { ApiClient } from "../../api/client";
 import { type UiBootstrap, type UiProfileView, type UiTemplateView, type UiUserView } from "../types";
 import { ProfileEditor } from "./admin/ProfileEditor";
 import { TemplateEditor } from "./admin/TemplateEditor";
+import { programTitle } from "../../i18n/shipped";
 import { moduleMeta } from "./meta";
 
 interface Props {
@@ -69,7 +70,7 @@ export function WorkspacesAdmin({ api, boot, part }: Props) {
     [load],
   );
 
-  const title = (w: UiTemplateView) => (w.title_key ? t(w.title_key, { defaultValue: w.title }) : w.title);
+  const title = (w: UiTemplateView) => programTitle(w, t);
   const moduleChoices = useMemo(
     () =>
       (boot?.modules ?? [])

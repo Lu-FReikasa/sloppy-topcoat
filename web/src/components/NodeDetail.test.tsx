@@ -42,7 +42,7 @@ describe("NodeDetailView", () => {
     expect(await screen.findByRole("heading", { name: "node-nvidia" })).toBeTruthy();
     expect(screen.getByText("Fake CPU (8 Kerne)")).toBeTruthy();
     expect(screen.getByText(/Fake \(Test\) – verfügbar/)).toBeTruthy();
-    expect(screen.getByText("qwen-7b")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "qwen-7b" })).toBeTruthy();
     expect(screen.getByText("4,5 GB")).toBeTruthy();
     expect(screen.getByText("Modell geladen")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Laden" })).toBeTruthy();

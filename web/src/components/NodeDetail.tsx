@@ -5,7 +5,7 @@ import { useNode } from "../data/useNode";
 import { useNodeActions, type ModelAction, type NodeActions } from "../data/useNodeActions";
 import type { HubEvents } from "../data/hubEvents";
 import { describeError } from "../errors";
-import { bytesToGb, formatDateTime, formatDecimal, formatInt, mbToGb } from "../format";
+import { bytesToGb, formatDateTime, formatDecimal, formatInt } from "../format";
 import { eventDetailKey, loadEventText } from "../nodeActivity";
 import {
   DEFAULT_RESIDENT_PRIORITY,
@@ -14,19 +14,18 @@ import {
   residentsOf,
 } from "../pressure";
 import { modelHref, modelsHref, overviewHref } from "../route";
-import { nodeGlance } from "../summaries";
 import type { CpuInfo, ModelInfo, NodeDetail, NodeEvent, Resident, ResidentUpdate } from "../types";
 import { BenchmarkSection } from "./BenchmarkSection";
 import { NodeConfigForm } from "./NodeConfigForm";
 import { DownloadDialog, DownloadList } from "./Downloads";
-import { diskLow, useDiskText, useRamText } from "./NodeFacts";
+import { diskLow, useDiskText } from "./NodeFacts";
+import { NodeHeader } from "./NodeHeader";
 import { PressureSettings } from "./PressureSettings";
 import { PowerSettings, YieldSettings } from "./YieldSettings";
 import { HostReadSection } from "./HostReadSection";
 import { ToolsSection } from "./ToolsSection";
 import { RenameNode } from "./RenameNode";
 import { UpdateSection } from "./UpdateSection";
-import { StateBadge } from "./StateBadge";
 import { ForeignUsage, VramBar } from "./UsageBar";
 import { askConfirm } from "./askConfirm";
 import { TransferList } from "./TransferList";
@@ -100,12 +99,9 @@ function DetailBody({
 }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
-  const ram = useRamText(node);
   const disk = useDiskText(node);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const { pending } = actions;
-  const actionError = actions.error ? describeError(actions.error, t, i18n) : null;
-  const notice = actions.notice ? t(`power.${actions.notice}`) : null;
   const offline = !node.connected || node.state === "offline";
 
   const residents = new Map(residentsOf(node.config).map((r) => [r.model, r]));
@@ -121,74 +117,18 @@ function DetailBody({
     await actions.runModelAction(action, model);
   }
 
-  async function sleepNow() {
-    if (!(await askConfirm(t("power.confirmSleep", { node: node.name })))) return;
-    await actions.sleep();
-  }
-
-  const canWake = offline && (node.network?.length ?? 0) > 0;
   const roles = node.config?.roles;
   // a tool node (E2-04) or a dev node (E6-01) has no models: its page is about capabilities instead
   const isTools =
     Array.isArray(roles) &&
     (roles.includes("tools") || roles.includes("dev")) &&
     !roles.includes("gpu");
-  const allowed = node.config?.allowed_actions;
-  const canSleep = !offline && Array.isArray(allowed) && allowed.includes("node.sleep");
   const lastSeen = formatDateTime(node.last_seen, locale) ?? t("node.never");
-  // what matters first (issue #22): state, memory, GPU, loaded models; the inventory is folded
-  const glance = nodeGlance(node);
-  const gb = (mb: number) => formatDecimal(mbToGb(mb), locale);
+  // what matters first (issues #22, #175) is in the header; the inventory is folded
 
   return (
     <>
-      <div className="detail-head">
-        <h1>{node.name}</h1>
-        <StateBadge state={node.state} />
-      </div>
-      <dl className="facts" data-testid="node-glance">
-        <dt>{t("node.ram")}</dt>
-        <dd>{offline ? "–" : ram}</dd>
-        {glance.gpus.length > 0 && (
-          <>
-            <dt>{t("detail.glanceGpu")}</dt>
-            <dd data-testid="glance-gpus">
-              {glance.gpus.map((g, i) => (
-                <span className="fact-item" key={i}>
-                  {t("detail.glanceGpuValue", {
-                    name: g.name,
-                    used: g.usedMb === null ? "?" : gb(g.usedMb),
-                    total: gb(g.totalMb),
-                  }) +
-                    (g.shared
-                      ? `, ${t("detail.glanceGpuShared", {
-                          used: g.shared.usedMb === null ? "?" : gb(g.shared.usedMb),
-                          total: gb(g.shared.totalMb),
-                        })}`
-                      : "")}
-                </span>
-              ))}
-            </dd>
-          </>
-        )}
-        {!isTools && glance.live && (
-          <>
-            <dt>{t("detail.glanceLoaded")}</dt>
-            <dd data-testid="glance-loaded">
-              {glance.loaded.length === 0
-                ? t("detail.glanceNone")
-                : glance.loaded.map((m) => (
-                    <span className="fact-item" key={m.name}>
-                      {m.vramMb === null
-                        ? m.name
-                        : t("detail.glanceLoadedValue", { name: m.name, vram: gb(m.vramMb) })}
-                    </span>
-                  ))}
-            </dd>
-          </>
-        )}
-        {disk && diskLow(node) && <DiskFact disk={disk} low />}
-      </dl>
+      <NodeHeader node={node} actions={actions} isTools={isTools} />
       <details className="facts-more">
         <summary>{t("detail.factsMore")}</summary>
         <dl className="facts">
@@ -217,8 +157,6 @@ function DetailBody({
           <dd>{node.connected ? t("node.yes") : t("node.no")}</dd>
           <dt>{t("node.lastSeen")}</dt>
           <dd>{lastSeen}</dd>
-          <dt>{t("node.agentVersion")}</dt>
-          <dd>{node.agent_version ?? t("node.unknown")}</dd>
           <dt>{t("detail.runner")}</dt>
           <dd>
             {node.runner ? (
@@ -288,30 +226,6 @@ function DetailBody({
             </button>
           </div>
           {offline && <p className="muted">{t("detail.offlineHint")}</p>}
-          {(canWake || canSleep) && (
-            <div className="power-actions">
-              {canWake && (
-                <button type="button" disabled={pending !== null} onClick={() => void actions.wake()}>
-                  {t("power.wake")}
-                </button>
-              )}
-              {canSleep && (
-                <button type="button" disabled={pending !== null} onClick={() => void sleepNow()}>
-                  {t("power.sleepNow")}
-                </button>
-              )}
-            </div>
-          )}
-          {notice && (
-            <p className="notice" role="status">
-              {notice}
-            </p>
-          )}
-          {actionError && (
-            <p className="error" role="alert">
-              {actionError}
-            </p>
-          )}
           {node.models.length === 0 ? (
             <p className="muted">{t("detail.noModels")}</p>
           ) : (

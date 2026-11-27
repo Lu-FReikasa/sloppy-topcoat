@@ -55,19 +55,37 @@ def branch_of(number: str) -> str:
     return "topcoat/v-" + (re.sub(r"[^0-9a-z]+", "-", number.lower()).strip("-") or "0")
 
 
-def scope_text(number: str, title: str, repo: str) -> str:
-    """What the card of the workshop scope says, word for word what the hub enforces (D110)."""
+LANGUAGES = ("en", "de")  # the GUI's languages; the card and the stored text come in each
+
+
+def scope_text(number: str, title: str, repo: str, language: str = "de") -> str:
+    """What the card of the workshop scope says, word for word what the hub enforces (D110), in
+    the GUI's ``language`` (``en``/``de``; anything else is English). The click stores the text
+    in the language the card showed, so what was read is what was granted (D15, D83)."""
+    branch = branch_of(number)
+    if language == "de":
+        return (
+            f"Vorhaben {number} „{title}“: Der Hub darf in der Werkstatt ({repo}) "
+            "auf genau dem Zweig "
+            f"{branch} die Entwürfe seiner Teilaufgaben anwenden (Änderungen und neue "
+            "Dateien), dort committen, Tests, Lint, Typprüfung und Builds laufen lassen, "
+            "Screenshots des Werkstatt-Builds mit Testdaten machen und Theme- und Persona-Entwürfe "
+            "ändern, ohne Klick je Fix. Jeder Versuch wird geprüft (Umfang, Inhalt, Pfade, keine "
+            "Geheimnisse, saubere Werkstatt, Stopp nach gleichem Fehler zweimal) und steht in der "
+            "Akte. Nicht abgedeckt: Ausrollen auf den Hub (bleibt ein Klick), Themes oder Personas "
+            "speichern oder aktivieren, andere Zweige oder Repositories, topcoat/live und main, "
+            f"Push, Merge, Deploy, Löschen. Gilt {DAYS} Tage oder bis zum Widerruf."
+        )
     return (
-        f"Vorhaben {number} „{title}“: Der Hub darf in der Werkstatt ({repo}) "
-        "auf genau dem Zweig "
-        f"{branch_of(number)} die Entwürfe seiner Teilaufgaben anwenden (Änderungen und neue "
-        "Dateien), dort committen, Tests, Lint, Typprüfung und Builds laufen lassen, Screenshots "
-        "des Werkstatt-Builds mit Testdaten machen und Theme- und Persona-Entwürfe ändern, ohne "
-        "Klick je Fix. Jeder Versuch wird geprüft (Umfang, Inhalt, Pfade, keine Geheimnisse, "
-        "saubere Werkstatt, Stopp nach gleichem Fehler zweimal) und steht in der Akte. Nicht "
-        "abgedeckt: Ausrollen auf den Hub (bleibt ein Klick), Themes oder Personas speichern oder "
-        "aktivieren, andere Zweige oder Repositories, topcoat/live und main, Push, Merge, Deploy, "
-        f"Löschen. Gilt {DAYS} Tage oder bis zum Widerruf."
+        f"Large task {number} “{title}”: in the workshop ({repo}), on exactly the branch "
+        f"{branch}, the hub may apply the drafts of its sub-tasks (changes and new files), commit "
+        "there, run tests, lint, type checks and builds, take screenshots of the workshop build "
+        "with test data, and change theme and persona drafts, without a click per fix. Every try "
+        "is checked (scope, content, paths, no secrets, a clean workshop, a stop after the same "
+        "failure twice) and written to the record. Not covered: rolling out to the hub (stays a "
+        "click), saving or activating themes or personas, other branches or repositories, "
+        "topcoat/live and main, push, merge, deploy, delete. For "
+        f"{DAYS} days or until you revoke it."
     )
 
 
@@ -233,8 +251,13 @@ def next_step(item: Item) -> str:
     return "startet, wenn die Abhängigkeiten fertig sind"
 
 
-def view(large: Any, project_title: str, items: Sequence[Item], mandate: Any | None) -> dict:
-    """The API shape the view of issue #33 reads (agreed in the PR of #32)."""
+def view(
+    large: Any, project_title: str, items: Sequence[Item], mandate: Any | None, repo: str
+) -> dict:
+    """The API shape the view of issue #33 reads (agreed in the PR of #32). ``scope_text`` holds
+    the card of the workshop scope in the hub's own words, one text per GUI language
+    (:func:`scope_text`; the click stores the one the card showed), so the card cannot drift from
+    what the click grants (issue #190)."""
     by_node = {str(i.node.id): i.spec.id for i in items}
     subtasks = [
         {
@@ -281,6 +304,9 @@ def view(large: Any, project_title: str, items: Sequence[Item], mandate: Any | N
             "branch": branch_of(large.number),
             "state": overall,
             "scope": scope,
+            "scope_text": {
+                lang: scope_text(large.number, large.title, repo, lang) for lang in LANGUAGES
+            },
         },
         "subtasks": subtasks,
         "rollout": {"ready": overall == "done"},
@@ -504,6 +530,8 @@ class Coordinator:
         )
 
     async def view(self, user_id: uuid.UUID, large_id: uuid.UUID) -> dict[str, Any]:
+        from topcoat_hub.issue_fixes import LIVE_REPO  # the repository the scope's click names
+
         large = await self.store.get_node(user_id, large_id)
         project = await self.store.get_project(user_id, large.project_id)
         items = await self.items(user_id, large)
@@ -512,7 +540,7 @@ class Coordinator:
             for m in await self.store.mandates_of(user_id, large.project_id)
             if m.branch == branch_of(large.number) and WORKSHOP in (m.actions or [])
         ]
-        return view(large, project.title, items, mandates[0] if mandates else None)
+        return view(large, project.title, items, mandates[0] if mandates else None, LIVE_REPO)
 
     async def tick(
         self,

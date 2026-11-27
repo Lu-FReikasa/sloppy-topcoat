@@ -115,6 +115,11 @@ def test_branch_scope_text_and_the_spec_in_the_body() -> None:
     assert vh.branch_of("3.2.1") == "topcoat/v-3-2-1"
     text = vh.scope_text("3.2.1", "Teilaufgaben", LIVE_REPO)
     assert "topcoat/v-3-2-1" in text and "Push" in text and "14 Tage" in text
+    en = vh.scope_text("3.2.1", "Teilaufgaben", LIVE_REPO, "en")
+    assert "topcoat/v-3-2-1" in en and "push" in en and "14 days" in en and LIVE_REPO in en
+    assert vh.scope_text("3.2.1", "T", LIVE_REPO, "fr") == vh.scope_text(
+        "3.2.1", "T", LIVE_REPO, "en"
+    )
     s = dc.Subtask(
         "s2", "Teil", "Ein Satz.", "api", ["hub/a.py"], ["f"], [], ["test:hub/tests/t.py"], ["s1"]
     )
@@ -270,9 +275,11 @@ async def test_a_workshop_scope_never_pushes_and_covers_nothing_else(client: Tes
 async def test_the_card_makes_the_scope_and_the_view_shows_it(client: TestClient) -> None:
     _, large, _, _ = await _setup(client)
     _, admin_key = make_user(TEST_DB_URL, "vorhaben key", role="admin")
+    before = client.get(f"/api/project/nodes/{large.id}/large-task", headers=AUTH).json()
+    assert before["large_task"]["scope"] is None
     url = f"/api/project/nodes/{large.id}/workshop-scope"
     assert client.post(url, headers=admin_key).status_code in (401, 403)
-    made = client.post(url, headers=AUTH)
+    made = client.post(f"{url}?language=de", headers=AUTH)
     assert made.status_code == 201, made.text
     m = made.json()["mandate"]
     assert m["actions"] == [WORKSHOP] and m["push"] is False and m["repo"] == LIVE_REPO
@@ -284,3 +291,13 @@ async def test_the_card_makes_the_scope_and_the_view_shows_it(client: TestClient
         body["large_task"]["scope"]["id"] == m["id"] and body["large_task"]["state"] == "planning"
     )
     assert body["subtasks"] == [] and body["rollout"] == {"ready": False}
+    # the card shows the hub's words before the click, and they are what the click stored (#190)
+    assert before["large_task"]["scope_text"]["de"] == m["text"]
+    assert body["large_task"]["scope_text"] == before["large_task"]["scope_text"]
+    # an English card stores the English text: what was read is what was granted (#190); without
+    # a language the person's stored one counts, else English
+    assert client.post(f"/api/project/mandates/{m['id']}/revoke", headers=AUTH).status_code == 200
+    made_en = client.post(url, headers=AUTH)
+    assert made_en.status_code == 201, made_en.text
+    assert made_en.json()["mandate"]["text"] == before["large_task"]["scope_text"]["en"]
+    assert "14 days" in made_en.json()["mandate"]["text"]

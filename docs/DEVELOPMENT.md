@@ -101,7 +101,7 @@ Environment variables (prefix `TOPCOAT_`, see `hub/src/topcoat_hub/config.py`):
 | variable | default | meaning |
 |---|---|---|
 | `TOPCOAT_DATABASE_URL` | `postgresql+psycopg://topcoat:topcoat@localhost:5432/topcoat` | SQLAlchemy URL |
-| `TOPCOAT_DEV_ADMIN_TOKEN` | empty (= GUI API locked) | static bearer token of the seeded dev admin |
+| `TOPCOAT_DEV_ADMIN_TOKEN` | empty (= GUI API locked) | static bearer token of the seeded dev admin; at least 32 characters (`serve` refuses a shorter one or the example value). 30 failed sign-ins per address and minute answer 429 until the minute is over |
 | `TOPCOAT_PROTO_ROOT` | `<repo>/proto` | directory with the JSON Schemas of every protocol version (`v0/`, `v1/`) |
 | `TOPCOAT_CHAT_DEFAULT_CONTEXT_TOKENS` | `8192` | prompt budget base when the node does not report the loaded model's context length |
 | `TOPCOAT_EMBEDDING_MODEL` | empty | embedding model served through the gateway (`/v1/embeddings`, bge-m3 after E2-03); empty = the transitional model-free hashing embedder |
@@ -496,6 +496,43 @@ check like the one above, not a CI job:
 cd web && npm run build && npm run shell-layout                     # all 216 checks
 SIZES=320x640,1280x800 LANGS=de LOOKS=terminal SHOTS=/tmp/shots npm run shell-layout
 ```
+
+## GUI checks in the desktop overlay (first)
+
+The maintainer uses the GUI mainly in the **desktop overlay** of the client (`desktop/`, one see-through
+window per screen with the hub's desktop, `?overlay=1&screen=<id>`). GUI work is checked there first and in
+the browser's navigation shell second. Two tools, so nobody has to take screenshots by hand:
+
+**1. Simulated overlay (anyone, no client, no hub).** `web/scripts/overlay-check.mjs` loads the built GUI as
+the client does: `?overlay=1&screen=s1`, with `window.topcoatClient.config` set before the page starts. Against
+the faked hub it checks one, two and three programs, a maximised one and the open command palette, on four
+screens (1920x1080, 2560x1440 at 150 %, 1366x768, 1280x800), three looks, German and English: overlay mode
+is on, the page paints no ground that covers the screen, nothing scrolls, the taskbar and the programs stay
+on the screen and off the taskbar, no text is cut in title bars, taskbar or navigation, no page errors.
+The faked hub sends the hub's security headers (`security_headers.py`), so every GUI check (overlay,
+shell, sheets, layout) also fails on a Content-Security-Policy refusal: a change that needs a script,
+picture or connection from somewhere else shows up here, not first on the hub.
+`SHOTS` keeps each step twice: see-through, and `-desk.png` over a busy desktop with the client's tint.
+
+```
+cd web && npm run build && npm run overlay-layout                         # all 120 checks
+SCREENS=2560x1440@1.5 LANGS=de LOOKS=terminal SHOTS=/tmp/shots npm run overlay-layout
+CHANNEL=msedge npm run overlay-layout                                     # Windows: the installed Edge
+```
+
+**2. The real overlay (the maintainer's PC).** Start the client with the developer's switch
+`TOPCOAT_DEVTOOLS_PORT` (`desktop/src-tauri/src/devtools.rs`: WebView2 opens the DevTools protocol on
+127.0.0.1 only, off unless the variable is set). `web/scripts/overlay-capture.mjs` attaches to it, takes a
+screenshot of every overlay page that is shown and runs the same audit. It only looks: no click, no typing,
+no navigation, so the desktop on the hub stays as it is. `SHOW=1` presses the key for every screen itself.
+
+```powershell
+$env:TOPCOAT_DEVTOOLS_PORT = "9222"; & "$HOME\Documents\Dev\topcoat-client\topcoat-desktop.exe"
+cd web; $env:SHOW = "1"; npm run overlay-capture        # screenshots in web/overlay-shots/
+```
+
+Both need `playwright` or `playwright-core` (`npm i -g playwright-core`; with `NODE_PATH` set to
+`npm root -g`). Neither is a CI job.
 
 
 ## Your own checks

@@ -45,7 +45,7 @@ start_hub() {
   docker run -d --name topcoat-smoke-hub --network "$net" -p "127.0.0.1:$port:8443" \
     -v topcoat-smoke-tls:/data/tls \
     -e TOPCOAT_DATABASE_URL=postgresql+psycopg://topcoat:smoke@topcoat-smoke-db:5432/topcoat \
-    -e TOPCOAT_DEV_ADMIN_TOKEN=smoke-token \
+    -e TOPCOAT_DEV_ADMIN_TOKEN=smoke-token-0123456789abcdefghijklmn \
     -e TOPCOAT_TLS_HOSTNAMES=hub.example.lan,localhost \
     "$image" >/dev/null
   for _ in $(seq 60); do
@@ -67,7 +67,7 @@ curl -fsS --cacert "$work/ca.pem" "https://localhost:$port/" | grep -q '<div id=
   echo "GUI index.html not served" >&2
   exit 1
 }
-curl -fsS --cacert "$work/ca.pem" -X POST -H "Authorization: Bearer smoke-token" \
+curl -fsS --cacert "$work/ca.pem" -X POST -H "Authorization: Bearer smoke-token-0123456789abcdefghijklmn" \
   "https://localhost:$port/api/pairing-codes" | grep -q "$fp1" || {
   echo "pairing code does not carry the CA fingerprint" >&2
   exit 1

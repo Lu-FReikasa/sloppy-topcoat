@@ -161,6 +161,32 @@ optgroup {
   color: CanvasText;
 }
 
+/* In a look's typeface a select is as wide as its longest option, wider than the browser's own. In a
+   row of actions it gives way like the field beside it instead of squeezing that field to nothing, and
+   in a table cell it fills the cell instead of widening the table past its card (#172 review). */
+.dialog-actions > select {
+  min-width: 0;
+}
+
+/* The model name keeps room for a whole model id: the mode select (as wide as its longest
+   description) and the buttons wrap below it when the row is too narrow (#197 review). */
+.tool-modes .dialog-actions {
+  flex-wrap: wrap;
+}
+
+.tool-modes .dialog-actions > input {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.tool-modes .dialog-actions > select {
+  max-width: 100%;
+}
+
+table.plain td > select {
+  width: 100%;
+}
+
 .muted {
   color: var(--muted);
 }
@@ -279,6 +305,47 @@ optgroup {
 
 .detail-head h1 {
   margin: 0;
+}
+
+/* Node page header (issue #175): state, load, version and the main actions above the body */
+.node-header {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.node-header .facts {
+  margin: 0.75rem 0 0.5rem;
+}
+
+.node-header-version {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0;
+}
+
+/* two classes: .badge comes later in this file and sets white text */
+.badge.node-header-update {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.node-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.node-header-load {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .empty {
@@ -2618,6 +2685,27 @@ details.fold > summary > h2 {
   display: inline;
   margin: 0;
 }
+/* the hand-over list in groups (issue #177): ended groups fold behind their heading */
+.handover-group {
+  margin: 0.75rem 0 0;
+}
+.handover-group-title {
+  margin: 0 0 0.25rem;
+}
+details.handover-group > summary > .handover-group-title {
+  display: inline;
+}
+.handover-list > li + li {
+  margin-top: 0.75rem;
+}
+/* the hand-over a link (inbox answer, chat) named */
+.handover-list > li[aria-current="true"] {
+  border-left: 3px solid var(--accent);
+  padding-left: 0.5rem;
+}
+.handover-full > dl {
+  margin: 0.25rem 0 0;
+}
 .node-kind {
   margin: 0.75rem 0;
 }
@@ -3387,8 +3475,19 @@ pre.diff {
 
 .machine-edit-list li {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
+}
+
+/* the name keeps room to be read; a VM's kind and host selects wrap below it (#197 review) */
+.machine-edit-list li > input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.machine-edit-list li > select {
+  max-width: 100%;
 }
 
 /* Machines page (UI-01): one row per machine, each reading once */

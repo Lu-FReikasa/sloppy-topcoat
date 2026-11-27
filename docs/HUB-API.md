@@ -564,7 +564,8 @@ capabilities"). `GET /api/voice` → `{transcribe, speak}` says up front whether
 caller (the client shows its key only then). A browser cannot set a header on a WebSocket, so the **first frame** is
 `{"type": "auth", "token": "<the GUI's bearer token or an API key>"}`, a text frame of at most 4 KiB
 sent within 10 seconds; a larger one closes the socket with `1009`, anything else (or nothing) with
-`4401`. The hub answers `{"type": "ready", "transcribe": bool, "speak": bool}`: whether
+`4401`. No frame may exceed 8 MiB (the transport limit of every hub WebSocket, closed with `1009`).
+The hub answers `{"type": "ready", "transcribe": bool, "speak": bool}`: whether
 a connected node offers that capability to this person (grants and node config as for every
 capability call). Then, in any order, each request with an `id` of the client's choosing:
 

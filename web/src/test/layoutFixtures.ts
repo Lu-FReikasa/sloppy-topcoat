@@ -17,7 +17,9 @@ export function workspace(key: string, modules: string[], over: Partial<Workspac
     modules,
     agent: { ...AGENT, tool_scope: { ...AGENT.tool_scope } },
     requires_role: null,
-    builtin: true,
+    // an admin's own program: its title stays as given. A shipped one (builtin) without a
+    // title_key would read `workspace.<key>` from the catalogue (issue #181).
+    builtin: false,
     rev: 1,
     ...over,
   };

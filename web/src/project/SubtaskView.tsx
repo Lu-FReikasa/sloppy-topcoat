@@ -185,6 +185,8 @@ export function SubtaskView({
     none: () => t("largeTask.scopeMissing"),
   };
   const scopeLine = scopeLines[large.scope?.state ?? "none"]();
+  // the card in the GUI's language; the click names it, so the hub stores the text that was read
+  const language = i18n.resolvedLanguage === "de" ? "de" : "en";
 
   return (
     <section className="large-task" aria-label={t("largeTask.title")} data-testid="large-task">
@@ -222,8 +224,9 @@ export function SubtaskView({
       )}
 
       {large.state !== "planning" && writes && (
-        // the card of the workshop scope (D110): the whole scope is shown before the click, and
-        // only the signed-in admin's click gives it; the hub sets branch, actions and duration
+        // the card of the workshop scope (D110): the whole scope is shown before the click, in the
+        // hub's own words (#190; the catalogue text only for an older hub), and only the signed-in
+        // admin's click gives it; the hub sets branch, actions and duration
         <div className="project-form large-task-scope" data-testid="workshop-scope">
           <p>
             <strong>{t("largeTask.scopeTitle")}</strong>{" "}
@@ -231,7 +234,8 @@ export function SubtaskView({
           </p>
           {!scopeActive && (
             <p className="small">
-              {t("largeTask.scopeText", { number: large.number, title: large.title, branch: large.branch, days: SCOPE_DAYS })}
+              {large.scope_text?.[language] ||
+                t("largeTask.scopeText", { number: large.number, title: large.title, branch: large.branch, days: SCOPE_DAYS })}
             </p>
           )}
           <div className="project-actions">
@@ -240,7 +244,7 @@ export function SubtaskView({
                 {t("largeTask.scopeRevoke")}
               </button>
             ) : (
-              <button type="button" disabled={busy} onClick={() => void actions.giveScope()}>
+              <button type="button" disabled={busy} onClick={() => void actions.giveScope(language)}>
                 {t("largeTask.scopeGive")}
               </button>
             )}

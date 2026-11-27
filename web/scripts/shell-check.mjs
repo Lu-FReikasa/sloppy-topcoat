@@ -15,7 +15,7 @@
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { JSON_ROUTES, serve } from "./lib/fake-hub.mjs";
+import { JSON_ROUTES, serve, watchCsp } from "./lib/fake-hub.mjs";
 
 const require = createRequire(import.meta.url);
 function loadPlaywright() {
@@ -122,6 +122,7 @@ try {
         localStorage.setItem("topcoat.shell", "nav");
       });
       const page = await ctx.newPage();
+      watchCsp(page, (m) => problems.push(`content security policy: ${m}`));
       await page.route("**/api/**", (route) => {
         const path = new URL(route.request().url()).pathname;
         if (path === "/api/stream") return route.fulfill({ status: 200, contentType: "text/event-stream", body: "" });

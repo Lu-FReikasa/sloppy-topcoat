@@ -59,6 +59,7 @@ from topcoat_hub.api import updates as updates_api
 from topcoat_hub.api import voice as voice_api
 from topcoat_hub.api import vorhaben as vorhaben_api
 from topcoat_hub.api import wiki as wiki_api
+from topcoat_hub.auth import sign_in_limiter
 from topcoat_hub.bench.service import BenchService
 from topcoat_hub.blocks.service import BlockService
 from topcoat_hub.chat_digest import ChatDigester
@@ -101,12 +102,14 @@ from topcoat_hub.project_tools import ProjectTools
 from topcoat_hub.proposals import ProposalService
 from topcoat_hub.protocol import PROTOCOL_VERSION, load_schema_sets
 from topcoat_hub.queue_watch import QueueWatch
+from topcoat_hub.ratelimit import AddressLimiter
 from topcoat_hub.releases import ReleaseService
 from topcoat_hub.report_knowledge import ReportIndex
 from topcoat_hub.resume_stuck import StuckTaskResumer
 from topcoat_hub.retention import Retention
 from topcoat_hub.scheduling_log import SchedulingLog
 from topcoat_hub.secretbox import SecretBox
+from topcoat_hub.security_headers import SecurityHeaders
 from topcoat_hub.segments import SegmentService
 from topcoat_hub.service import NodeService
 from topcoat_hub.sheets.service import SheetResearchService
@@ -146,6 +149,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         app.state.sessions = NodeSessions()
         app.state.challenges = ChallengeStore()
+        # per-address limits before the caller is known (ratelimit.py)
+        app.state.sign_ins = sign_in_limiter()
+        app.state.pairings = AddressLimiter(node.PAIRINGS_PER_MINUTE, 60.0)
+        app.state.challenge_limit = AddressLimiter(node.CHALLENGES_PER_MINUTE, 60.0)
         app.state.updates = UpdateStore(
             settings.update_dir, parse_keys(settings.update_pubkeys), settings.update_keep
         )
@@ -516,6 +523,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await engine.dispose()
 
     app = FastAPI(title="sloppy-topcoat hub", version=__version__, lifespan=lifespan)
+    app.add_middleware(SecurityHeaders)
     app.include_router(node.router)
     app.include_router(updates_api.router)
     app.include_router(releases_api.router)

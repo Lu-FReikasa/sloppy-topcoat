@@ -73,7 +73,8 @@ export interface LargeTaskActions {
   readonly problems: string[];
   readonly notice: LargeTaskNotice | null;
   readonly decompose: () => Promise<void>;
-  readonly giveScope: () => Promise<void>;
+  /** `language`: the one the card was shown in, so the hub stores that text (#190). */
+  readonly giveScope: (language?: "en" | "de") => Promise<void>;
   readonly revokeScope: (mandateId: string) => Promise<void>;
   readonly tick: () => Promise<void>;
 }
@@ -121,9 +122,9 @@ export function useLargeTaskActions(
     [api, nodeId, mutate, run],
   );
   const giveScope = useCallback(
-    () =>
+    (language?: "en" | "de") =>
       run("scope", async () => {
-        await api.giveWorkshopScope(nodeId);
+        await api.giveWorkshopScope(nodeId, language);
         await reload();
         return { kind: "scope" };
       }),
