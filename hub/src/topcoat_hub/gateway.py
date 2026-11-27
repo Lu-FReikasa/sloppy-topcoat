@@ -985,6 +985,14 @@ class Gateway:
         model, pin = split_model(requested)
         return await self.candidates(self.background_model(model, pin), pin)
 
+    async def route_now(self, requested: str) -> Route:
+        """Like :meth:`route`, but only the nodes that can answer now: an asleep node is not
+        woken and nothing waits. For checks that ask "who could take it" (node_chain.pick, the
+        activity view): a wake there held a DB connection for the whole wake timeout, and the
+        polled activity view used up the pool with it (2026-11-27)."""
+        model, pin = split_model(requested)
+        return await self._candidates(self.background_model(model, pin), pin)
+
     async def preview(self, requested: str, background: bool) -> Route:
         """The route a request would take now, for the scheduling view; nothing is started."""
         token = _IN_BACKGROUND_WORK.set(background)
