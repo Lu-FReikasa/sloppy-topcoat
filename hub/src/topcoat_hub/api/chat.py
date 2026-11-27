@@ -49,6 +49,7 @@ from topcoat_hub import (
     project_write,
     quality,
     reaction,
+    recent_change,
     report,
     research_chat,
     research_profile,
@@ -1471,6 +1472,7 @@ async def _answer(
     prepared_sets: list[Any] | None = None,
     refused: str = "",
     held: "Held | None" = None,
+    just_changed: bool = False,
 ) -> AsyncIterator[str]:
     """SSE for the browser: ``meta``, ``delta``…, ``done`` | ``error``. The answer is stored
     however the stream ends (complete, stopped by the user, or broken).
@@ -1708,6 +1710,13 @@ async def _answer(
                         )
                         text += claim_note
                         yield chat.sse("delta", {"text": claim_note})
+                if just_changed:  # #224: no new event a minute after the change is not "off"
+                    guarded, removed = recent_change.guard(text, language)
+                    if removed:
+                        log.warning("chat: 'off' right after a settings change: %s", removed)
+                        yield chat.sse("discard", {})
+                        yield chat.sse("delta", {"text": guarded})
+                        text = guarded
                 if prepared_sets and (
                     listed := project_changesets.listing(prepared_sets, language)
                 ):
@@ -2010,6 +2019,17 @@ def _scope_guard(turn: Turn, task: Any) -> tuple[str, list[str], list[str]] | No
         return None
     language = chat.hub_language(turn.language, turn.last_user_text)
     return language, list(coverage.get("asked") or []), not_asked
+
+
+def _just_changed(turn: Turn, result: chat_tools.CheckResult) -> bool:
+    """#224: the person says, in this message or the one before, that they changed a setting a
+    moment ago, and the check read the event log."""
+    if not any(
+        (e.source or {}).get("capability") == recent_change.EVENTS_LOG for e in result.evidence
+    ):
+        return False
+    said = [c for r, c in turn.history if r == "user"][-2:]
+    return any(recent_change.just_changed(c) for c in [*said, turn.last_user_text])
 
 
 def _not_noted(message_id: int, reason: str) -> dict[str, Any]:
@@ -4250,6 +4270,7 @@ async def _checked_answer(
                 after_done=after_done,
                 closing=card is not None or pointer is not None,
                 scope=_scope_guard(turn, check.result.task),
+                just_changed=_just_changed(turn, check.result),
                 change_facts=_change_facts(
                     [*waiting, *(p for p in offered if p.get("status") == "pending")],
                     check.result.task,
@@ -4295,6 +4316,7 @@ async def _checked_answer(
                         send_meta=False,
                         agent_task_id=check.task_id,
                         closing=True,
+                        just_changed=_just_changed(turn, check.result),
                     )
                 ) as answer:
                     async for ev in answer:

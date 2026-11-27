@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from topcoat_hub import node_rename, tool_groups
+from topcoat_hub import node_rename, recent_change, tool_groups
 from topcoat_hub.chat import qualify_claim
 from topcoat_hub.json_repair import as_list_of_objects, repair_json_object
 from topcoat_hub.memory import parse_json_object
@@ -396,6 +396,15 @@ def wifi_hint(prompt: str, tools: list[dict[str, Any]]) -> str:
         "A phone may use a different MAC per Wi-Fi network, so a MAC from another SSID is another "
         "row."
     )
+
+
+def settings_change_hint(prompt: str, tools: list[dict[str, Any]]) -> str:
+    """#224: the person changed a setting a moment ago and the event log is there: its missing
+    events are "not confirmed yet", not "off" (``recent_change.py``)."""
+    have = {str(t["capability"]) for t in tools}
+    if recent_change.EVENTS_LOG not in have or not recent_change.just_changed(prompt):
+        return ""
+    return recent_change.hint()
 
 
 # names the user set in quotes: straight, German low-high, single and guillemet quotes
