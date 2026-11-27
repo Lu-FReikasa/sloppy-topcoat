@@ -8,7 +8,7 @@ import re
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -29,6 +29,9 @@ IMAGE = "web.image"
 GUARDED = (SEARCH, FETCH, IMAGES, IMAGE)  # every input of these is checked for private data
 HUB_ONLY = frozenset({IMAGE})
 MAX_IMAGE_SEARCHES = 3  # per run
+# the hub tool that has the hub fetch a picture for a report (message_tools.IMAGE): its URL leaves
+# the network like a web.fetch, so it is held to the same origin rule
+REPORT_IMAGE = "research.report.image"
 
 # (host names, user names, own domains) that must not appear in anything sent to the internet
 PrivateNames = Callable[[], Awaitable[tuple[Iterable[str], Iterable[str], Iterable[str]]]]
@@ -94,6 +97,113 @@ def make_guard(names: PrivateNames | None) -> Callable[[str, dict[str, Any]], Aw
     return check
 
 
+# --- where a URL may come from (security audit 2026-11-27, finding 03) -------------------------
+# A model that read an injected page could put what it read elsewhere (a file, a note, the chat)
+# into a URL and fetch it: the guard above only sees addresses and secret shapes. So a run fetches
+# only URLs it was given: a hit of this run's web.search / web.images, a picture a page of this run
+# listed, or a URL in the person's own message. A URL the model made up is refused with a reason.
+
+_URL_IN_TEXT = re.compile(r"(?i)\bhttps?://[^\s<>\"'`]+")
+_TRAILING = ".,;:!?\"'\u00bb\u201c\u201d\u2019"  # also closing quotes
+_CLOSERS = {")": "(", "]": "[", "}": "{"}
+
+
+def url_key(url: str) -> str:
+    """A URL as the origin rule compares it: scheme and host in lower case, no user part, no
+    fragment, ``/`` for an empty path. The query stays as it is: that is where data would go."""
+    try:
+        parts = urlsplit(url.strip())
+        host = (parts.hostname or "").lower()
+        port = parts.port
+    except ValueError:
+        return ""
+    if parts.scheme.lower() not in ("http", "https") or not host:
+        return ""
+    netloc = f"[{host}]" if ":" in host else host
+    if port is not None:
+        netloc += f":{port}"
+    return urlunsplit((parts.scheme.lower(), netloc, parts.path or "/", parts.query, ""))
+
+
+def urls_in(text: str) -> set[str]:
+    """The http(s) URLs written in a text (a sentence's full stop or a closing bracket around a
+    link is not part of it), as :func:`url_key` gives them."""
+    out: set[str] = set()
+    for m in _URL_IN_TEXT.finditer(text or ""):
+        url = m.group(0)
+        while url:
+            last = url[-1]
+            if last in _TRAILING or (
+                last in _CLOSERS and url.count(last) > url.count(_CLOSERS[last])
+            ):
+                url = url[:-1]
+            else:
+                break
+        key = url_key(url)
+        if key:
+            out.add(key)
+    return out
+
+
+@dataclass
+class WebOrigins:
+    """The URLs one run may fetch: the person's (``person``) and those the web gave it (``found``:
+    search hits, pictures and pages it listed). Kept in memory for the run only."""
+
+    person: set[str] = field(default_factory=set)
+    found: set[str] = field(default_factory=set)
+
+    def of_person(self, text: str) -> None:
+        self.person |= urls_in(text)
+
+    def is_person(self, url: str) -> bool:
+        return url_key(url) in self.person
+
+    def allows(self, url: str) -> bool:
+        key = url_key(url)
+        return bool(key) and (key in self.person or key in self.found)
+
+    def refusal(self, capability: str, call_input: Any) -> str | None:
+        """Why a fetch of this URL is refused, or ``None``."""
+        if capability not in (FETCH, IMAGE, REPORT_IMAGE) or not isinstance(call_input, dict):
+            return None
+        url = call_input.get("image_url" if capability == REPORT_IMAGE else "url")
+        if not isinstance(url, str) or not url.strip() or self.allows(url):
+            return None
+        if capability == REPORT_IMAGE:
+            return (
+                "this picture URL did not come from this run: place a picture exactly as a "
+                "web.images hit (image or thumbnail) or a page you read (its images) gives it"
+            )
+        return (
+            "this URL did not come from this run: fetch only a URL exactly as a web.search hit "
+            "of this run or the person's message gives it (no URL you built or changed yourself); "
+            "search for the page first if you need it"
+        )
+
+    def note(self, capability: str, output: Any) -> None:
+        """Keep the URLs a result gave: hits of a search, the pictures and the final address of a
+        page that was read."""
+        if not isinstance(output, dict):
+            return
+        urls: list[Any] = []
+        if capability == SEARCH:
+            urls = [r.get("url") for r in _dicts(output.get("results"))]
+        elif capability == IMAGES:
+            for r in _dicts(output.get("results")):
+                urls += [r.get("image"), r.get("thumbnail"), r.get("page")]
+        elif capability == FETCH:
+            urls = [output.get("url")] + [i.get("url") for i in _dicts(output.get("images"))]
+        for u in urls:
+            key = url_key(u) if isinstance(u, str) else ""
+            if key:
+                self.found.add(key)
+
+
+def _dicts(value: Any) -> list[dict[str, Any]]:
+    return [v for v in value if isinstance(v, dict)] if isinstance(value, list) else []
+
+
 # a page with at least this much text is a usable source: enough to answer from, unless it is
 # mostly footer, login or consent text (then it needs a lot more)
 USABLE_PAGE_CHARS = 500
@@ -136,6 +246,10 @@ class WebBudget:
     read: set[str] = field(default_factory=set)
     # sites that refused automated reading (HTTP 401/403/429/451): their other pages would too
     refused_hosts: set[str] = field(default_factory=set)
+    # where a fetched URL may come from (finding 03): the person's message, this run's hits. A
+    # web.fetch is checked in ToolService.invoke (``url_refusal``: after the private-data guard, and
+    # audited); the picture of research.report.image, a hub tool, here
+    origins: WebOrigins = field(default_factory=WebOrigins)
 
     def refusal(self, capability: str, call_input: Any = None) -> str | None:
         """Why the call may not be made, or ``None``."""
@@ -144,6 +258,8 @@ class WebBudget:
                 f"you already made {self.image_searches} picture searches: place one of the hits "
                 "you have (research.report.image) or go on without a picture"
             )
+        if capability == REPORT_IMAGE:
+            return self.origins.refusal(capability, call_input)
         if not is_web(capability):
             return None
         if (
@@ -196,6 +312,13 @@ class WebBudget:
             return self.searches >= self.max_searches
         return self.fetches >= self.max_fetches and not self.read
 
+    def url_refusal(self, capability: str, call_input: Any) -> str | None:
+        """Why this web.fetch's URL may not be read (it came from no hit of this run and not from
+        the person), or ``None``; a page already read may be read on."""
+        if capability != FETCH or _url_of(call_input) in self.read:
+            return None
+        return self.origins.refusal(capability, call_input)
+
     def note_call(self, capability: str, call_input: Any = None) -> None:
         """A call is being made (counted whether it works or not: it costs time either way)."""
         if capability == IMAGES:
@@ -225,6 +348,7 @@ class WebBudget:
 
     def note_result(self, capability: str, output: Any, ref: str, call_input: Any = None) -> None:
         """A call returned: a page with enough text is a usable source."""
+        self.origins.note(capability, output)
         url = _url_of(call_input)
         if capability == FETCH and url and isinstance(output, dict):
             self.read.add(url)

@@ -31,9 +31,17 @@ class NodeWeb:
     def __init__(self, tools: ToolService, caller: Caller, node_id: uuid.UUID) -> None:
         self.tools, self.caller, self.node_id = tools, caller, node_id
 
-    async def _call(self, capability: str, tool_input: dict[str, Any]) -> dict[str, Any]:
+    async def _call(
+        self, capability: str, tool_input: dict[str, Any], person_url: bool = False
+    ) -> dict[str, Any]:
         try:
-            res = await self.tools.invoke(self.caller, self.node_id, capability, tool_input)
+            res = await self.tools.invoke(
+                self.caller,
+                self.node_id,
+                capability,
+                tool_input,
+                **({"person_url": True} if person_url else {}),
+            )
         except ToolError as exc:
             raise RuntimeError(exc.message) from exc
         if not res.get("ok"):
@@ -45,11 +53,14 @@ class NodeWeb:
         out = await self._call(web_access.SEARCH, {"query": query[:200], "limit": 10})
         return [r for r in out.get("results") or [] if isinstance(r, dict)]
 
-    async def fetch(self, url: str, markup: bool) -> dict[str, Any]:
+    async def fetch(self, url: str, markup: bool, built: bool = False) -> dict[str, Any]:
+        """One page. ``built``: the hub made the URL itself from the person's request (the lyrics
+        lookup), it is no search hit; the node is told so (finding 03). Hits need nothing: the
+        node knows its own search results."""
         tool_input: dict[str, Any] = {"url": url, "max_chars": 600000 if markup else 20000}
         if markup:
             tool_input["format"] = "html"
-        return await self._call(web_access.FETCH, tool_input)
+        return await self._call(web_access.FETCH, tool_input, person_url=built)
 
 
 def reads_markup(tool: dict[str, Any]) -> bool:

@@ -63,8 +63,13 @@ from topcoat_hub.models import AgentTask, DevRepo, User
 from topcoat_hub.project_tools import PROJECT_NODE, PROJECT_NODE_ID
 from topcoat_hub.report_doc import WRITE_UP_KEY
 from topcoat_hub.steering import SteeringBoard
-from topcoat_hub.tools import Caller, ToolError
+from topcoat_hub.tools import URL_NOT_GIVEN, Caller, ToolError
 from topcoat_hub.topcoat_self import GUIDE_CAPABILITY, TOPCOAT_NODE
+
+# runs whose prompt the hub wrote from a model's text (a review of an answer, a planner's order,
+# a coordinator's sub-question, a care run): a URL in it is not the person's, so it is not fetched
+# without a search hit (finding 03)
+HUB_PROMPT_ORIGINS = frozenset({"review", "planner", "child", "care"})
 
 log = logging.getLogger(__name__)
 # the project tool a finish may name instead of calling it (_propose_sets)
@@ -879,6 +884,10 @@ class AgentLoop:
             stop_at_usable=lim.stop_web_at_usable,
             max_attempts=lim.max_web_attempts,
         )
+        if origin not in HUB_PROMPT_ORIGINS:
+            # the URLs the person gave with the question may be fetched; the run finds the rest
+            # through its own searches (finding 03: no URL the model made up)
+            state.web.origins.of_person(prompt)
         state.research_depth = research_depth
         state.progress_mark = state.informative
         mode = await self._tool_mode(model)
@@ -1742,13 +1751,27 @@ class AgentLoop:
             s.calls += 1
         s.used.add(a.capability)
         try:
+            # finding 03: a page only from this run's hits or the person's message
+            vouched = (
+                a.capability == web_access.FETCH
+                and isinstance(a.input, dict)
+                and s.web.origins.is_person(str(a.input.get("url") or ""))
+            )
+            not_given = s.web.url_refusal(a.capability, a.input)
             result = await self.tools.invoke(
-                s.caller, uuid.UUID(match["node_id"]), a.capability, a.input, s.task_id
+                s.caller,
+                uuid.UUID(match["node_id"]),
+                a.capability,
+                a.input,
+                s.task_id,
+                **({"person_url": True} if vouched else {}),
+                **({"url_refusal": not_given} if not_given else {}),
             )
             if polling and result.get("ok"):
                 result = await self._wait_for_test(s, match["node_id"], a, result)
         except ToolError as exc:
-            if exc.code == "private_data":  # the refused input is not kept: it held private data
+            if exc.code in ("private_data", URL_NOT_GIVEN):
+                # the refused input is not kept: it held private data, or may (a made-up URL)
                 label, info = f"{a.capability} on {a.node}", {**info, "input": {}}
             s.web.note_failure(a.capability)
             s.web.note_refused(a.input, exc.message)

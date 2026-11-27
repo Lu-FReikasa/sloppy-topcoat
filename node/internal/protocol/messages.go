@@ -328,7 +328,10 @@ type CapabilityInfo struct {
 	Scratch bool `json:"scratch,omitempty"`
 	// Manage marks a capability the person runs from the hub's page (workshop.manage, D76): the
 	// hub never offers it to an assistant.
-	Manage      bool            `json:"manage,omitempty"`
+	Manage bool `json:"manage,omitempty"`
+	// URLOrigin marks web.fetch / web.image of a node that reads only its own hits or URLs the hub
+	// vouches for with url_origin "person" (finding 03).
+	URLOrigin   bool            `json:"url_origin,omitempty"`
 	InputSchema json.RawMessage `json:"input_schema"`
 }
 
