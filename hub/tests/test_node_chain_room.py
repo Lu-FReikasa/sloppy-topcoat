@@ -47,3 +47,25 @@ def test_a_full_first_node_hands_the_request_to_a_free_one_of_the_row() -> None:
 def test_a_node_that_cannot_take_it_at_all_is_still_a_fallback() -> None:
     got = pick({"node-amd": 0})
     assert got == node_chain.Pick("node-amd", "gpt-oss", "node-nvidia", "offline")
+
+
+class WakingGateway(Gateway):
+    """``route`` would wake an asleep node and wait; ``route_now`` only asks who can take it."""
+
+    def __init__(self, free: dict[str, int]) -> None:
+        super().__init__(free)
+        self.woken: list[str] = []
+
+    async def route(self, requested: str) -> SimpleNamespace:
+        self.woken.append(requested)
+        raise AssertionError("pick must not wake a node")
+
+    async def route_now(self, requested: str) -> SimpleNamespace:
+        return await Gateway.route(self, requested)
+
+
+def test_pick_never_wakes_an_asleep_node() -> None:
+    gw = WakingGateway({"node-amd": 1})
+    got = asyncio.run(node_chain.pick(gw, CHAIN))  # type: ignore[arg-type]
+    assert got == node_chain.Pick("node-amd", "gpt-oss", "node-nvidia", "offline")
+    assert gw.woken == []
