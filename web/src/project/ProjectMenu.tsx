@@ -27,7 +27,8 @@ export function menuFocus(
 
 /** A "⋯" button that opens the project's actions as a menu. Opening it focuses the first entry;
  *  arrows, Home and End move between entries; Escape closes it and gives the focus back to the
- *  button (and is kept from the desktop, which would minimise the window); Tab and a click outside
+ *  button (and is kept from the desktop, which would minimise the window, and from the overlay's
+ *  client, which would hide the overlay); Tab and a click outside
  *  close it. */
 export function ProjectMenu({
   label,
@@ -94,6 +95,9 @@ export function ProjectMenu({
           className="project-menu-list"
           role="menu"
           aria-label={label}
+          // in the desktop overlay Esc is the client's key: it hides the whole overlay unless
+          // something open asks to close first (desktop/client.ts, CLOSES_FIRST)
+          data-esc-first=""
           onKeyDown={onKey}
         >
           {items.map((item, i) => (

@@ -24,11 +24,19 @@ export function useScrollportHeight(
     const el = ref.current;
     if (!active || !el) return;
     const port = scrollParent(el);
-    const measure = () =>
-      el.style.setProperty(
-        name,
-        `${port ? port.clientHeight : window.innerHeight}px`,
+    // a sticky element sticks inside the port's padding, so the padding is not room for it (the
+    // window's .ws-page has 0.75rem: counted in, the panel's top slid under the port's edge once the
+    // tree was scrolled to its end)
+    const room = (p: HTMLElement) => {
+      const { paddingTop, paddingBottom } = getComputedStyle(p);
+      return (
+        p.clientHeight -
+        (parseFloat(paddingTop) || 0) -
+        (parseFloat(paddingBottom) || 0)
       );
+    };
+    const measure = () =>
+      el.style.setProperty(name, `${port ? room(port) : window.innerHeight}px`);
     measure();
     if (!port || typeof ResizeObserver === "undefined") {
       window.addEventListener("resize", measure);

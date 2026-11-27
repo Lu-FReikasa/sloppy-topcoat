@@ -925,6 +925,8 @@ export function ProjectPage({
             onTrash={() =>
               write(async () => {
                 await api.trashProjectNode(sideNode.id);
+                // its row is gone with it: the focus goes back to the tree, not to the page
+                returnTo.current = sideNode.id;
                 setNodeId(null);
               }, t("project.trashed"))
             }
@@ -941,8 +943,6 @@ export function ProjectPage({
     </div>
   );
 }
-
-
 
 function NewProject({
   onCreate,

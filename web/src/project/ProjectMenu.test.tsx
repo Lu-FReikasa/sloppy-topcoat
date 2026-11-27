@@ -1,7 +1,15 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "../api/client";
 import i18n from "../i18n";
+import { installEscape } from "../desktop/client";
 import { fakeApi, node, project } from "../test/projectFixtures";
 import { menuFocus, ProjectMenu } from "./ProjectMenu";
 import { ProjectPage } from "./ProjectPage";
@@ -67,6 +75,32 @@ describe("ProjectMenu", () => {
     expect(seen.every((prevented) => prevented)).toBe(true);
   });
 
+  it("closes on the overlay's Esc instead of hiding the overlay", () => {
+    // the desktop client takes Esc while its overlay is up and hands it to the page (client.ts)
+    const client = window as unknown as {
+      topcoatClient?: {
+        config?: object;
+        escape?: () => void;
+        leave?: () => void;
+      };
+    };
+    const leave = vi.fn();
+    client.topcoatClient = { config: { key: "ctrl+alt+Space" }, leave };
+    const stop = installEscape();
+    render(<ProjectMenu label="Actions" items={items()} />);
+    const button = screen.getByRole("button", { name: "Actions" });
+    fireEvent.click(button);
+    act(() => client.topcoatClient!.escape!());
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(button);
+    expect(leave).not.toHaveBeenCalled();
+    // with the menu closed, the next Esc is the overlay's again
+    act(() => client.topcoatClient!.escape!());
+    expect(leave).toHaveBeenCalledOnce();
+    stop();
+    delete client.topcoatClient;
+  });
+
   it("closes on a click outside", () => {
     render(
       <div>
@@ -113,5 +147,26 @@ describe("the open node as a side panel (#179)", () => {
       await screen.findByRole("button", { name: "Close the details" }),
     );
     expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull();
+  });
+
+  it("gives the focus to the tree when the open node goes to the trash", async () => {
+    const task = node({ id: "t1", title: "Plan", number: "1" });
+    const api = fakeApi({ project: project(), nodes: [task] });
+    render(<ProjectPage api={api as unknown as ApiClient} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Topcoat/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Plan/ }));
+    const side = await screen.findByRole("complementary", { name: "Details" });
+    fireEvent.click(
+      within(side).getByRole("button", { name: "Move to trash" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("complementary", { name: "Details" }),
+      ).toBeNull(),
+    );
+    // the button that had the focus is gone; the focus must not fall back to the page's body
+    // (the fake hub still lists the node, so its row takes it; on the hub the tree does)
+    const tree = screen.getByRole("region", { name: "Tree" });
+    expect(tree.contains(document.activeElement)).toBe(true);
   });
 });
