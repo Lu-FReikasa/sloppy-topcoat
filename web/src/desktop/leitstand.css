@@ -348,6 +348,13 @@
   }
 }
 
+/* on a phone the 40 px touch floor holds (2.6rem is 39 px, and this rule beats touch.css) */
+@media (max-width: 759px) {
+  .dt-look-leitstand .dt-task {
+    min-width: 40px;
+  }
+}
+
 @media (max-width: 760px) {
   .dt-look-leitstand .dt-clock {
     display: none;
