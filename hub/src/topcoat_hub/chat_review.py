@@ -97,7 +97,7 @@ EARLIER_CHARS = 1200  # of one earlier message the reviewer reads next to the an
 # "ja bitte" was judged without what the "ja" agreed to)
 EARLIER_BUDGET = 6000
 EARLIER_SCAN = 40
-# the hub's own lines that carry nothing of the conversation (api/chat.py CONFIRMATIONS)
+# the hub's own lines that carry nothing of the conversation (chat_engine/common.py CONFIRMATIONS)
 # the reviewer of a check without a model (citation_check.py), as chat_reviews names it
 HUB_CHECK = "hub"
 HUB_LINES = frozenset({"Schau ich mir an.", "On it — I'll take a look."})

@@ -46,7 +46,7 @@ section on roles below stays true until it is built.
    it with its record (`claims.py`) and writes the true state under it, with the refused calls and their
    reasons; a check the hub did not start (its task limit) is stated as that, not as a failed check.
    The system prompt names the program, the model and the machine the answer is made on (`_where` in
-   `api/chat.py`; the hardware only for an admin), so the model can say where it runs.
+   `chat_engine/answer.py`; the hardware only for an admin), so the model can say where it runs.
 
 ## What the agent can see of a machine
 

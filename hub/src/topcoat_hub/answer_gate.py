@@ -2,8 +2,8 @@
 
 The answer is made, checked against its evidence, and made again with the findings until the check
 passes or the revisions are used up. The model call and the check are passed in, so the loop is
-tested without a model or a database. Not wired into ``api/chat.py`` yet: that needs the answer
-held back while it streams (brief R1-01, round R2).
+tested without a model or a database. Not wired into ``chat_engine/answer.py`` yet: that needs the
+answer held back while it streams (brief R1-01, round R2).
 """
 
 from collections.abc import Awaitable, Callable

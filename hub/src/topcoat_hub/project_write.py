@@ -11,8 +11,8 @@ held only titles, and the answer claimed instructions. Writing is not a job for 
 3. the hub builds the change set from the sections (ids, revisions, the lines a run needs) and
    the person sees it with before and after.
 
-Everything here but the model call is a pure function; ``api/chat.py`` drives it. A request that
-is not clearly "rewrite these tasks" stays with the agent loop."""
+Everything here but the model call is a pure function; ``chat_engine/answer.py`` drives it. A
+request that is not clearly "rewrite these tasks" stays with the agent loop."""
 
 import re
 from collections.abc import Iterable, Sequence

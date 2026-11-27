@@ -271,3 +271,20 @@ def test_repo_show_tells_the_agent_that_it_returns_no_text_and_where_to_read(cli
     client.app.state.trace.repos = SimpleNamespace(list=names)
     out = run(client, "repo.show", {"repo": "topcoat-localdev", "path": "VERSION"})["output"]
     assert "no text" in out["note"] and "repo.read" in out["note"]
+
+
+def test_every_place_in_the_code_a_trace_points_to_is_there() -> None:
+    """The pointers name a file and a text to find in it; a move of the code (issue #205) must
+    move them too, or the development assistant opens the wrong file."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    places = [p for group in trace_tool._POINTERS.values() for p in group]
+    places += trace_tool._SECOND_LOOK + trace_tool.PIPELINE
+    missing = [
+        (p["path"], p["find"])
+        for p in places
+        if not (root / p["path"]).is_file()
+        or p["find"] not in (root / p["path"]).read_text(encoding="utf-8")
+    ]
+    assert missing == []

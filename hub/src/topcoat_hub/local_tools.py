@@ -3,7 +3,7 @@
 cut to a size, then one answer of the model that cites the result as evidence (``[E1]``).
 
 This module holds the pure parts (the offered functions, reading arguments, cutting, the record
-view). The chat runs the calls and writes the answer (``api/chat.py``)."""
+view). The chat runs the calls and writes the answer (``chat_engine/answer.py``)."""
 
 from __future__ import annotations
 

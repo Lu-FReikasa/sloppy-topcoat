@@ -3,7 +3,7 @@
 The chat starts the job and goes on with the person. The job's progress is written into the chat
 message while it runs; when it ends, the chat writes a short summary that answers the questions of
 the conversation with the report as its ground. This module holds the wording and the progress of
-the run; the wiring is in ``api/chat.py``.
+the run; the wiring is in ``chat_engine/answer.py``.
 """
 
 from typing import Any
