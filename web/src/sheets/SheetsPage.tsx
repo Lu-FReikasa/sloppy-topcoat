@@ -320,10 +320,13 @@ function inFront(el: HTMLElement | null): boolean {
 }
 
 /** Whether the shell around the page has a menu or drawer open (the web shell's drawer or user
- *  menu, the taskbar menu): Esc then closes that, it does not leave the sheet. Expanded controls
- *  inside this page or in other windows do not count. */
+ *  menu, the taskbar menu): Esc then closes that, it does not leave the sheet. Only popups count:
+ *  other expanded controls (the unfolded Clipper dock beside the window) stay open for as long as
+ *  the person likes and must not take the page's Esc. Popups inside this page or in other windows
+ *  do not count either. */
 function shellPopupOpen(el: HTMLElement | null): boolean {
-  return [...document.querySelectorAll('[aria-expanded="true"]')].some((x) => !el?.contains(x) && !x.closest(".dt-program"));
+  const open = document.querySelectorAll('[aria-haspopup][aria-expanded="true"], .ws-burger[aria-expanded="true"]');
+  return [...open].some((x) => !el?.contains(x) && !x.closest(".dt-program"));
 }
 
 function typing(target: EventTarget | null): boolean {
@@ -918,6 +921,8 @@ function Stage({
       // a dialog over the stage (the desktop's command palette) keeps its keys, and so does another
       // window brought in front of this one (its text field's arrows, its own Esc)
       if (e.defaultPrevented || !inFront(root.current)) return;
+      // the stage has no fields: keys typed in one beside it (the Clipper dock) stay with the field
+      if (typing(e.target)) return;
       if (e.key === "Escape") leave();
       else if (e.key === "ArrowRight" || e.key === "PageDown") go(next, 1);
       else if (e.key === "ArrowLeft" || e.key === "PageUp") go(prev, -1);

@@ -218,14 +218,28 @@ describe("Sheets", () => {
     field.remove();
     // a menu of the shell is open (the web shell's drawer, the taskbar menu): that Esc is the menu's
     const menu = document.createElement("button");
+    menu.setAttribute("aria-haspopup", "menu");
     menu.setAttribute("aria-expanded", "true");
     document.body.appendChild(menu);
     expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
     expect(window.location.hash).toBe("#/sheets/s1");
     menu.remove();
+    const burger = document.createElement("button");
+    burger.className = "ws-burger";
+    burger.setAttribute("aria-expanded", "true");
+    document.body.appendChild(burger);
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+    expect(window.location.hash).toBe("#/sheets/s1");
+    burger.remove();
+    // the unfolded Clipper dock beside the window is expanded too, but no menu: Esc still leaves
+    const dock = document.createElement("button");
+    dock.className = "clipper-talk-figure";
+    dock.setAttribute("aria-expanded", "true");
+    document.body.appendChild(dock);
     // taken by the page (the desktop shell then does not minimise the window)
     expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(false);
     expect(window.location.hash).toBe("#/sheets");
+    dock.remove();
   });
 
   it("transposes only the view and compares a source", async () => {
@@ -397,6 +411,14 @@ describe("Sheets", () => {
     await at(2);
     await waitFor(() => expect(asked()).toEqual(["s9", "s2", "s9", "s2"]));
     expect(window.location.hash).toBe("#/sheets");
+    // keys typed in a field beside the stage (the Clipper dock) move its caret, not the song
+    const field = document.createElement("textarea");
+    document.body.appendChild(field);
+    expect(fireEvent.keyDown(field, { key: "ArrowRight" })).toBe(true);
+    expect(fireEvent.keyDown(field, { key: "Escape" })).toBe(true);
+    await at(2);
+    expect(screen.getByTestId("sheet-stage")).toBeTruthy();
+    field.remove();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByTestId("sheet-stage")).toBeNull();
     // leaving opens the song the setlist was at (the newest version of Example Song)
