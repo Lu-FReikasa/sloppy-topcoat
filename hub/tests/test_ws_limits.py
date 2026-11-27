@@ -84,6 +84,23 @@ async def test_one_byte_more_closes_the_socket_with_1009(hub_url: str) -> None:
     assert closed.value.rcvd is not None and closed.value.rcvd.code == 1009
 
 
+@pytest.mark.parametrize(
+    "message",
+    [b"\0" * (8 * MIB + 1), iter([b"\0" * (5 * MIB), b"\0" * (5 * MIB)])],
+    ids=["one-frame", "fragmented"],
+)
+async def test_the_limit_counts_the_whole_message_on_the_wire_too(
+    hub_url: str, message: Any
+) -> None:
+    # the client above compresses (permessage-deflate), so the hub counts the inflated size;
+    # here without compression, and split into fragments that are each under the limit
+    async with connect(hub_url, max_size=None, compression=None) as ws:
+        with pytest.raises(ConnectionClosed) as closed:
+            await ws.send(message)
+            await asyncio.wait_for(ws.recv(), 10)
+    assert closed.value.rcvd is not None and closed.value.rcvd.code == 1009
+
+
 async def test_the_largest_node_answer_goes_through(hub_url: str) -> None:
     # voice.speak's answer: a WAV of up to 2_800_000 bytes (node/internal/voice/voice.go
     # MaxSpeechBytes), base64 in one action_result envelope (docs/PROTOCOL.md)
