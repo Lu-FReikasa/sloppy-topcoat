@@ -75,7 +75,7 @@
     {"name": "service.restart", "group": "services", "roles": [], "note": "state-changing; offered only where tools.restart_units is set"},
     {"name": "voice.transcribe", "group": "voice", "roles": [], "note": "offered only where tools.voice is enabled (D127)"},
     {"name": "voice.speak", "group": "voice", "roles": [], "note": "offered only where tools.voice is enabled (D127)"},
-    {"name": "hub.update", "group": "hub", "roles": [], "note": "offered only where the node runs with --hub-update; run by hub.manage on an admin click"},
+    {"name": "hub.update", "group": "hub", "roles": [], "note": "offered only where the node runs with --hub-update-script; run by hub.manage on an admin click"},
     {"name": "windows.defender", "group": "windows", "roles": [], "note": "offered only on Windows nodes"},
     {"name": "windows.devices", "group": "windows", "roles": [], "note": "offered only on Windows nodes"},
     {"name": "windows.events", "group": "windows", "roles": [], "note": "offered only on Windows nodes"},
