@@ -562,8 +562,9 @@ them in the tab in memory only (at most 12 per tab), answers with `asked` (the q
 between a client and the node services `voice.transcribe` / `voice.speak` (docs/PROTOCOL.md, "Voice
 capabilities"). `GET /api/voice` → `{transcribe, speak}` says up front whether it can work for the
 caller (the client shows its key only then). A browser cannot set a header on a WebSocket, so the **first frame** is
-`{"type": "auth", "token": "<the GUI's bearer token or an API key>"}`; anything else closes the
-socket with `4401`. The hub answers `{"type": "ready", "transcribe": bool, "speak": bool}`: whether
+`{"type": "auth", "token": "<the GUI's bearer token or an API key>"}`, a text frame of at most 4 KiB
+sent within 10 seconds; a larger one closes the socket with `1009`, anything else (or nothing) with
+`4401`. The hub answers `{"type": "ready", "transcribe": bool, "speak": bool}`: whether
 a connected node offers that capability to this person (grants and node config as for every
 capability call). Then, in any order, each request with an `id` of the client's choosing:
 
