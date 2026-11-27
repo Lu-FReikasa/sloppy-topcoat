@@ -46,8 +46,9 @@ func mustParse(b []byte, tag *regexp.Regexp) llamacpp.Manifest {
 	return m
 }
 
-// Limits of one request. Audio and speech travel base64-encoded inside one session message of
-// at most 4 MB (agent/session.go), so they stay well below 3 MB.
+// Limits of one request. Audio and speech travel base64-encoded inside one session message: the
+// node reads at most 4 MiB (agent/session.go), and an answer stays below the output ceiling of a
+// capability (capability.MaxOutputCeiling, 4 MiB), so both stay well below 3 MB.
 const (
 	MaxAudioBytes  = 2_500_000 // ~78 s of 16 kHz mono 16-bit WAV
 	MaxSpeechBytes = 2_800_000 // ~63 s of Piper's 22 kHz mono 16-bit WAV

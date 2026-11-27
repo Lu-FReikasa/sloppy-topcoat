@@ -114,6 +114,7 @@ func (h *fakeHub) serve(w http.ResponseWriter, r *http.Request) {
 		h.t.Errorf("accept: %v", err)
 		return
 	}
+	c.SetReadLimit(8 << 20) // as the hub (serve.py ws_max_size): a spoken answer is up to ~3.7 MB
 	hc := &hubConn{t: h.t, c: c, msgs: make(chan protocol.Envelope, 256), closed: make(chan struct{})}
 	hc.closeStatus.Store(-1)
 	go hc.readLoop()
