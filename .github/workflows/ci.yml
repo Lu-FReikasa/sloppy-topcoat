@@ -120,7 +120,7 @@ jobs:
         run: scripts/smoke-test-hub-image.sh topcoat-hub:ci
 
   web:
-    name: web (eslint + vitest + build)
+    name: web (eslint + vitest + build + layout)
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -137,6 +137,12 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # the layout checks (#208): the built GUI in a real Chromium against the fake hub
+      # (scripts/lib/fake-hub.mjs); the headless shell is enough, the version comes from package-lock.json
+      - name: chromium for the layout checks
+        run: npx playwright install --with-deps --only-shell chromium
+      - run: npm run shell-layout
+      - run: npm run sheets-layout
 
   e2e:
     name: integration (hub + two fake nodes)

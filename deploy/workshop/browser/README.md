@@ -12,7 +12,7 @@ configuration:
   dropped and two mounts: a copy of the worktree (read-only) and the mailbox (`/box`).
 * `helper.mjs` serves the built GUI of the worktree copy with a faked hub on the container's own
   loopback, drives Chromium through Playwright, and answers one command at a time from the mailbox.
-* The audit, snapshot and fake-hub modules are shared with `web/scripts/layout-check.mjs`
+* The audit, snapshot and fake-hub modules are shared with the layout checks in `web/scripts/`
   (`web/scripts/lib/`); their pure parts have unit tests (`npm test`).
 
 The helper has run against a real Chromium (`node deploy/workshop/browser/selftest.mjs` repeats that run:
