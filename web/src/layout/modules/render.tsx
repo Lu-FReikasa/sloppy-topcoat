@@ -127,25 +127,25 @@ function ChatWindow({
       data-app={workspace}
       style={{ "--chat-accent": applicationAccent(workspace) } as CSSProperties}
     >
-      <div className="chat-window-bar">
-        <button
-          type="button"
-          className="linklike"
-          onClick={() =>
-            requestOpen({
-              module: "page.handovers",
-              props: { from: workspace },
-            })
-          }
-        >
-          {t("chat.handover")}
-        </button>
-      </div>
       <TalkPage
         api={api}
         newChatScope={scope}
         application={workspace}
         conversationId={id}
+        headerActions={
+          <button
+            type="button"
+            className="linklike"
+            onClick={() =>
+              requestOpen({
+                module: "page.handovers",
+                props: { from: workspace },
+              })
+            }
+          >
+            {t("chat.handover")}
+          </button>
+        }
       />
     </div>
   );

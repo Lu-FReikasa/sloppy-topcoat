@@ -141,6 +141,26 @@ input:where(:not([type="checkbox"], [type="radio"])) {
   width: 100%;
 }
 
+/* a select is drawn like the fields beside it, in every look (#172), not as the browser's grey box.
+   A bare element selector, so page rules like ".picker select" still win. The open list stays the
+   browser's own: its options take the system colours of the look's color-scheme, so they stay
+   readable where the look's ground is transparent (Schreibtisch paper) or dark. */
+select {
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--bg);
+  color: var(--text);
+  max-width: 100%;
+}
+
+option,
+optgroup {
+  background-color: Canvas;
+  color: CanvasText;
+}
+
 .muted {
   color: var(--muted);
 }

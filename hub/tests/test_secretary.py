@@ -161,6 +161,21 @@ async def test_a_reading_task_is_queued_at_once_and_remembered(client: TestClien
     assert again.message.project_id == node.project_id
 
 
+async def test_a_task_the_queue_refuses_fails_at_once_with_the_reason(client: TestClient) -> None:
+    fake = QueueFake(client.app.state.sessionmaker, refuse="too many tasks")
+    conv = await _conversation(client)
+    decision = secretary.Route("hand_on", "research", "Compare two backup tools", (), True)
+    handed = await secretary.hand_on(_service(client, fake), DEV_ADMIN_ID, True, conv, decision)
+    assert "too many tasks" in handed.reason
+    assert handed.message.msg_state == "failed" and handed.order.status == "failed"
+    sm = client.app.state.sessionmaker
+    async with sm() as db:
+        assert await secretary.OrderStore(db, DEV_ADMIN_ID).listed(open_only=True) == []
+    status = await secretary.status_lines(sm, DEV_ADMIN_ID, conv)
+    assert "Compare two backup tools" in status and "failed" in status
+    assert "I will tell you" not in status  # nothing is left to report
+
+
 async def test_only_an_employee_of_the_contract_is_handed_a_task(client: TestClient) -> None:
     fake = QueueFake(client.app.state.sessionmaker)
     for decision in (
@@ -506,3 +521,23 @@ async def test_a_deleted_direct_conversation_is_made_again(client: TestClient) -
     )
     second = client.post(f"/api/orders/{handed.order.id}/direct", headers=AUTH).json()
     assert second["conversation_id"] != first["conversation_id"]
+
+
+def test_in_chat_a_refused_hand_on_says_so_instead_of_handed(
+    client: TestClient,
+    world,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client.app.state.settings.secretary_routing = True
+    fake = QueueFake(client.app.state.sessionmaker, refuse="too many tasks")
+    monkeypatch.setattr(client.app.state.agents, "start", fake.start)
+
+    async def route(gateway: Any, requested: str, text: str, history: str = "") -> Any:
+        return secretary.Route("hand_on", "research", "Compare two backup tools", (), True)
+
+    monkeypatch.setattr(secretary, "route", route)
+    status, events, _ = ask_with(client, _chat(client), "Have research compare two backup tools")
+    assert status == 200 and events[-1][0] == "done"
+    done = events[-1][1]["message"]["content"]
+    assert "could not hand this on" in done and "too many tasks" in done
+    assert "I handed this" not in done

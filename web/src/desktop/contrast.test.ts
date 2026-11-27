@@ -318,9 +318,14 @@ describe("the desk's paper", () => {
   });
 
   it("writes the link in a chat window's bar in the look's ink, readable on every paper", () => {
-    const link = colour(decls(sheet, ".dt-look-schreibtisch .dt-program .chat-window[data-app] .chat-window-bar .linklike").color!, vars);
+    const link = colour(decls(sheet, ".dt-look-schreibtisch .dt-program .chat-window[data-app] .talk-head-actions .linklike").color!, vars);
     const pairs = papers.map(([name, paper]) => ({ what: `link on ${name}`, fg: link, bg: paper }));
     expect(worst(pairs)).toEqual([]);
+  });
+
+  it("writes the grey lettering (rail labels, table headings) readable on every paper", () => {
+    const muted = colour("var(--muted)", vars);
+    expect(worst(papers.map(([name, paper]) => ({ what: `muted on ${name}`, fg: muted, bg: paper })))).toEqual([]);
   });
 
   it("writes an application's name in its hue as an ink readable on every paper, whatever the hue", () => {

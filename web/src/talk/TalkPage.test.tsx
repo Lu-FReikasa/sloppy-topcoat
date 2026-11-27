@@ -177,6 +177,30 @@ describe("TalkPage", () => {
     expect(mock.calls.some((c) => c.url.includes("/orders"))).toBe(false);
   });
 
+  it("puts the window's actions and the origin in the header above the stream (#173)", async () => {
+    const mock = mockFetch({
+      "GET /api/conversations": [CONV],
+      "GET /api/conversations/c1": { ...CONV, messages: [msg(1, "user", "Hello?")] },
+      "GET /api/conversations/c1/memory": [],
+    });
+    const api = new ApiClient({ token: "t", fetchImpl: mock.fetch });
+    render(
+      <TalkPage
+        api={api}
+        headerActions={<button type="button">Hand over</button>}
+      />,
+    );
+    await screen.findByText("Hello?");
+    const head = screen.getByTestId("talk-head");
+    const stream = screen.getByRole("log");
+    const action = screen.getByRole("button", { name: "Hand over" });
+    expect(head.contains(action)).toBe(true);
+    expect(head.contains(screen.getByTestId("chat-origin"))).toBe(true);
+    // the header is not part of the stream, so a scrolled message never slides under it
+    expect(stream.contains(head)).toBe(false);
+    expect(stream.contains(action)).toBe(false);
+  });
+
   it("asks nothing about reviews while no chat is open yet", async () => {
     const mock = mockFetch({
       "GET /api/conversations": [],
