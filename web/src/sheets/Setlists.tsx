@@ -60,16 +60,18 @@ interface Props {
   onOpen: () => void;
   /** Play the setlist on the stage, from the item at this index. */
   onPlay: (setlist: Setlist, from: number) => void;
+  /** Print the setlist or save it as a PDF, in its order. */
+  onPrint: (setlist: Setlist) => void;
   onError: (e: unknown) => void;
 }
 
 /** The person's setlists: pick one, create, rename, delete; add the open sheet (that version or
  *  always the newest of its song), reorder by drag or Alt+↑/↓, open a song (the setlist then stays
- *  beside it), play it on the stage from the start or from a song. Every change
+ *  beside it), play it on the stage from the start or from a song, print it. Every change
  *  is saved at once; a refused one reloads the setlists from the hub. A setlist can also be looked
  *  at sorted by title or artist and searched (#149): only the view changes, each row keeps its
- *  position number, reordering works only in setlist order, and the stage plays in setlist order. */
-export function Setlists({ api, list, openId, onOpen, onPlay, onError }: Props) {
+ *  position number, reordering works only in setlist order, and the stage and print go in setlist order. */
+export function Setlists({ api, list, openId, onOpen, onPlay, onPrint, onError }: Props) {
   const { t } = useTranslation();
   const [setlists, setSetlists] = useState<Setlist[] | null>(null);
   const [selected, setSelectedState] = useState(rememberedSetlist);
@@ -181,6 +183,7 @@ export function Setlists({ api, list, openId, onOpen, onPlay, onError }: Props) 
           onDelete={() => void remove(current)}
           onOpen={onOpen}
           onPlay={(from) => onPlay(current, from)}
+          onPrint={() => onPrint(current)}
         />
       )}
     </section>
@@ -217,6 +220,7 @@ function SetlistEditor({
   onDelete,
   onOpen,
   onPlay,
+  onPrint,
 }: {
   setlist: Setlist;
   list: SheetSummary[];
@@ -225,6 +229,7 @@ function SetlistEditor({
   onDelete: () => void;
   onOpen: () => void;
   onPlay: (from: number) => void;
+  onPrint: () => void;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState(setlist.name);
@@ -289,6 +294,9 @@ function SetlistEditor({
       <div className="sheets-row">
         <button type="button" onClick={() => onPlay(0)} disabled={!playable} data-testid="setlist-play">
           {t("sheets.setlists.play")}
+        </button>
+        <button type="button" onClick={onPrint} disabled={!playable} data-testid="setlist-print">
+          {t("sheets.setlists.print")}
         </button>
         <button type="button" className="link-button small" onClick={onDelete}>
           {t("sheets.setlists.delete")}

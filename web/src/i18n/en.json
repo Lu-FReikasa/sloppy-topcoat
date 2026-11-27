@@ -4390,6 +4390,32 @@
       "next": "Next song",
       "scroll": "Too long for one screen: scroll"
     },
+    "print": {
+      "open": "Print or PDF",
+      "list": "Print these songs or save them as a PDF …",
+      "title": "Print or save as PDF",
+      "hint": "One song per page, laid out like the stage mode. In the print dialog choose “Save as PDF” to keep the songs for rooms without Wi-Fi.",
+      "songs": "Songs to print",
+      "picked": "{{count}} of {{total}} songs picked",
+      "all": "All",
+      "none": "None",
+      "up": "Move {{title}} up",
+      "down": "Move {{title}} down",
+      "paper": "Paper",
+      "paperName": {
+        "a4": "A4",
+        "letter": "Letter"
+      },
+      "orientation": "Orientation",
+      "orientationName": {
+        "portrait": "Portrait",
+        "landscape": "Landscape"
+      },
+      "preparing": "Preparing the pages …",
+      "waiting": "The print dialog is open. Close this when you have printed or saved the PDF.",
+      "close": "Close",
+      "start": "Print"
+    },
     "setlists": {
       "title": "Setlists",
       "choose": "Choose a setlist",
@@ -4413,6 +4439,7 @@
       "remove": "Remove from the setlist",
       "missing": "Sheet deleted",
       "position": "{{name}} · {{n}} of {{total}}",
+      "print": "Print or PDF",
       "side": "Setlist",
       "search": "Search the setlist",
       "view": "View",

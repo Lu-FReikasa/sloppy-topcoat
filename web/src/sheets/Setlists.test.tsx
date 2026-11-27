@@ -39,7 +39,7 @@ describe("Setlists", () => {
       }),
     } as unknown as ApiClient;
     window.localStorage.setItem("topcoat.sheets.setlist", "L1");
-    render(<Setlists api={api} list={list} onOpen={() => undefined} onPlay={() => undefined} onError={() => undefined} />);
+    render(<Setlists api={api} list={list} onOpen={() => undefined} onPlay={() => undefined} onPrint={() => undefined} onError={() => undefined} />);
     const items = await screen.findByTestId("setlist-items");
     const down = () => within(items).getAllByRole("button", { name: /^(Move down|Nach unten)$/ });
     fireEvent.click(down()[0]!); // a b c -> b a c
@@ -76,7 +76,7 @@ describe("Setlists", () => {
       ),
     } as unknown as ApiClient;
     window.localStorage.setItem("topcoat.sheets.setlist", "L1");
-    render(<Setlists api={api} list={list} onOpen={() => undefined} onPlay={() => undefined} onError={onError} />);
+    render(<Setlists api={api} list={list} onOpen={() => undefined} onPlay={() => undefined} onPrint={() => undefined} onError={onError} />);
     const items = await screen.findByTestId("setlist-items");
     const down = () => within(items).getAllByRole("button", { name: /^(Move down|Nach unten)$/ });
     fireEvent.click(down()[0]!);
@@ -106,7 +106,7 @@ describe("Setlists", () => {
     const onPlay = vi.fn();
     window.localStorage.setItem("topcoat.sheets.setlist", "L2");
     window.localStorage.removeItem("topcoat.sheets.setlistView");
-    const { unmount } = render(<Setlists api={api} list={list} onOpen={() => undefined} onPlay={onPlay} onError={() => undefined} />);
+    const { unmount } = render(<Setlists api={api} list={list} onOpen={() => undefined} onPlay={onPlay} onPrint={() => undefined} onError={() => undefined} />);
     const items = await screen.findByTestId("setlist-items");
     const rows = () =>
       within(items)
@@ -142,7 +142,7 @@ describe("Setlists", () => {
     // the view is remembered per setlist; the search is not
     fireEvent.change(screen.getByTestId("setlist-view"), { target: { value: "title" } });
     unmount();
-    render(<Setlists api={api} list={list} onOpen={() => undefined} onPlay={onPlay} onError={() => undefined} />);
+    render(<Setlists api={api} list={list} onOpen={() => undefined} onPlay={onPlay} onPrint={() => undefined} onError={() => undefined} />);
     expect(((await screen.findByTestId("setlist-view")) as HTMLSelectElement).value).toBe("title");
     expect((screen.getByTestId("setlist-search") as HTMLInputElement).value).toBe("");
   });
