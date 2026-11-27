@@ -245,7 +245,7 @@
 .sheets-back {
   display: inline-flex;
   align-items: center;
-  min-height: 2.5rem;
+  min-height: 40px; /* a touch target (2.5rem was 37.5 px) */
 }
 
 .sheets-side-toggle[aria-pressed="true"] {

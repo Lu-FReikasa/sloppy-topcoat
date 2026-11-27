@@ -101,6 +101,20 @@
   transform: scale(0.99);
 }
 
+/* on a phone the slip is not made smaller: scaled, its 40 px touch targets measured 39 px.
+   The front slip keeps a transform (rotate 0, not none): it holds the page's fixed overlays (the
+   Sheets stage) inside the slip, above the taskbar; with none they slid under the taskbar */
+@media (max-width: 759px) {
+  .dt-look-schreibtisch .dt-program {
+    transform: rotate(var(--rot, 0deg));
+  }
+
+  .dt-look-schreibtisch .dt-program.dt-focused,
+  .dt-look-schreibtisch .dt-program.dt-maxi {
+    transform: rotate(0deg);
+  }
+}
+
 /* a strip of tape at the top */
 .dt-look-schreibtisch .dt-program::before {
   content: "";
