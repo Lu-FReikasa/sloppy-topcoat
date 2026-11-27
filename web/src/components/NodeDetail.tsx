@@ -623,7 +623,8 @@ function ModelRow({
       </td>
       <td className="row-actions">
         {/* one menu per row instead of a pair of buttons (issue #176) */}
-        <details className="row-menu" ref={menu} onKeyDown={onMenuKey}>
+        {/* data-esc-open: in the desktop overlay Esc closes this menu first, not the overlay */}
+        <details className="row-menu" ref={menu} onKeyDown={onMenuKey} data-esc-open="">
           <summary aria-label={t("nodeTabs.rowMenu", { model: model.name })}>⋯</summary>
           <div className="row-menu-items">
             {model.loaded ? (
