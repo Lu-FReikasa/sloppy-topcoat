@@ -1,10 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { ApiClient } from "../api/client";
 import { takeIntent } from "../layout/intent";
 import { jsonResponse, mockFetch } from "../test/mockFetch";
 import type { ChatMessage, WorkCard } from "../types";
-import { placeCards, WorkCardView } from "./WorkCards";
+import { CARD_REFRESH_MAX_MS, CARD_REFRESH_MS, placeCards, useWorkCards, WorkCardView } from "./WorkCards";
 
 const card = (over: Partial<WorkCard> = {}): WorkCard => ({
   id: "o1",
@@ -97,5 +97,53 @@ describe("WorkCardView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Direkt mit Verwaltung sprechen" }));
     expect((await screen.findByRole("alert")).textContent).toMatch(/nicht öffnen/);
     expect(takeIntent()).toBeNull();
+  });
+});
+
+describe("useWorkCards", () => {
+  it("asks again while a task is open, ever less often, and stops once all are closed", async () => {
+    vi.useFakeTimers();
+    try {
+      let status: WorkCard["status"] = "running";
+      const mock = mockFetch({
+        "GET /api/conversations/c1/orders?language=de": () => jsonResponse([card({ status })]),
+      });
+      const api = new ApiClient({ token: "t", fetchImpl: mock.fetch });
+      const { result } = renderHook(() => useWorkCards(api, "c1", true, 0));
+      const looks = () => mock.calls.filter((c) => c.url.includes("/orders")).length;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(looks()).toBe(1);
+      expect(result.current[0]?.status).toBe("running");
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CARD_REFRESH_MS);
+      });
+      expect(looks()).toBe(2);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CARD_REFRESH_MS); // the next wait is twice as long
+      });
+      expect(looks()).toBe(2);
+      status = "done";
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CARD_REFRESH_MS);
+      });
+      expect(looks()).toBe(3);
+      expect(result.current[0]?.status).toBe("done");
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CARD_REFRESH_MAX_MS * 2);
+      });
+      expect(looks()).toBe(3); // nothing open: no more looks
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("asks nothing when it is off", () => {
+    const mock = mockFetch({});
+    const api = new ApiClient({ token: "t", fetchImpl: mock.fetch });
+    const { result } = renderHook(() => useWorkCards(api, "c1", false, 0));
+    expect(result.current).toEqual([]);
+    expect(mock.calls).toHaveLength(0);
   });
 });

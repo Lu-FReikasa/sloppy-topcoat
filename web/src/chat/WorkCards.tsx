@@ -8,12 +8,14 @@ import { Markdown } from "./Markdown";
 
 /** States in which the employee is still at it: the cards are asked again while one is. */
 const OPEN: ReadonlySet<WorkCard["status"]> = new Set(["sent", "queued", "running", "waiting"]);
-/** How often open cards are asked again. */
+/** How soon open cards are asked again, at first and at most (a task can stay open for long:
+ *  one the queue refused stays "sent"). The conversation moving starts again from the first. */
 export const CARD_REFRESH_MS = 10_000;
+export const CARD_REFRESH_MAX_MS = 120_000;
 const NONE: WorkCard[] = [];
 
 /** The work cards of a conversation (D112, #37): what the secretary handed on in it. Asked again
- *  when the conversation moves (`tick`) and, while a task is open, every few seconds. */
+ *  when the conversation moves (`tick`) and, while a task is open, ever less often. */
 export function useWorkCards(
   api: ApiClient | undefined,
   conversationId: string | undefined,
@@ -28,13 +30,15 @@ export function useWorkCards(
     if (!api || !conversationId || !enabled) return;
     let live = true;
     let timer: number | undefined;
+    let wait = CARD_REFRESH_MS; // doubles on each look, up to CARD_REFRESH_MAX_MS
     const look = async (): Promise<void> => {
       try {
         const r = await api.conversationOrders(conversationId, language);
         if (!live) return;
         setLoaded({ of: conversationId, cards: r });
         if (r.some((c) => OPEN.has(c.status))) {
-          timer = window.setTimeout(() => void look(), CARD_REFRESH_MS);
+          timer = window.setTimeout(() => void look(), wait);
+          wait = Math.min(wait * 2, CARD_REFRESH_MAX_MS);
         }
       } catch {
         // no cards is no failure of the conversation: they come with the next look
