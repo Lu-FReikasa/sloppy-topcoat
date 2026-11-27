@@ -342,79 +342,93 @@ async def pipeline_events(
     except GatewayError as exc:
         outcome.set_result(api._error(exc.status, exc.code, exc.message, exc.retry_after))
         return
-    if upstream.status != 200:
-        detail = b"".join([c async for c in upstream.body])[:2000].decode("utf-8", "replace")
-        upstream.close()
-        log.warning("chat: model answered %s: %s", upstream.status, detail)
-        if is_context_full(detail):
-            outcome.set_result(
-                api._error(
-                    503,
-                    "context_full",
-                    CONTEXT_FULL_MESSAGE,
-                    state.settings.gateway_retry_after_seconds,
+    try:
+        if upstream.status != 200:
+            detail = b"".join([c async for c in upstream.body])[:2000].decode("utf-8", "replace")
+            upstream.close()
+            log.warning("chat: model answered %s: %s", upstream.status, detail)
+            if is_context_full(detail):
+                outcome.set_result(
+                    api._error(
+                        503,
+                        "context_full",
+                        CONTEXT_FULL_MESSAGE,
+                        state.settings.gateway_retry_after_seconds,
+                    )
                 )
+                return
+            outcome.set_result(
+                api._error(502, "model_error", f"the model refused the request ({upstream.status})")
             )
             return
-        outcome.set_result(
-            api._error(502, "model_error", f"the model refused the request ({upstream.status})")
-        )
-        return
-    on_tool = None
-    if turn.decide:
+        on_tool = None
+        if turn.decide:
 
-        def on_tool(name: str, arguments: str) -> AsyncIterator[str]:
-            if name in local_tools.LOCAL:  # read-only functions of the hub itself (T3.6, T3.8)
-                return api._local_answer(
-                    request, user, turn, route, name, arguments, context_length, budget, recalled
+            def on_tool(name: str, arguments: str) -> AsyncIterator[str]:
+                if name in local_tools.LOCAL:  # read-only functions of the hub itself (T3.6, T3.8)
+                    return api._local_answer(
+                        request,
+                        user,
+                        turn,
+                        route,
+                        name,
+                        arguments,
+                        context_length,
+                        budget,
+                        recalled,
+                    )
+                # the model decided to look: in Research that is a research (or its offer), too
+                mode = api.research_mode(turn.application, turn.quality, turn.from_hub)
+                if mode == "job":
+                    return api._research_start_events(request, user, turn)
+                if mode == "offer":
+                    return api._research_offer_events(request, user, turn)
+                order, focus = api._order_of(turn, arguments)
+                return api._checked_answer(
+                    request,
+                    user,
+                    turn,
+                    route,
+                    "decided",
+                    api.notes_on_topic(recalled, turn.last_user_text),
+                    context_length,
+                    budget,
+                    focus,
+                    order,
                 )
-            # the model decided to look: in Research that is a research (or its offer), too
-            mode = api.research_mode(turn.application, turn.quality, turn.from_hub)
-            if mode == "job":
-                return api._research_start_events(request, user, turn)
-            if mode == "offer":
-                return api._research_offer_events(request, user, turn)
-            order, focus = api._order_of(turn, arguments)
-            return api._checked_answer(
+
+        after_done = None
+        # a revision is asked with what the model was shown, the images included
+        shown_prompt = replace(prompt, messages=sent) if sent is not None else prompt
+        held = api._held_for(turn, shown_prompt, on_tool, request.app.state.settings)
+        if held is None and turn.second_look and turn.verify_model:
+            # "thorough": a second look at every answer; without a check there is no evidence, the
+            # reviewer marks what looks wrong or cannot be known without looking (quality.py)
+
+            def after_done(message: dict[str, Any]) -> AsyncIterator[str]:
+                return api._verify_answer(request, user, turn, message, "")
+
+        outcome.set_result(None)  # the model answers: the request becomes a reader of the run
+        async with contextlib.aclosing(
+            api._answer(
                 request,
                 user,
                 turn,
-                route,
-                "decided",
-                api.notes_on_topic(recalled, turn.last_user_text),
+                upstream,
+                prompt,
                 context_length,
-                budget,
-                focus,
-                order,
+                recalled,
+                on_tool=on_tool,
+                after_done=after_done,
+                held=held,
             )
-
-    after_done = None
-    # a revision is asked with what the model was shown, the images included
-    shown_prompt = replace(prompt, messages=sent) if sent is not None else prompt
-    held = api._held_for(turn, shown_prompt, on_tool, request.app.state.settings)
-    if held is None and turn.second_look and turn.verify_model:
-        # "thorough": a second look at every answer; without a check there is no evidence, the
-        # reviewer marks what looks wrong or cannot be known without looking (quality.py)
-
-        def after_done(message: dict[str, Any]) -> AsyncIterator[str]:
-            return api._verify_answer(request, user, turn, message, "")
-
-    outcome.set_result(None)  # the model answers: the request becomes a reader of the run
-    async with contextlib.aclosing(
-        api._answer(
-            request,
-            user,
-            turn,
-            upstream,
-            prompt,
-            context_length,
-            recalled,
-            on_tool=on_tool,
-            after_done=after_done,
-            held=held,
-        )
-    ) as answer:
-        async for chunk in answer:
-            if held is not None and held.hides(chunk):
-                continue  # the text waits for its check; the activity around it is shown
-            yield chunk
+        ) as answer:
+            async for chunk in answer:
+                if held is not None and held.hides(chunk):
+                    continue  # the text waits for its check; the activity around it is shown
+                yield chunk
+    finally:
+        # the model's stream ends with this answer, however it ends: a failure between the
+        # forward and the moment the answer reads it (issue #205) left it open, and the place it
+        # holds on the node made the next message there wait forever (close() is idempotent)
+        upstream.close()
