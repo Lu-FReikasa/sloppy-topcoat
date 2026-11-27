@@ -127,6 +127,56 @@ describe("TalkPage", () => {
     expect(screen.queryByTestId("evidence-mark")).toBeNull();
   });
 
+  it("shows the secretary's work card under the message that handed the task on", async () => {
+    setup(
+      {
+        ...CONV,
+        application: "chat",
+        messages: [
+          msg(1, "user", "Lass Recherche zwei Backup-Werkzeuge vergleichen"),
+          msg(2, "assistant", "Ich habe das an Recherche weitergegeben."),
+          msg(3, "user", "Danke", { created_at: "2026-01-01T10:05:00Z" }),
+        ],
+      },
+      [CONV],
+      {
+        "GET /api/conversations/c1/orders?language=de": [
+          {
+            id: "o1",
+            employee: "research",
+            employee_title: "Recherche",
+            topic: "Zwei Backup-Werkzeuge vergleichen",
+            status: "done",
+            report_when_done: false,
+            created_at: "2026-01-01T10:00:01Z",
+            chat_message_id: 2,
+            summary: "Werkzeug A wird gepflegt.",
+            withheld: [],
+            direct_conversation_id: null,
+          },
+        ],
+      },
+    );
+    const cardEl = await screen.findByTestId("work-card");
+    expect(cardEl.textContent).toContain("Zwei Backup-Werkzeuge vergleichen");
+    expect(cardEl.textContent).toContain("Werkzeug A wird gepflegt.");
+    // it stands in the row of message 2, before the next message
+    const rows = Array.from(document.querySelectorAll(".talk-row"));
+    const row = rows.find((r) => r.contains(cardEl));
+    expect(row?.textContent).toContain("Ich habe das an Recherche weitergegeben.");
+    expect(row?.textContent).not.toContain("Danke");
+  });
+
+  it("asks for no work cards in another program's conversation", async () => {
+    const mock = setup({
+      ...CONV,
+      application: "dev",
+      messages: [msg(1, "user", "Hallo"), msg(2, "assistant", "Hallo zurück")],
+    });
+    await screen.findByText("Hallo zurück");
+    expect(mock.calls.some((c) => c.url.includes("/orders"))).toBe(false);
+  });
+
   it("puts the window's actions and the origin in the header above the stream (#173)", async () => {
     const mock = mockFetch({
       "GET /api/conversations": [CONV],

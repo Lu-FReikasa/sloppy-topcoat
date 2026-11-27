@@ -593,3 +593,88 @@
     margin-left: auto;
   }
 }
+
+/* A task the secretary handed on (D112, #37): under the message that said so, the program's colour
+   as a stripe, the state as a dot and words (never by colour alone). */
+.work-card {
+  align-self: flex-start;
+  width: 100%;
+  max-width: min(100%, 52rem);
+  min-width: 0;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid hsl(var(--pg-hue, 140) 60% 50%);
+  border-radius: calc(var(--radius, 12px) + 4px);
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+
+.work-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+}
+
+.work-card-who {
+  font-weight: 600;
+}
+
+.work-card-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.work-card-state::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--off, #8a93a0);
+}
+
+.work-card-state-running::before,
+.work-card-state-waiting::before {
+  background: var(--warn, #d9a43a);
+}
+
+.work-card-state-done::before {
+  background: var(--ok, #3aa76d);
+}
+
+.work-card-state-failed::before,
+.work-card-state-stopped::before {
+  border-radius: 0; /* a square: not done, by shape too */
+  background: var(--bad, #c0504d);
+}
+
+.work-card-topic {
+  margin: 0.3rem 0 0;
+}
+
+.work-card-result {
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+
+.work-card-result > :first-child {
+  margin-top: 0;
+}
+
+.work-card-result > :last-child {
+  margin-bottom: 0;
+}
+
+.work-card-note {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+}
+
+.work-card-actions {
+  margin: 0.45rem 0 0;
+}

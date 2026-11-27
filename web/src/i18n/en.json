@@ -4563,5 +4563,20 @@
       "setting": "a setting by you",
       "dependencies": "starts when the sub-tasks before it are done"
     }
+  },
+  "workCard": {
+    "label": "Task for {{employee}}",
+    "status": {
+      "sent": "Sent",
+      "queued": "Waiting in the queue",
+      "running": "Working on it",
+      "waiting": "Has a question back",
+      "done": "Done",
+      "failed": "Failed",
+      "stopped": "Stopped"
+    },
+    "reportWhenDone": "I'll tell you here when it is done.",
+    "talkDirectly": "Talk to {{employee}} directly",
+    "openFailed": "The conversation could not be opened. Please try again."
   }
 }
