@@ -129,7 +129,9 @@ button.primary {
   color: var(--accent-text);
 }
 
-input {
+/* not checkboxes and radios: at full width the tick sat in the middle of the row, its label below.
+   :where keeps the plain element weight, so page rules like ".x input" still win */
+input:where(:not([type="checkbox"], [type="radio"])) {
   font: inherit;
   padding: 0.4rem 0.6rem;
   border: 1px solid var(--border);

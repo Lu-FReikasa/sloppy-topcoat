@@ -2494,7 +2494,7 @@
   },
   "inbox": {
     "title": "Posteingang",
-    "tabInbox": "Inbox",
+    "tabInbox": "Posteingang",
     "all": "Alle",
     "empty": "Nichts wartet auf dich.",
     "loadFailed": "Die Inbox konnte nicht geladen werden.",
