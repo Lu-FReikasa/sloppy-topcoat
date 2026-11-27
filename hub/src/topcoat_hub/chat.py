@@ -28,6 +28,9 @@ class Capabilities:
     decider: bool = False
     # the user may use the web, but switched "Internet" off in this conversation
     internet_off: bool = False
+    # the state-changing actions the user may have proposed (each runs after their click, D15/D83),
+    # in words; empty: the assistant can change nothing on the systems it looks at (#223)
+    actions: tuple[str, ...] = ()
 
 
 DECIDER_FUNCTION = "look_at_my_systems"
@@ -83,6 +86,8 @@ def describe_capabilities(caps: Capabilities, compact: bool = False) -> str:
             else f" Start the tools with the function {DECIDER_FUNCTION} when you need facts from "
             "them; never say you have no access to what is listed."
         )
+    if caps.tools:
+        text += " " + _offer_rule(caps.actions, compact)
     if caps.internet_off:
         text += (
             " The user switched Internet off in this conversation: you cannot search the web "
@@ -102,6 +107,30 @@ def describe_capabilities(caps: Capabilities, compact: bool = False) -> str:
             "or remembered it; say plainly when something is impossible."
         )
     return text
+
+
+def _offer_rule(actions: tuple[str, ...], compact: bool) -> str:
+    """What the assistant may offer to change (#223): only what an action on the whitelist does."""
+    if actions:
+        if compact:
+            return (
+                "Changes you may propose (the user clicks to run each): " + "; ".join(actions) + "."
+            )
+        return (
+            "Changes you may propose, each runs only after the user's click on its card: "
+            + "; ".join(actions)
+            + ". Offer a change only if one of these does it; for anything else say what the user "
+            "can do themselves and do not ask for permission."
+        )
+    if compact:
+        return (
+            "You cannot change anything on these systems: never offer to; say what the user can do."
+        )
+    return (
+        "You cannot change anything on these systems (no action for it is available): never "
+        "offer to enable, restart, change or delete something and never ask for permission to; "
+        "say what the user can do themselves instead (where, which setting)."
+    )
 
 
 # Contexts below this use the short system prompt (it is ~4x smaller).

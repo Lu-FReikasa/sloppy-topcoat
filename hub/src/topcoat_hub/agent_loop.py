@@ -1266,6 +1266,11 @@ class AgentLoop:
             log.exception("agent: could not read the notes about the names of the question")
             return {}
 
+    async def chat_actions(self, caller: Caller) -> list[dict[str, Any]]:
+        """What a check of a chat may propose for this caller (:meth:`_proposable`): the only
+        changes the chat's assistant may offer (#223)."""
+        return await self._proposable(caller, "chat")
+
     async def _proposable(self, caller: Caller, origin: str) -> list[dict[str, Any]]:
         """The state-changing actions this task's user could confirm (E3-01b), only when the hub
         has proposals switched on. A task from the tasks page may propose all of them (the card
