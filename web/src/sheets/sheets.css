@@ -725,7 +725,8 @@
 
 .sheets-setlists select {
   flex: 1 1 8rem;
-  min-width: 0;
+  /* wide enough for "Setliste wählen" in a look's typeface; the button wraps below instead */
+  min-width: min(100%, 12rem);
 }
 
 .setlist {

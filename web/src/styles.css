@@ -161,6 +161,22 @@ optgroup {
   color: CanvasText;
 }
 
+/* In a look's typeface a select is as wide as its longest option, wider than the browser's own. In a
+   row of actions it gives way like the field beside it instead of squeezing that field to nothing, and
+   in a table cell it fills the cell instead of widening the table past its card (#172 review). */
+.dialog-actions > select {
+  min-width: 0;
+}
+
+/* the model name and its mode share the row instead of the name taking all of it */
+.tool-modes .dialog-actions > input {
+  flex: 1 1 8rem;
+}
+
+table.plain td > select {
+  width: 100%;
+}
+
 .muted {
   color: var(--muted);
 }
