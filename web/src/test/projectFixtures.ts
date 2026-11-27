@@ -1,5 +1,6 @@
 // Test data for the Projects page: a project, nodes, and a fake of the API it uses whose answers are
 // set per test. Not shipped (tests import it).
+import { fireEvent, screen } from "@testing-library/react";
 import { vi } from "vitest";
 import type {
   Project,
@@ -245,3 +246,12 @@ export const TREE: ProjectNode[] = [
     status: null,
   }),
 ];
+
+/** Pick an entry of the project's "⋯" menu (#179), as a click on the old toolbar button did. */
+export function chooseProjectAction(name: string) {
+  fireEvent.click(screen.getByRole("button", { name: "Project actions" }));
+  const entry =
+    screen.queryByRole("menuitem", { name }) ??
+    screen.getByRole("menuitemcheckbox", { name });
+  fireEvent.click(entry);
+}

@@ -9,7 +9,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "../api/client";
 import i18n from "../i18n";
 import { PreparedChanges } from "../chat/PreparedChanges";
-import { fakeApi, node, project } from "../test/projectFixtures";
+import {
+  chooseProjectAction,
+  fakeApi,
+  node,
+  project,
+} from "../test/projectFixtures";
 import { ChangeSetCard } from "./ChangeSets";
 import { ProjectPage } from "./ProjectPage";
 import { facts, KIND_GROUPS } from "./Timeline";
@@ -339,16 +344,12 @@ describe("the trash", () => {
     await open(api);
     fireEvent.click(screen.getByRole("button", { name: /Plan/ }));
     await screen.findByRole("group", { name: "History" });
-    // the button of the project comes first on the page, the one of the entry in its detail
-    const buttons = screen.getAllByRole("button", { name: "Move to trash" });
-    expect(buttons).toHaveLength(2);
-    fireEvent.click(buttons[1]!);
+    // the entry's button is in its detail, the project's in the project's menu (#179)
+    fireEvent.click(screen.getByRole("button", { name: "Move to trash" }));
     await waitFor(() =>
       expect(api.trashProjectNode).toHaveBeenCalledWith("t1"),
     );
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "Move to trash" })[0]!,
-    );
+    chooseProjectAction("Move to trash");
     await waitFor(() => expect(api.trashProject).toHaveBeenCalledWith("p1"));
     expect(await screen.findByText("Pick a project on the left.")).toBeTruthy(); // it left the page
   });

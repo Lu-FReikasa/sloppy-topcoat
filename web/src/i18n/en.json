@@ -3082,7 +3082,14 @@
     "setSuperseded": "Replaced by a newer proposal of the same run.",
     "changeSetsNoneOpen": "No open change sets.",
     "setsShowDecided": "Show decided ones ({{count}})",
-    "setsHideDecided": "Hide decided ones"
+    "setsHideDecided": "Hide decided ones",
+    "menu": {
+      "open": "Project actions"
+    },
+    "side": {
+      "back": "← Back to the tree",
+      "close": "Close the details"
+    }
   },
   "incognito": {
     "title": "Incognito",

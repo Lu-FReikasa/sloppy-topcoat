@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, type ApiClient } from "../api/client";
 import { describeError, toActionError } from "../errors";
@@ -32,6 +38,8 @@ import {
 } from "./types";
 import "./project.css";
 import { askConfirm } from "../components/askConfirm";
+import { ProjectMenu } from "./ProjectMenu";
+import { useScrollportHeight } from "./scrollport";
 import { useProjectDetail } from "./useProjectDetail";
 import {
   LAYOUTS,
@@ -62,7 +70,8 @@ interface Props {
 
 /** The Projekte page. Projects (and "Today", across all of them) on the left; the selected project
  *  in the middle as a list, a table or a board, with a filter, a sort rule and saved views; the
- *  selected node below it. Each project has its own grants for the project agent. Every write
+ *  selected node in a side panel next to it (over it, with a back button, in a narrow window); the
+ *  project's actions in a "⋯" menu. Each project has its own grants for the project agent. Every write
  *  carries the revision it was read at; a conflict reloads and says so, it never overwrites.
  *  The tree's state lives in useProjectTree, the detail's (tab, open node) in useProjectDetail. */
 export function ProjectPage({
@@ -271,6 +280,39 @@ export function ProjectPage({
       tree.setViews((await api.projectViews(selected ?? undefined)).views);
     });
 
+  // the open node shows beside the tree; in a narrow window (CSS container query) it covers the
+  // tree, so the focus moves into the panel; closing it gives the focus back to the node's row
+  const sideNode = current && tab === "tree" && !showScope ? node : null;
+  const sideRef = useRef<HTMLElement>(null);
+  const treeRef = useRef<HTMLElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const returnTo = useRef<string | null>(null);
+  useScrollportHeight(rootRef, "--project-view-h", !!sideNode);
+  const sideId = sideNode?.id;
+  useEffect(() => {
+    if (!sideId) {
+      const id = returnTo.current;
+      returnTo.current = null;
+      if (id === null || !treeRef.current) return;
+      const row = [
+        ...treeRef.current.querySelectorAll<HTMLElement>("[data-node-id]"),
+      ].find((el) => el.dataset.nodeId === id);
+      (row ?? treeRef.current).focus();
+      return;
+    }
+    const side = sideRef.current;
+    if (!side || !treeRef.current) return;
+    if (getComputedStyle(treeRef.current).display === "none") {
+      // covering the tree: show the panel from its top (the back button), not from where the row was
+      side.scrollIntoView?.({ block: "start" });
+      side.focus({ preventScroll: true });
+    } else side.scrollIntoView?.({ block: "nearest" });
+  }, [sideId]);
+  const closeSide = () => {
+    returnTo.current = nodeId;
+    setNodeId(null);
+  };
+
   // A task's run (project_runs.py): start it, approve a batch of the open tasks; the tree keeps
   // the page current while a run is in progress.
   const runNode = async (node: ProjectNode) => {
@@ -287,14 +329,21 @@ export function ProjectPage({
     const open = nodes.filter((n) => n.kind === "task" && n.status === "todo");
     if (open.length === 0) return;
     const titles = open.map((n) => `${n.ref} ${n.title}`).join("\n");
-    if (!await askConfirm(t("project.runBatchConfirm", { count: open.length, titles }))) return;
+    if (
+      !(await askConfirm(
+        t("project.runBatchConfirm", { count: open.length, titles }),
+      ))
+    )
+      return;
     try {
       const batch = await api.createProjectBatch(selected, {
         node_ids: open.map((n) => n.id),
         max_runs: open.length,
       });
       if (batch.status === "stopped") {
-        setMessage(t("project.runBatchStopped", { reason: batch.stop_reason ?? "" }));
+        setMessage(
+          t("project.runBatchStopped", { reason: batch.stop_reason ?? "" }),
+        );
       }
       await loadDetail(selected);
     } catch (err) {
@@ -305,7 +354,12 @@ export function ProjectPage({
   return (
     // the project and task in view, for Clipper's conversation (persona/ClipperDock.tsx, placeOf):
     // the window's props name only what it was opened with (live 2026-11-20: the agent guessed "p1")
-    <div className="project" data-place-project={selected ?? undefined} data-place-node={nodeId ?? undefined}>
+    <div
+      ref={rootRef}
+      className={`project${sideNode ? " has-side" : ""}`}
+      data-place-project={selected ?? undefined}
+      data-place-node={nodeId ?? undefined}
+    >
       <aside className="project-projects" aria-label={t("project.projects")}>
         <h2>{t("project.projects")}</h2>
         <ul className="project-list">
@@ -378,7 +432,12 @@ export function ProjectPage({
         />
       </aside>
 
-      <section className="project-tree" aria-label={t("project.tree")}>
+      <section
+        className="project-tree"
+        aria-label={t("project.tree")}
+        tabIndex={-1}
+        ref={treeRef}
+      >
         {selected === TEMPLATES ? (
           <>
             {error && (
@@ -485,63 +544,70 @@ export function ProjectPage({
                   {t(`project.statuses.${current.status}`)}
                 </span>
               </div>
-              <div className="project-actions">
-                {nodes.some((n) => n.kind === "task" && n.status === "todo") && (
-                  <button type="button" onClick={() => void approveBatch()}>
-                    {t("project.runBatch")}
-                  </button>
-                )}
-                <button type="button" onClick={() => setShowScope((v) => !v)}>
-                  {t("project.scope")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void exportAs(current.id, "json")}
-                >
-                  {t("project.exportJson")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void exportAs(current.id, "markdown")}
-                >
-                  {t("project.exportZip")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNaming((v) => !v)}
-                  aria-expanded={naming}
-                >
-                  {t("project.saveTemplate")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    write(async () => {
-                      await api.trashProject(current.id);
-                      tree.unselect();
-                    }, t("project.trashed"))
-                  }
-                >
-                  {t("project.moveToTrash")}
-                </button>
-                {current.status !== "dropped" && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      write(
-                        () =>
-                          api.updateProject(current.id, {
-                            revision: current.revision,
-                            status: "dropped",
-                          }),
-                        t("project.archived"),
-                      )
-                    }
-                  >
-                    {t("project.archive")}
-                  </button>
-                )}
-              </div>
+              <ProjectMenu
+                label={t("project.menu.open")}
+                items={[
+                  ...(nodes.some(
+                    (n) => n.kind === "task" && n.status === "todo",
+                  )
+                    ? [
+                        {
+                          key: "batch",
+                          label: t("project.runBatch"),
+                          onSelect: () => void approveBatch(),
+                        },
+                      ]
+                    : []),
+                  {
+                    key: "scope",
+                    label: t("project.scope"),
+                    checked: showScope,
+                    onSelect: () => setShowScope((v) => !v),
+                  },
+                  {
+                    key: "json",
+                    label: t("project.exportJson"),
+                    onSelect: () => void exportAs(current.id, "json"),
+                  },
+                  {
+                    key: "zip",
+                    label: t("project.exportZip"),
+                    onSelect: () => void exportAs(current.id, "markdown"),
+                  },
+                  {
+                    key: "template",
+                    label: t("project.saveTemplate"),
+                    checked: naming,
+                    onSelect: () => setNaming((v) => !v),
+                  },
+                  {
+                    key: "trash",
+                    label: t("project.moveToTrash"),
+                    onSelect: () =>
+                      void write(async () => {
+                        await api.trashProject(current.id);
+                        tree.unselect();
+                      }, t("project.trashed")),
+                  },
+                  ...(current.status !== "dropped"
+                    ? [
+                        {
+                          key: "archive",
+                          label: t("project.archive"),
+                          onSelect: () =>
+                            void write(
+                              () =>
+                                api.updateProject(current.id, {
+                                  revision: current.revision,
+                                  status: "dropped",
+                                }),
+                              t("project.archived"),
+                            ),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             </header>
             {error && (
               <p role="alert" className="project-error">
@@ -784,56 +850,6 @@ export function ProjectPage({
                     onLimit={tree.setLimit}
                   />
                 )}
-                {node && (
-                  <NodeDetail
-                    key={`${node.id}:${node.revision}`}
-                    api={api}
-                    node={node}
-                    nodes={nodes}
-                    zone={zone}
-                    onRun={(n) => void runNode(n)}
-                    onSave={(patch) =>
-                      write(
-                        () =>
-                          api.updateProjectNode(node.id, {
-                            revision: node.revision,
-                            ...patch,
-                          }),
-                        t("project.saved"),
-                      )
-                    }
-                    onMove={(parentId) =>
-                      write(
-                        () =>
-                          api.moveProjectNode(node.id, {
-                            revision: node.revision,
-                            parent_id: parentId,
-                          }),
-                        t("project.moved"),
-                      )
-                    }
-                    onAnswer={(answer) =>
-                      write(
-                        () => api.answerProjectQuestion(node.id, answer),
-                        t("project.saved"),
-                      )
-                    }
-                    onComplete={(n) => void complete(n)}
-                    onTrash={() =>
-                      write(async () => {
-                        await api.trashProjectNode(node.id);
-                        setNodeId(null);
-                      }, t("project.trashed"))
-                    }
-                    onChanged={() => void (selected && loadDetail(selected))}
-                    onRestored={() => {
-                      setMessage(t("project.versionRestored"));
-                      void (selected && loadDetail(selected));
-                      bump();
-                    }}
-                    onError={fail}
-                  />
-                )}
                 <AskAgent
                   onSend={(prompt) =>
                     write(
@@ -847,6 +863,81 @@ export function ProjectPage({
           </>
         )}
       </section>
+      {sideNode && (
+        <aside
+          className="project-side"
+          aria-label={t("project.detail")}
+          tabIndex={-1}
+          ref={sideRef}
+        >
+          <div className="project-side-bar">
+            <button
+              type="button"
+              className="project-side-back"
+              onClick={closeSide}
+            >
+              {t("project.side.back")}
+            </button>
+            <button
+              type="button"
+              className="project-side-close"
+              aria-label={t("project.side.close")}
+              title={t("project.side.close")}
+              onClick={closeSide}
+            >
+              ×
+            </button>
+          </div>
+          <NodeDetail
+            key={`${sideNode.id}:${sideNode.revision}`}
+            api={api}
+            node={sideNode}
+            nodes={nodes}
+            zone={zone}
+            onRun={(n) => void runNode(n)}
+            onSave={(patch) =>
+              write(
+                () =>
+                  api.updateProjectNode(sideNode.id, {
+                    revision: sideNode.revision,
+                    ...patch,
+                  }),
+                t("project.saved"),
+              )
+            }
+            onMove={(parentId) =>
+              write(
+                () =>
+                  api.moveProjectNode(sideNode.id, {
+                    revision: sideNode.revision,
+                    parent_id: parentId,
+                  }),
+                t("project.moved"),
+              )
+            }
+            onAnswer={(answer) =>
+              write(
+                () => api.answerProjectQuestion(sideNode.id, answer),
+                t("project.saved"),
+              )
+            }
+            onComplete={(n) => void complete(n)}
+            onTrash={() =>
+              write(async () => {
+                await api.trashProjectNode(sideNode.id);
+                setNodeId(null);
+              }, t("project.trashed"))
+            }
+            onChanged={() => void (selected && loadDetail(selected))}
+            onRestored={() => {
+              setMessage(t("project.versionRestored"));
+              void (selected && loadDetail(selected));
+              bump();
+            }}
+            onError={fail}
+          />
+        </aside>
+      )}
     </div>
   );
 }

@@ -8,7 +8,13 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, type ApiClient } from "../api/client";
 import i18n from "../i18n";
-import { fakeApi, node, project, TREE } from "../test/projectFixtures";
+import {
+  chooseProjectAction,
+  fakeApi,
+  node,
+  project,
+  TREE,
+} from "../test/projectFixtures";
 import { ProjectPage, visibleNodes } from "./ProjectPage";
 
 afterEach(() => {
@@ -64,9 +70,7 @@ describe("ProjectPage", () => {
   it("saves the grants of the project through the scope editor", async () => {
     const api = fakeApi({ project: project({ scope: {} }), nodes: [] });
     await openProject(api);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Grants for the agent" }),
-    );
+    chooseProjectAction("Grants for the agent");
     fireEvent.change(screen.getByLabelText("dev request_report"), {
       target: { value: "free" },
     });
@@ -85,9 +89,7 @@ describe("ProjectPage", () => {
   it("shows the grant to split large tasks and saves it as project.decompose", async () => {
     const api = fakeApi({ project: project({ scope: {} }), nodes: [] });
     await openProject(api);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Grants for the agent" }),
-    );
+    chooseProjectAction("Grants for the agent");
     const select = screen.getByLabelText("project decompose");
     const row = select.closest("tr") as HTMLElement;
     expect(within(row).getByText("This project")).toBeTruthy();
@@ -115,9 +117,7 @@ describe("ProjectPage", () => {
       nodes: [],
     });
     await openProject(api);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Grants for the agent" }),
-    );
+    chooseProjectAction("Grants for the agent");
     const select = screen.getByLabelText(
       "project decompose",
     ) as HTMLSelectElement;
@@ -213,7 +213,7 @@ describe("ProjectPage", () => {
       new ApiError(409, "conflict", "stale"),
     );
     await openProject(api);
-    fireEvent.click(screen.getByRole("button", { name: "Archive project" }));
+    chooseProjectAction("Archive project");
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(screen.getByRole("alert").textContent ?? "").toContain(
       "changed meanwhile",

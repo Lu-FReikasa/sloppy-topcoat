@@ -73,6 +73,7 @@ export function ListView({
             <button
               type="button"
               className="project-open"
+              data-node-id={n.id}
               onClick={() => onOpen(n.id)}
             >
               <span className="project-number">{n.number}</span>

@@ -3082,7 +3082,14 @@
     "setSuperseded": "Ersetzt durch einen neueren Vorschlag desselben Laufs.",
     "changeSetsNoneOpen": "Keine offenen Änderungssätze.",
     "setsShowDecided": "Entschiedene anzeigen ({{count}})",
-    "setsHideDecided": "Entschiedene ausblenden"
+    "setsHideDecided": "Entschiedene ausblenden",
+    "menu": {
+      "open": "Aktionen des Projekts"
+    },
+    "side": {
+      "back": "← Zurück zum Baum",
+      "close": "Details schließen"
+    }
   },
   "incognito": {
     "title": "Inkognito",
