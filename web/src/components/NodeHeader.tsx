@@ -60,7 +60,8 @@ export function NodeHeader({
   const actionError = actions.error ? describeError(actions.error, t, i18n) : null;
   const notice = actions.notice ? t(`power.${actions.notice}`) : null;
 
-  const loadable = isTools ? [] : node.models.filter((m) => !m.loaded).map((m) => m.name);
+  // an offline node loads nothing: no picker then (the body says actions are not possible)
+  const loadable = isTools || offline ? [] : node.models.filter((m) => !m.loaded).map((m) => m.name);
   const [choice, setChoice] = useState("");
   const pick = loadable.includes(choice) ? choice : (loadable[0] ?? "");
 
@@ -135,6 +136,8 @@ export function NodeHeader({
       </dl>
       <p className="node-header-version muted small" data-testid="node-version">
         {t("nodeHeader.version", { version: version.installed ?? t("node.unknown") })}
+        {/* a space, so a screen reader does not read "0.2.18Update" */}
+        {version.newer && " "}
         {version.newer && (
           <span className="badge node-header-update" data-testid="node-update-hint">
             {t("nodeHeader.updateAvailable", { version: version.newer })}
@@ -158,7 +161,7 @@ export function NodeHeader({
               <select
                 aria-label={t("nodeHeader.loadPick")}
                 value={pick}
-                disabled={offline || pending !== null}
+                disabled={pending !== null}
                 onChange={(e) => setChoice(e.target.value)}
               >
                 {loadable.map((name) => (
@@ -169,7 +172,7 @@ export function NodeHeader({
               </select>
               <button
                 type="button"
-                disabled={offline || pending !== null || pick === ""}
+                disabled={pending !== null || pick === ""}
                 onClick={() => void actions.runModelAction("models.load", pick)}
               >
                 {t("nodeHeader.load")}

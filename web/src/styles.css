@@ -302,7 +302,8 @@ optgroup {
   margin: 0.25rem 0;
 }
 
-.node-header-update {
+/* two classes: .badge comes later in this file and sets white text */
+.badge.node-header-update {
   background: var(--accent);
   color: var(--accent-text);
 }

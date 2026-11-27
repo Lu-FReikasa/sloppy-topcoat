@@ -65,7 +65,7 @@ describe("NodeHeader", () => {
     expect(h.getByTestId("glance-gpus").textContent).toBe("Fake GPU: 8,0 / 24,0 GB VRAM");
     expect(h.getByTestId("glance-loaded").textContent).toBe("llama-8b (5,9 GB VRAM)");
     // 0.2.18 stays 0.2.18 (it was once shown as 0.2.8)
-    expect(h.getByTestId("node-version").textContent).toContain("Agent 0.2.18");
+    expect(h.getByTestId("node-version").textContent).toBe("Agent 0.2.18 Update 0.2.19 verfügbar");
     expect(h.getByTestId("node-update-hint").textContent).toBe("Update 0.2.19 verfügbar");
   });
 
@@ -112,10 +112,9 @@ describe("NodeHeader", () => {
       { "POST /api/nodes/n1/wake": { sent: 1, broadcast: "255.255.255.255", port: WOL_PORT } },
     );
     let header = await screen.findByTestId("node-header");
-    // an offline node: nothing to load, the picker is off
-    expect(
-      (within(header).getByRole("button", { name: "Modell laden" }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    // an offline node loads nothing: no picker
+    expect(within(header).queryByRole("combobox")).toBeNull();
+    expect(within(header).queryByRole("button", { name: "Modell laden" })).toBeNull();
     fireEvent.click(within(header).getByRole("button", { name: "Aufwecken (Wake-on-LAN)" }));
     await waitFor(() =>
       expect(wake.calls.some((c) => c.method === "POST" && c.url === "/api/nodes/n1/wake")).toBe(
