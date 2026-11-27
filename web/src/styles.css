@@ -4444,8 +4444,13 @@ button.tag-chip {
   border-top: 2px solid var(--border);
 }
 
-/* one menu per model row instead of a pair of buttons: it opens in place, so the scrolling table
-   cannot clip it */
+/* one menu per model row instead of a pair of buttons. Its items float to the left of the "⋯"
+   inside the row: opened in place they widened the last column and pushed the buttons past the
+   scrolling table's right edge (PR #211 review) */
+.row-menu {
+  position: relative;
+}
+
 .row-menu > summary {
   list-style: none;
   cursor: pointer;
@@ -4467,8 +4472,17 @@ button.tag-chip {
 }
 
 .row-menu-items {
+  position: absolute;
+  right: calc(100% + 0.35rem);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
   display: flex;
-  flex-wrap: wrap;
   gap: 0.35rem;
-  margin-top: 0.35rem;
+  padding: 0.35rem;
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.3);
 }

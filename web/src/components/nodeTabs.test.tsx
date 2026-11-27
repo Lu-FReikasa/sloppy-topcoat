@@ -142,7 +142,11 @@ describe("node page tabs", () => {
 
     const expected: [string, (panel: HTMLElement) => boolean, string][] = [
       ["GPUs", heading("GPUs"), "models"],
-      ["models table", (p) => p.querySelector("table.models:not(.benchmarks):not(.capabilities)") !== null, "models"],
+      [
+        "models table",
+        (p) => p.querySelector("table.models:not(.benchmarks):not(.capabilities)") !== null,
+        "models",
+      ],
       ["download", (p) => within(p).queryByText("Modell herunterladen") !== null, "models"],
       ["missing residents", (p) => p.querySelector(".missing-residents") !== null, "models"],
       ["transfers", heading("Modell-Übertragungen"), "history"],
@@ -214,6 +218,26 @@ describe("node page tabs", () => {
       name: "models.load",
       args: { model: "alpha-1b" },
     });
+  });
+
+  it("closes the row menu after its action and on Escape, focus back on its button", async () => {
+    setup(makeDetail({ models: [model("alpha-1b")], config: { roles: ["gpu"] } }));
+    const summary = await screen.findByLabelText("Aktionen für alpha-1b");
+    const menu = summary.closest("details");
+    if (!menu) throw new Error("no row menu");
+    menu.open = true;
+    const load = within(menu).getByRole("button", { name: "Laden" });
+    load.focus();
+    const esc = fireEvent.keyDown(load, { key: "Escape" });
+    expect(esc).toBe(false); // taken: the windows shell must not minimise the window
+    expect(menu.open).toBe(false);
+    expect(document.activeElement).toBe(summary);
+    // closed, Escape is not the menu's
+    expect(fireEvent.keyDown(summary, { key: "Escape" })).toBe(true);
+
+    menu.open = true;
+    fireEvent.click(within(menu).getByRole("button", { name: "Laden" }));
+    expect(menu.open).toBe(false);
   });
 
   it("shows the last ten events and benchmarks until asked for more", async () => {

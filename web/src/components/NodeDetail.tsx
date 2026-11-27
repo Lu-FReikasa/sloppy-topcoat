@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
 import { useNode } from "../data/useNode";
@@ -563,6 +563,26 @@ function ModelRow({
 }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
+  const menu = useRef<HTMLDetailsElement>(null);
+
+  // the menu closes after its action and on Escape (focus back on its button), like a menu does
+  function closeMenu() {
+    if (!menu.current?.open) return;
+    menu.current.open = false;
+    menu.current.querySelector("summary")?.focus();
+  }
+  function act(a: ModelAction) {
+    closeMenu();
+    onAction(a);
+  }
+  function onMenuKey(e: KeyboardEvent<HTMLDetailsElement>) {
+    if (e.key !== "Escape" || !menu.current?.open) return;
+    // the windows shell minimises the window on Escape: this one is the menu's
+    e.preventDefault();
+    e.stopPropagation();
+    closeMenu();
+  }
+
   return (
     <tr>
       <td className="model-name">
@@ -603,15 +623,15 @@ function ModelRow({
       </td>
       <td className="row-actions">
         {/* one menu per row instead of a pair of buttons (issue #176) */}
-        <details className="row-menu">
+        <details className="row-menu" ref={menu} onKeyDown={onMenuKey}>
           <summary aria-label={t("nodeTabs.rowMenu", { model: model.name })}>⋯</summary>
           <div className="row-menu-items">
             {model.loaded ? (
-              <button type="button" disabled={disabled} onClick={() => onAction("models.unload")}>
+              <button type="button" disabled={disabled} onClick={() => act("models.unload")}>
                 {t("detail.unload")}
               </button>
             ) : (
-              <button type="button" disabled={disabled} onClick={() => onAction("models.load")}>
+              <button type="button" disabled={disabled} onClick={() => act("models.load")}>
                 {t("detail.load")}
               </button>
             )}
@@ -621,7 +641,7 @@ function ModelRow({
                 className="danger"
                 disabled={disabled || model.loaded}
                 aria-label={t("detail.deleteAria", { model: model.name })}
-                onClick={() => onAction("models.delete")}
+                onClick={() => act("models.delete")}
               >
                 {t("detail.deleteModel")}
               </button>
