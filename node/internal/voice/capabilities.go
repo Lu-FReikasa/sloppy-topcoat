@@ -85,10 +85,16 @@ func (speakCap) Name() string { return "voice.speak" }
 
 func (c speakCap) Info() capability.Info {
 	return capability.Info{
-		Description: "Text to speech (Piper): a text in, a WAV recording out. Voices: " + strings.Join(c.s.Voices(), ", "),
-		ReadOnly:    true,
+		Description:    "Text to speech (Piper): a text in, a WAV recording out. Voices: " + strings.Join(c.s.Voices(), ", "),
+		ReadOnly:       true,
+		MaxOutputBytes: speakOutputBytes,
 	}
 }
+
+// speakOutputBytes is the largest answer of voice.speak: a WAV of MaxSpeechBytes as base64 plus
+// the JSON around it. A WAV cannot be cut like text, so the default output limit of a capability
+// (about 260 KB, under 5 s of speech) would refuse most answers.
+var speakOutputBytes = base64.StdEncoding.EncodedLen(MaxSpeechBytes) + 256
 
 func (speakCap) InputSchema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","additionalProperties":false,"required":["text"],

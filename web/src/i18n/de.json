@@ -2584,7 +2584,14 @@
     "fileCopy": "Als Markdown kopieren",
     "fileDownload": "Herunterladen (.md)",
     "filed": "In der Wissensbasis abgelegt: {{path}}",
-    "fileFailed": "Die Akte konnte nicht geladen werden."
+    "fileFailed": "Die Akte konnte nicht geladen werden.",
+    "fullText": "Ganze Anfrage",
+    "group": {
+      "waiting": "Wartet auf dich",
+      "running": "Läuft",
+      "done": "Erledigt",
+      "withdrawn": "Zurückgezogen"
+    }
   },
   "project": {
     "title": "Projekte",
@@ -4256,6 +4263,8 @@
     "firstFailure": "Erster Fehler:",
     "testOutput": "Vollständige Testausgabe",
     "sameFailure": "{{count}}× derselbe Fehler",
+    "output": "Ausgabe",
+    "earlier": "Frühere Versuche mit demselben Ende: {{count}}",
     "rollout": "Einspielen",
     "apply": "Übernehmen und testen",
     "rolloutButton": "Auf den Hub einspielen",

@@ -21,7 +21,7 @@ import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { JSON_ROUTES, serve } from "./lib/fake-hub.mjs";
+import { JSON_ROUTES, serve, watchCsp } from "./lib/fake-hub.mjs";
 import { overlayAudit } from "./lib/overlay-audit.mjs";
 
 const require = createRequire(import.meta.url);
@@ -124,6 +124,7 @@ try {
             });
           }, CLIENT);
           const page = await ctx.newPage();
+          watchCsp(page, (m) => problems.push(`content security policy: ${m}`));
           const errors = [];
           page.on("pageerror", (e) => errors.push(e.message));
           await page.route("**/api/**", (route) => {

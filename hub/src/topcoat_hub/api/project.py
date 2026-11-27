@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from topcoat_hub.agent_service import AgentError
 from topcoat_hub.api.agent import task_view as agent_task_view
-from topcoat_hub.auth import CurrentUser, api_user
+from topcoat_hub.auth import CurrentUser, api_user, person_user
 from topcoat_hub.message_service import MessageService
 from topcoat_hub.project_base import user_zone
 from topcoat_hub.project_changes import APPLIED, FAILED, ChangeError, ChangeStore
@@ -1671,10 +1671,13 @@ class ConfirmBody(BaseModel):
 
 @router.post("/nodes/{node_id}/confirm")
 async def confirm_issue(
-    node_id: uuid.UUID, body: ConfirmBody, request: Request, user: CurrentUser = Depends(api_user)
+    node_id: uuid.UUID,
+    body: ConfirmBody,
+    request: Request,
+    user: CurrentUser = Depends(person_user),
 ) -> dict[str, Any]:
     """After a fix runs: "it works" closes the issue; "it does not" starts the next fix iteration
-    with what still fails."""
+    with what still fails. The person's click, not an API key (auth.person_user)."""
     store = _store(request)
     try:
         node = await store.get_node(user.uuid, node_id)

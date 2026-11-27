@@ -47,7 +47,7 @@ def _worker_db_url(base: str) -> str:
 
 
 TEST_DB_URL = _worker_db_url(BASE_TEST_DB_URL)
-DEV_TOKEN = "test-dev-token"
+DEV_TOKEN = "test-dev-token-0123456789abcdefghij"
 AUTH = {"Authorization": f"Bearer {DEV_TOKEN}"}
 
 

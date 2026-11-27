@@ -354,7 +354,9 @@ loaded[]}`. The actions `image.generate` / `image.edit` follow with milestone P6
 `config.tools.voice {enabled, backend?: auto|cpu}` adds two read-only capabilities (invoked like every
 capability, assigned per node): `voice.transcribe {audio_base64 (WAV, at most 2.5 MB), model?, language?:
 auto|<iso>}` → `{text, language}` and `voice.speak {text (at most 600 characters), voice?}` →
-`{audio_base64, format: "wav"}`. They run the pinned official builds of whisper.cpp (`b5454`; Linux CPU,
+`{audio_base64, format: "wav"}` (a WAV of at most 2.8 MB, so an answer of up to about 3.7 MB: voice.speak
+has its own output limit, every other capability keeps the default of 256 KiB + 4 KiB, and no capability
+sends more than 4 MiB). They run the pinned official builds of whisper.cpp (`b5454`; Linux CPU,
 Windows CPU or CUDA 12; no Vulkan build) and Piper (`2023.11.14-2`, the last standalone binary) as **one
 short process per request**: no server, no port; audio is written to a temporary directory and removed
 after the request. The builds (up to about 685 MB) are installed in the background when `voice` is switched on;

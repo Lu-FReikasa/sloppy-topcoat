@@ -63,9 +63,7 @@ export function programTilt(key: string): number {
   return Math.round(((h % 13) - 6) * 10) / 100; // -0.6 .. 0.6
 }
 
-export function programTitle(w: Workspace, t: T): string {
-  return w.title_key ? t(w.title_key, { defaultValue: w.title }) : w.title;
-}
+export { programTitle } from "../i18n/shipped";
 
 /** The views of a program its navigation lists: known to this build, allowed for the person, and
  *  not one that only a link can open (a node, a model). */

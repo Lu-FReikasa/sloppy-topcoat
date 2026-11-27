@@ -202,7 +202,7 @@ func (a *Agent) runCapability(ctx context.Context, args map[string]json.RawMessa
 		log.Warn("capability failed", "err", err)
 		return nil, errorf(protocol.ErrCapabilityFailed, "%s", err.Error()), nil
 	}
-	if len(raw) > tools.HardMaxOutputBytes+4096 {
+	if len(raw) > outputLimit(info) {
 		log.Warn("capability output too large", "bytes", len(raw))
 		return nil, errorf(protocol.ErrCapabilityFailed, "the output of %s is larger than this node sends (%d bytes)", name, len(raw)), nil
 	}
@@ -212,3 +212,15 @@ func (a *Agent) runCapability(ctx context.Context, args map[string]json.RawMessa
 		"duration_ms": took.Milliseconds(), "at": start.UTC().Format(time.RFC3339),
 	}, nil, nil
 }
+
+// outputLimit is the largest output the node sends for a capability: its own MaxOutputBytes
+// (capped at capability.MaxOutputCeiling) or else the default for every capability.
+func outputLimit(info capability.Info) int {
+	if info.MaxOutputBytes > 0 {
+		return min(info.MaxOutputBytes, capability.MaxOutputCeiling)
+	}
+	return defaultOutputLimit
+}
+
+// defaultOutputLimit is the output limit of a capability that sets none.
+const defaultOutputLimit = tools.HardMaxOutputBytes + 4096
