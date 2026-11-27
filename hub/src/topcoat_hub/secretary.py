@@ -285,7 +285,7 @@ class OrderStore:
 class HandedOn:
     order: Order
     message: ProjectNode
-    reason: str = ""  # why it is not in the queue yet ("" when it is)
+    reason: str = ""  # why it is not in the queue ("" when it is); the order is failed then
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -314,7 +314,8 @@ async def hand_on(
 ) -> HandedOn:
     """Hand a routed reading task on: an ``assistant.request`` in the Secretary project, queued
     for the employee at once (no click: the contract hands on only to reading, D112), and an
-    order that remembers it. ``service`` is a :class:`topcoat_hub.message_service.MessageService`.
+    order that remembers it. A request the queue refuses fails at once, with the reason (it would
+    wait for nothing). ``service`` is a :class:`topcoat_hub.message_service.MessageService`.
     Raises ``ValueError`` for a decision the contract does not allow."""
     from topcoat_hub import messages
     from topcoat_hub.message_service import Actor
@@ -336,6 +337,14 @@ async def hand_on(
         payload=payload, state="sent", chain_id=chain.id,
     )  # fmt: skip
     node, reason = await service.queue(user_id, admin, node)
+    if reason and node.msg_state == "sent" and node.task_id is None:
+        # the queue refused it (or there is none): nothing queues it later, so it ends here with
+        # the reason, and the order is failed at once instead of staying "sent" forever
+        from topcoat_hub.message_service import SYSTEM
+
+        node = await service._as(SYSTEM).set_message_state(
+            user_id, node.id, "failed", reason=reason
+        )
     async with service.store._sessionmaker() as db:
         order = await OrderStore(db, user_id).add(
             conversation_id=conversation_id,
