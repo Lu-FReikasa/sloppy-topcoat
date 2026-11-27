@@ -240,4 +240,16 @@ it("sends a dossier with a secret only after the explicit approval of that click
     expect(screen.queryByTestId("handover-group-waiting")).toBeNull();
     expect(screen.queryByTestId("handover-group-withdrawn")).toBeNull();
   });
+
+  it("opens the folded group of the hand-over a link names (inbox answer)", async () => {
+    const { api } = hub([
+      handover({ id: "d1", status: "done" }),
+      handover({ id: "c1", status: "cancelled" }),
+    ]);
+    render(<HandoversPage api={api} id="d1" />);
+    const done = (await screen.findByTestId("handover-group-done")) as HTMLDetailsElement;
+    expect(done.open).toBe(true);
+    expect(done.querySelector('[aria-current="true"]')).not.toBeNull();
+    expect((screen.getByTestId("handover-group-withdrawn") as HTMLDetailsElement).open).toBe(false);
+  });
 });

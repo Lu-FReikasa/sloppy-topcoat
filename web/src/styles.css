@@ -2631,6 +2631,11 @@ details.handover-group > summary > .handover-group-title {
 .handover-list > li + li {
   margin-top: 0.75rem;
 }
+/* the hand-over a link (inbox answer, chat) named */
+.handover-list > li[aria-current="true"] {
+  border-left: 3px solid var(--accent);
+  padding-left: 0.5rem;
+}
 .handover-full > dl {
   margin: 0.25rem 0 0;
 }

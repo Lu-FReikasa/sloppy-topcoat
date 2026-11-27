@@ -152,7 +152,11 @@ export function HandoversPage({ api, from, incognito, id, tick = 0 }: Props) {
   const groups = groupHandovers(shown);
 
   const row = (h: Handover) => (
-    <li key={h.id} data-testid="handover">
+    <li
+      key={h.id}
+      data-testid="handover"
+      aria-current={h.id === id ? "true" : undefined}
+    >
       <AppTag application={h.from_application} />
       {" → "}
       <AppTag application={h.to_application} />{" "}
@@ -312,6 +316,8 @@ export function HandoversPage({ api, from, incognito, id, tick = 0 }: Props) {
             key={g}
             className="handover-group fold"
             data-testid={`handover-group-${g}`}
+            // a link to one hand-over (an inbox answer, a chat's stored answer) opens its group
+            open={(id !== undefined && items.some((h) => h.id === id)) || undefined}
           >
             <summary>{heading}</summary>
             {body}
