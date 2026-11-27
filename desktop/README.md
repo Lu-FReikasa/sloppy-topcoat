@@ -86,3 +86,10 @@ Linux host without `libayatana-appindicator3-dev` (the CLI checks it even for a 
 UNVERIFIED on real hardware: the async window fix, the navigation guard (another program, outside pages) and the window
 title from the page were built and the routing rules tested (`nav.rs`), not yet run on Windows. Seen on Windows
 (2026-11-11, before the fix): sign-in, the tray, the selector.
+
+## Developer switch for GUI checks
+
+`TOPCOAT_DEVTOOLS_PORT=<port>` (1024-65535) in the client's environment starts WebView2 with the DevTools protocol on
+`127.0.0.1:<port>` (`src/devtools.rs`), so `web/scripts/overlay-capture.mjs` can take screenshots of the real overlay
+(docs/DEVELOPMENT.md, "GUI checks in the desktop overlay"). Off unless the variable is set; there is no setting for it
+in `client.json` or the GUI, because whoever reaches the port controls the pages and the session in them.

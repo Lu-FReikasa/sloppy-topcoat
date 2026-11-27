@@ -12,7 +12,9 @@
     "preview": "vite preview",
     "layout": "node scripts/layout-check.mjs",
     "shell-layout": "node scripts/shell-check.mjs",
-    "sheets-layout": "node scripts/sheets-check.mjs"
+    "sheets-layout": "node scripts/sheets-check.mjs",
+    "overlay-layout": "node scripts/overlay-check.mjs",
+    "overlay-capture": "node scripts/overlay-capture.mjs"
   },
   "dependencies": {
     "@xyflow/react": "12.12.0",
