@@ -383,11 +383,19 @@ class PersonaStore:
         name: str | None = None,
         components: dict[str, Any] | None = None,
         example: Any = ...,
+        voice: Any = ...,
     ) -> Persona:
         p = await self.get(persona_id)
         if p is None:
             raise PersonaError(404, "not_found", "unknown persona")
         self._may_write(p)
+        if voice is not ... and (p.defaults or {}).get("voice") != voice:
+            # the voice (D127) is not part of the text: no new version, the prompts stay as they are
+            rest = {k: v for k, v in (p.defaults or {}).items() if k != "voice"}
+            p.defaults = {**rest, "voice": voice} if voice else rest
+            p.updated_at = func.now()
+            await self.db.flush()
+            await self.db.refresh(p)
         changed = False
         if name is not None and (new := _text(name, NAME_MAX, "name")) != p.name and new:
             p.name, changed = new, True

@@ -53,6 +53,9 @@ class PersonaUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=personas.NAME_MAX)
     components: dict[str, Any] | None = None
     example: dict[str, str] | str | None = None
+    # D127: the voice this persona speaks with (a voice name of the node's voice.speak); null = the
+    # node's own voice. Not part of the persona's text: it changes no version.
+    voice: str | None = Field(None, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 
 class DefaultBody(BaseModel):
@@ -235,6 +238,8 @@ async def update(
     kwargs: dict[str, Any] = {"name": body.name, "components": body.components}
     if "example" in body.model_fields_set:
         kwargs["example"] = body.example
+    if "voice" in body.model_fields_set:
+        kwargs["voice"] = body.voice
     try:
         persona = await store.update(persona_id, **kwargs)
     except PersonaError as exc:
