@@ -19,7 +19,9 @@ import re
 MARK = {"de": "*Nicht geprüft:* ", "en": "*Not checked:* "}
 MAX_MARKED = 5
 
-_LABEL = r"[A-ZÄÖÜ][\w&'/()+-]*(?:[ \t]+[\w&'/()+-]+){0,4}"
+# a word of a label is at most 40 characters: unbounded, a long run like "A/A/A/..." made every
+# start position scan to the end of the line (quadratic, 20 s for 40 000 characters)
+_LABEL = r"[A-ZÄÖÜ][\w&'/()+-]{0,40}(?:[ \t]+[\w&'/()+-]{1,40}){0,4}"
 _SEP = r"[ \t]*(?:→|->|=>|\u203a|»|>)[ \t]*"
 _MENU_PATH = re.compile(rf"(?<![\w>-]){_LABEL}(?:{_SEP}{_LABEL})+")
 _QUOTED = re.compile(r"[\"“„«]([^\"“”„«»\n]{3,60})[\"”“»]")
@@ -27,6 +29,12 @@ _QUOTED = re.compile(r"[\"“„«]([^\"“”„«»\n]{3,60})[\"”“»]")
 _UI_WORDS = re.compile(
     r"(?i)\b(menu|menü|tab|reiter|setting|settings|einstellung\w*|option|switch|schalter|button|"
     r"schaltfläche|knopf|toggle|checkbox|page|seite|dialog|section|abschnitt)\b"
+)
+# a sentence that leads somewhere in a GUI: only there is "A → B" a menu path ("OOM → restart",
+# "Client → Proxy → Web" and German nouns in a chain of causes are no menu)
+_NAV_WORDS = re.compile(
+    r"(?i)\b(go to|open|navigate|click|select|choose|under|gehe?|öffne|klicke?|wähle|unter|"
+    r"navigiere)\b"
 )
 # the sentence marks itself as unchecked already
 _SAYS_UNCHECKED = re.compile(
@@ -72,10 +80,12 @@ def _pointers(sentence: str, haystack: str) -> list[str]:
     """The menu paths and labels of one sentence that the sources do not hold."""
     out: list[str] = []
     plain = sentence.replace("`", "").replace("**", "")
-    for m in _MENU_PATH.finditer(plain):
-        if not _backed_path(m.group(0), haystack):
-            out.append(m.group(0).strip())
-    if _UI_WORDS.search(plain):
+    about_gui = bool(_UI_WORDS.search(plain))
+    if about_gui or _NAV_WORDS.search(plain):
+        for m in _MENU_PATH.finditer(plain):
+            if not _backed_path(m.group(0), haystack):
+                out.append(m.group(0).strip())
+    if about_gui:
         for m in _QUOTED.finditer(plain):
             label = m.group(1).strip()
             if label and _norm(label) not in haystack and not any(label in p for p in out):
@@ -85,8 +95,9 @@ def _pointers(sentence: str, haystack: str) -> list[str]:
 
 def mark(answer: str, sources: str, language: str) -> tuple[str, list[str]]:
     """The answer with every sentence marked that names a menu path or a setting no source holds,
-    and those pointers. Code blocks are left as they are (a command is not a claim about a GUI);
-    a sentence that already says it is not checked keeps its words."""
+    and those pointers (the first ``MAX_MARKED``, for the log; every such sentence is marked).
+    Code blocks are left as they are (a command is not a claim about a GUI); a sentence
+    that already says it is not checked keeps its words."""
     haystack = _haystack(sources)
     prefix = MARK.get(language, MARK["en"])
     found: list[str] = []
@@ -96,7 +107,7 @@ def mark(answer: str, sources: str, language: str) -> tuple[str, list[str]]:
         if _FENCE.match(line):
             in_fence = not in_fence
             continue
-        if in_fence or not line.strip() or len(found) >= MAX_MARKED:
+        if in_fence or not line.strip():
             continue
         head = _LIST_MARKER.match(line)
         start = head.end() if head else 0

@@ -1686,6 +1686,14 @@ async def _answer(
                 sources = "\n".join(str(m.get("content") or "") for m in prompt.messages)
                 visible = "\n".join(str(m.get("content") or "") for m in prompt.messages[1:])
                 language = hub_language(turn.language, turn.last_user_text)
+                if closing:  # #222: under a report, advice no evidence holds is marked as such;
+                    # before the hub's own lines below, which are not the model's advice
+                    marked, unchecked = unchecked_advice.mark(text, sources, language)
+                    if unchecked:
+                        log.warning("chat: advice under a report without evidence: %s", unchecked)
+                        yield chat.sse("discard", {})
+                        yield chat.sse("delta", {"text": marked})
+                        text = marked
                 note = chat.source_notes(
                     language,
                     chat.unsupported_backrefs(text, visible),
@@ -1714,13 +1722,6 @@ async def _answer(
                 ):
                     text += listed  # what the click would write, not the model's retelling of it
                     yield chat.sse("delta", {"text": listed})
-                if closing:  # #222: under a report, advice no evidence holds is marked as such
-                    marked, unchecked = unchecked_advice.mark(text, sources, language)
-                    if unchecked:
-                        log.warning("chat: advice under a report without evidence: %s", unchecked)
-                        yield chat.sse("discard", {})
-                        yield chat.sse("delta", {"text": marked})
-                        text = marked
                 # the offer the person already said yes to is not made again (chat_loop.py)
                 earlier = [c for r, c in turn.history[:-1] if r == "assistant"]
                 trimmed = chat_loop.without_repeated_offer(text, earlier)
