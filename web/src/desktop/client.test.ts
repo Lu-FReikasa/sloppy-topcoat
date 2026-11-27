@@ -67,6 +67,29 @@ describe("the client's Esc", () => {
     document.removeEventListener("keydown", pressed);
     stop();
   });
+
+  it("closes an open row menu before the overlay, and a closed one does not count (#211)", () => {
+    (window as unknown as { topcoatClient: object }).topcoatClient = { config: { key: "ctrl+alt+Space" } };
+    const assign = vi.fn();
+    vi.spyOn(window, "location", "get").mockReturnValue({ ...window.location, assign } as Location);
+    const stop = installEscape();
+    const escape = (window as unknown as { topcoatClient: { escape: () => void } }).topcoatClient.escape;
+
+    const menu = document.createElement("details");
+    menu.setAttribute("data-esc-open", "");
+    menu.innerHTML = "<summary>⋯</summary><button>Load</button>";
+    menu.open = true;
+    document.body.append(menu);
+    // the focus is elsewhere: the menu closes, the overlay stays
+    escape();
+    expect(menu.open).toBe(false);
+    expect(assign).not.toHaveBeenCalled();
+    // closed, it no longer holds the key back
+    escape();
+    expect(assign).toHaveBeenCalledWith("?client=hide");
+    menu.remove();
+    stop();
+  });
 });
 
 describe("installOverlayMotion", () => {

@@ -4600,5 +4600,19 @@
     "cpuLoad": "{{value}} % Last",
     "loadPick": "Zu ladendes Modell",
     "load": "Modell laden"
+  },
+  "nodeTabs": {
+    "label": "Bereiche der Node-Seite",
+    "models": "Modelle",
+    "history": "Verlauf",
+    "rights": "Rechte & Fähigkeiten",
+    "maintenance": "Wartung",
+    "storage": "Speicherplatz",
+    "storageUnknown": "Der Node hat sein Modell-Laufwerk nicht gemeldet.",
+    "filter": "Modelle filtern",
+    "filterHint": "Name enthält …",
+    "filtered": "Vom Filter ausgeblendet: {{count}}",
+    "rowMenu": "Aktionen für {{model}}",
+    "showMore": "Mehr zeigen ({{count}})"
   }
 }

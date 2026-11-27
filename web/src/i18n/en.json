@@ -4600,5 +4600,19 @@
     "cpuLoad": "{{value}} % load",
     "loadPick": "Model to load",
     "load": "Load model"
+  },
+  "nodeTabs": {
+    "label": "Node page sections",
+    "models": "Models",
+    "history": "History",
+    "rights": "Rights & capabilities",
+    "maintenance": "Maintenance",
+    "storage": "Storage",
+    "storageUnknown": "The node has not reported its model drive.",
+    "filter": "Filter models",
+    "filterHint": "Name contains …",
+    "filtered": "Hidden by the filter: {{count}}",
+    "rowMenu": "Actions for {{model}}",
+    "showMore": "Show more ({{count}})"
   }
 }

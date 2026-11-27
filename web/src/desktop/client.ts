@@ -71,7 +71,12 @@ export function onClientResult(fn: (r: ClientResult) => void): () => void {
 }
 
 /** What stands open on the page and closes with Esc before the overlay does. */
-const CLOSES_FIRST = "[aria-modal='true'], .dt-palette-backdrop, .dt-me-menu, [data-esc-first]";
+const CLOSES_FIRST =
+  "[aria-modal='true'], .dt-palette-backdrop, .dt-me-menu, [data-esc-first], details[open][data-esc-open]";
+
+/** A `<details data-esc-open>` menu counts only while open; Esc with the focus outside it closes it
+ *  here, since the page's own Esc handling on the menu would not get the key. */
+const OPEN_DETAILS_MENU = "details[open][data-esc-open]";
 
 /** Esc while the overlay is up is the client's key; it gives it to the page here: something open
  *  closes (the page's own Esc handling gets the key), else the overlay goes. */
@@ -79,8 +84,13 @@ export function installEscape(): () => void {
   const c = global();
   if (!c) return () => undefined;
   const escape = () => {
-    if (document.querySelector(CLOSES_FIRST)) {
+    const open = document.querySelector(CLOSES_FIRST);
+    if (open) {
       const target = document.activeElement instanceof HTMLElement ? document.activeElement : document.body;
+      if (open.matches(OPEN_DETAILS_MENU) && !open.contains(target)) {
+        (open as HTMLDetailsElement).open = false;
+        return;
+      }
       target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
       return;
     }
