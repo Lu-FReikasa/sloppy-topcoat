@@ -12,43 +12,35 @@ import contextlib
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from fastapi import Request
 from fastapi.responses import Response
 
 from topcoat_hub import chat, chat_images, chat_tools, local_tools
 from topcoat_hub.auth import CurrentUser
+from topcoat_hub.chat_engine import router
+from topcoat_hub.chat_engine.turn import Turn
 from topcoat_hub.gateway import CONTEXT_FULL_MESSAGE, GatewayError, Upstream, is_context_full
 from topcoat_hub.job_log import set_job_context
 from topcoat_hub.memory import Recalled, is_followup
-
-if TYPE_CHECKING:
-    from topcoat_hub.api.chat import Turn
 
 log = logging.getLogger(__name__)
 
 RECALL_MAX_TOKENS = 400  # at most this much of the prompt goes to memory notes
 
 
-def _api() -> Any:
-    """The router module, where the steps of the pipeline still are (see the module docstring)."""
-    from topcoat_hub.api import chat as api_chat
-
-    return api_chat
-
-
 async def pipeline(
     request: Request,
     user: CurrentUser,
-    turn: "Turn",
+    turn: Turn,
     tools: str,
     outcome: "asyncio.Future[Response | None]",
 ) -> AsyncIterator[str]:
     """The answer's events. Until the model has started to answer, a failure is reported through
     ``outcome`` (an HTTP error response) and nothing is yielded; ``outcome`` is ``None`` once the
     answer starts."""
-    api = _api()
+    api = router()
     try:
         # (aclosing: a stop or a shutdown reaches the generators inside, which store the text)
         async with contextlib.aclosing(
@@ -65,7 +57,7 @@ async def pipeline(
             outcome.set_result(api._error(500, "internal_error", "the answer could not be started"))
 
 
-async def reserve(state: Any, turn: "Turn") -> Any:
+async def reserve(state: Any, turn: Turn) -> Any:
     """The place for this answer. A model or node the person picked wins, but a pick that cannot
     be served now (its machine is off, away or kept free) does not end in an error: the row of the
     program in the table of applications answers instead, and the answer says whom it replaces
@@ -93,11 +85,11 @@ async def reserve(state: Any, turn: "Turn") -> Any:
 async def pipeline_events(
     request: Request,
     user: CurrentUser,
-    turn: "Turn",
+    turn: Turn,
     tools: str,
     outcome: "asyncio.Future[Response | None]",
 ) -> AsyncIterator[str]:
-    api = _api()
+    api = router()
     state = request.app.state
     emoji = await api._reaction_for(request, turn)
     if emoji is not None:
