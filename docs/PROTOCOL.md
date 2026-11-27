@@ -723,6 +723,18 @@ registered repositories and offers only named, schema-checked operations (no she
   symbolic links are never read, listed, searched, copied or written; pipeline files
   (`.github/workflows`) are never changed. Output is masked like every tool output.
 
+### Capability names (`proto/capabilities.json`)
+Every capability a node build can offer is listed once in `proto/capabilities.json`: `name`
+(`<prefix>.<action>`), `group` (the area it belongs to, such as `docker`, `connectors`, `workshop`),
+`roles` (the node roles whose default config switches it on: `tools`, `dev`, `build`; empty = an admin
+adds it to `config.capabilities` by hand) and an optional `note` (where the node offers it). Its input
+schema is the one the node reports in `inventory.capabilities[].input_schema`. The hub builds the
+default `capabilities` of each role from the file; the node's tests fail when it registers a
+capability the file does not list or the file lists one it does not register; the web's tests fail
+when a listed capability has no text `tools.cap.<prefix>.<action>` in `en.json` and `de.json`.
+Adding a capability is one entry there, the code on the node and its two texts. The file is additive:
+a new entry needs no protocol version bump.
+
 ### Tool nodes (E2-04, ARCHITECTURE D29)
 A server can be a node without models: `topcoat-node install --role tools`. The hub gives it
 `roles: ["tools"]`, `runner: {"type": "none"}` (no llama.cpp download, no GPU work, the node is
