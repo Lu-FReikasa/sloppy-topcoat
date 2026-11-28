@@ -42,6 +42,9 @@ import { EvidenceMark } from "./EvidenceMark";
 import { IdleArt } from "./IdleArt";
 import { Clipper, moodOf, useClipperActive } from "../persona/Clipper";
 import { MessageLine } from "./MessageLine";
+import { wakeTimeoutNodes } from "../errors";
+import type { StreamError } from "../chat/state";
+import type { TFunction } from "i18next";
 import { MIN_LINES, useGrowingTextarea } from "./growTextarea";
 import { PushToTalkButton, VoiceProblemLine } from "../voice/PushToTalkButton";
 import { usePushToTalk } from "../voice/usePushToTalk";
@@ -92,6 +95,14 @@ export interface SectionBreak {
 }
 
 /** The line between a chat of the continuous conversation and the next one. */
+/** The calm line under an answer that failed: a node woken for it that did not come gets its own
+ *  (#102), everything else the general "try again". */
+export function failedText(error: StreamError, t: TFunction): string {
+  if (error.code !== "wake_timeout") return t("talk.failed");
+  const nodes = wakeTimeoutNodes(error.message);
+  return nodes ? t("talk.wakeTimeout", { nodes }) : t("talk.wakeTimeoutAny");
+}
+
 function breakBetween(
   index: number,
   before: ThreadSection,
@@ -741,7 +752,7 @@ export function TalkPage({
           )}
         {!running && stream?.error && (
           <p className="talk-calm" role="alert">
-            {t("talk.failed")}
+            {failedText(stream.error, t)}
           </p>
         )}
         {!running && work !== "idle" && (

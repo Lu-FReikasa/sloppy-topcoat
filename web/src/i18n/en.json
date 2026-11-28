@@ -265,7 +265,8 @@
     "model_missing": "The model no longer exists on the source node.",
     "model_exists": "A model with this name already exists on the target node.",
     "insufficient_disk": "The target node does not have enough free disk space.",
-    "not_allowed": "The node may not do this. Allow the actions models.send and models.receive in its configuration."
+    "not_allowed": "The node may not do this. Allow the actions models.send and models.receive in its configuration.",
+    "wake_timeout": "The node was woken but did not come online in time. Is it on standby with Wake-on-LAN enabled?"
   },
   "pairing": {
     "heading": "Add node",
@@ -1971,7 +1972,8 @@
       "quality": "Answer quality",
       "embedding": "Embeddings",
       "background": "Background work",
-      "load": "Loading a model"
+      "load": "Loading a model",
+      "waking": "Waking …"
     },
     "roles": "Standing tasks (default model and node)",
     "automatic": "automatic",
@@ -2189,6 +2191,8 @@
     "thinking": "Thinking …",
     "background": "The summary of this chat is still being brought up to date in the background. You can keep writing.",
     "failed": "That did not work just now. Try again in a moment.",
+    "wakeTimeoutAny": "The machine for this model was woken but did not come online in time. Try again in a moment.",
+    "wakeTimeout": "The machine for this model ({{nodes}}) was woken but did not come online in time. Try again in a moment.",
     "jump": "Jump to the latest",
     "via": "via {{node}}",
     "viaWhy": "Answered by {{node}} because {{from}} was not available.",

@@ -265,7 +265,8 @@
     "model_missing": "Das Modell gibt es auf dem Quell-Node nicht mehr.",
     "model_exists": "Auf dem Ziel-Node gibt es schon ein Modell mit diesem Namen.",
     "insufficient_disk": "Auf dem Ziel-Node ist nicht genug Platz frei.",
-    "not_allowed": "Der Node darf das nicht. Erlaube die Aktionen models.send und models.receive in seiner Konfiguration."
+    "not_allowed": "Der Node darf das nicht. Erlaube die Aktionen models.send und models.receive in seiner Konfiguration.",
+    "wake_timeout": "Der Node wurde geweckt, ist aber nicht rechtzeitig online gekommen. Ist er im Standby und Wake-on-LAN eingeschaltet?"
   },
   "pairing": {
     "heading": "Node hinzufügen",
@@ -1971,7 +1972,8 @@
       "quality": "Antwortqualität",
       "embedding": "Einbettungen",
       "background": "Hintergrundarbeit",
-      "load": "Modell wird geladen"
+      "load": "Modell wird geladen",
+      "waking": "Wird geweckt …"
     },
     "roles": "Standardaufgaben (Modell und Node)",
     "automatic": "automatisch",
@@ -2189,6 +2191,8 @@
     "thinking": "Ich denke nach …",
     "background": "Die Zusammenfassung dieses Chats wird im Hintergrund noch nachgeführt. Du kannst weiterschreiben.",
     "failed": "Das hat gerade nicht geklappt. Versuch es gleich noch einmal.",
+    "wakeTimeoutAny": "Die Maschine für dieses Modell wurde geweckt, ist aber nicht rechtzeitig online gekommen. Versuch es gleich noch einmal.",
+    "wakeTimeout": "Die Maschine für dieses Modell ({{nodes}}) wurde geweckt, ist aber nicht rechtzeitig online gekommen. Versuch es gleich noch einmal.",
     "jump": "Zum Neuesten springen",
     "via": "über {{node}}",
     "viaWhy": "{{node}} hat geantwortet, weil {{from}} nicht verfügbar war.",

@@ -42,3 +42,10 @@ export function hubUnreachable(err: unknown): boolean {
   // the hub's own 503 (a busy model) carries its code; a proxy's has only the status
   return e.status === 502 || e.status === 504 || (e.status === 503 && e.code === "http_503");
 }
+
+/** The nodes named in a `wake_timeout` error ("node-a, node-b did not wake within 240 s …", the
+ *  hub's gateway), or null when the message does not name them. */
+export function wakeTimeoutNodes(message: string): string | null {
+  const m = /^(.+?) did not wake within\b/.exec(message.trim());
+  return m ? (m[1] as string) : null;
+}

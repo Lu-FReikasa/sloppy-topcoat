@@ -120,6 +120,39 @@ describe("the answer", () => {
     expect(screen.queryByTestId("talk-live")).toBeNull();
   });
 
+  it("says so when the machine woken for it did not come, naming it (#102)", async () => {
+    setup({
+      "POST /api/conversations/c1/messages": () =>
+        sseResponse([
+          [
+            "error",
+            {
+              code: "wake_timeout",
+              message:
+                "node-amd did not wake within 240 s to serve 'qwen-7b' (Wake-on-LAN sent; …)",
+              retry: true,
+            },
+          ],
+        ]),
+    });
+    await type("Next question");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(
+      "Die Maschine für dieses Modell (node-amd) wurde geweckt, ist aber nicht rechtzeitig online gekommen. Versuch es gleich noch einmal.",
+    );
+  });
+
+  it("keeps the general line for other failures", async () => {
+    setup({
+      "POST /api/conversations/c1/messages": () =>
+        sseResponse([["error", { code: "stream_broken", message: "lost", retry: false }]]),
+    });
+    await type("Next question");
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Das hat gerade nicht geklappt. Versuch es gleich noch einmal.",
+    );
+  });
+
   it("is sent with Enter but not with Shift+Enter", async () => {
     const { mock } = setup({
       "POST /api/conversations/c1/messages": () =>

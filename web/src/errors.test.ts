@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "./api/client";
-import { describeError, toActionError } from "./errors";
+import { describeError, toActionError, wakeTimeoutNodes } from "./errors";
 import i18n from "./i18n";
 
 const t = i18n.getFixedT("en");
@@ -83,5 +83,17 @@ describe("toActionError", () => {
       code: "unknown",
       message: "boom",
     });
+  });
+});
+
+describe("wakeTimeoutNodes", () => {
+  it("reads the woken nodes from the hub's wake_timeout message", () => {
+    expect(
+      wakeTimeoutNodes("node-amd, node-nvidia did not wake within 240 s to serve 'qwen' (…)"),
+    ).toBe("node-amd, node-nvidia");
+  });
+
+  it("gives null for a message that does not name them", () => {
+    expect(wakeTimeoutNodes("no node came")).toBeNull();
   });
 });
