@@ -36,7 +36,17 @@ TASK_CHARS = 6000
 _NUMBERED = re.compile(r"^\s*\d+\s*[:|\t]\s?")  # "120: def x()" - a line number copied along
 # "147-148", "l. 120", "line 88": a line number given as the anchor (live 2026-11-23, 2.18.3)
 _LINE_NUMBER = re.compile(r"^\s*(?:l\.|lines?|zeilen?)?\s*\d+(?:\s*[-–]\s*\d+)?\s*$", re.I)  # noqa: RUF001
-WHERE = ("in", "before", "after", "end")
+WHERE = ("in", "before", "after", "end", "new")
+
+
+def _needs(s: dict[str, Any]) -> list[Any]:
+    """The steps a step builds on: ``needs`` (#237), or ``after`` as plans wrote it before.
+    Live 2026-11-27 (1.19): Qwen3-Coder read ``after`` as the position (like ``where: "after"``)
+    and wrote line numbers into it, so the field is called ``needs`` now."""
+    got = s.get("needs") if s.get("needs") is not None else s.get("after")
+    return got if isinstance(got, list) else []
+
+
 SYMBOL_AROUND = 10  # lines shown on each side of a symbol's body
 SYMBOL_SHOWN = 160  # a longer symbol is shown around its head only
 MAX_SYMBOL_LINES = 80  # a symbol written anew whole (REPLACE SYMBOL) is at most this long
@@ -50,7 +60,8 @@ class Step:
     do: str
     after: list[int] = field(default_factory=list)
     symbol: str = ""  # Class.method, function, JSON key path, heading, CSS selector (1.10)
-    where: str = "in"  # in, before, after the symbol, or the end of the file
+    where: str = "in"  # in, before, after the symbol, the end of the file, or "new" (see below)
+    near: str = ""  # where: "new": the existing symbol the new code goes after (#238)
 
 
 @dataclass
@@ -91,9 +102,7 @@ def tests_out_of_steps(doc: dict[str, Any]) -> dict[str, Any]:
     none, or when every code step is in web/ and its test is not a GUI test. A step another step
     builds on stays where it is."""
     raw = doc.get("steps") if isinstance(doc.get("steps"), list) else []
-    needed = {
-        int(a) for s in raw if isinstance(s, dict) for a in s.get("after") or [] if str(a).isdigit()
-    }
+    needed = {int(a) for s in raw if isinstance(s, dict) for a in _needs(s) if str(a).isdigit()}
     moved = [
         (n, s)
         for n, s in enumerate(raw, 1)
@@ -112,10 +121,11 @@ def tests_out_of_steps(doc: dict[str, Any]) -> dict[str, Any]:
         kept.append(s)
         renumber[n] = len(kept)
     for s in kept:
-        if isinstance(s, dict) and s.get("after"):
-            s["after"] = [
-                renumber[int(a)] for a in s["after"] if str(a).isdigit() and int(a) in renumber
+        if isinstance(s, dict) and _needs(s):
+            s["needs"] = [
+                renumber[int(a)] for a in _needs(s) if str(a).isdigit() and int(a) in renumber
             ]
+            s.pop("after", None)
     test = doc.get("test") if isinstance(doc.get("test"), dict) else {}
     test_path = str(test.get("path") or "").strip()
     code_paths = [str(s.get("path") or "") for s in kept if isinstance(s, dict)]
@@ -150,15 +160,21 @@ def parse_plan(text: str, *, repair: bool = False) -> tuple[Plan | None, list[st
         anchor = "\n".join(ln for ln in lines if ln)
         symbol = " ".join(str(s.get("symbol") or "").split())
         where = str(s.get("where") or "in").strip().lower()
-        where = {"new": "after" if symbol else "end", "inside": "in", "at": "in"}.get(where, where)
+        where = {"inside": "in", "at": "in"}.get(where, where)
+        near = " ".join(str(s.get("near") or "").split())
         do = " ".join(str(s.get("do") or "").split())
-        # a step that names itself is no error (live 2026-11-19, gpt-oss: step 1 "after": [1])
-        after = [int(a) for a in s.get("after") or [] if str(a).isdigit() and int(a) != n]
+        # a step that names itself is no error (live 2026-11-19, gpt-oss: step 1 "after": [1]);
+        # a number no step has is a line number in the wrong field (#237), not a later step
+        after = [
+            int(a)
+            for a in _needs(s)
+            if str(a).isdigit() and int(a) != n and 1 <= int(a) <= len(raw)
+        ]
         if not _path_ok(path):
             problems.append(f"step {n}: {path!r} is not a file under {PLACES}")
         elif where not in WHERE:
             problems.append(f"step {n} ({path}): where is one of {', '.join(WHERE)}, not {where!r}")
-        elif not symbol and where != "end" and _LINE_NUMBER.match(anchor or "0"):
+        elif not symbol and where not in ("end", "new") and _LINE_NUMBER.match(anchor or "0"):
             problems.append(
                 f"step {n} ({path}): name the symbol the change is at (function, Class.method, "
                 "component, JSON key path, heading), not a line number"
@@ -168,7 +184,7 @@ def parse_plan(text: str, *, repair: bool = False) -> tuple[Plan | None, list[st
         elif any(a >= n for a in after):
             problems.append(f"step {n}: it builds on a step that comes later ({after})")
         else:
-            steps.append(Step(n, path, anchor, do, after, symbol, where))
+            steps.append(Step(n, path, anchor, do, after, symbol, where, near))
     if not raw and not repair:
         problems.append("the plan has no steps")
     # a plan the person wrote ("given", RunService.given_plan) may be finer: the limit is the
@@ -371,6 +387,19 @@ def _head_line(lines: list[str], sym: code_symbols.Symbol) -> str:
     return next((ln for ln in body if last and last in ln), next((ln for ln in body if ln), ""))
 
 
+def settle_new(step: Step, text: str) -> None:
+    """``where: "new"`` (#238): new code, so ``symbol`` may name what the step creates. It goes
+    after ``near`` (an existing symbol), else after ``symbol`` when that exists already, else at
+    the end of the file. Live 2026-11-27 (1.19, 3.3.6): the anchor was the new function
+    ``_get_obsolete_pages`` itself and the plan was refused."""
+    if step.near:
+        step.symbol, step.where = step.near, "after"
+    elif step.symbol and code_symbols.find(step.path, text, step.symbol)[0]:
+        step.where = "after"
+    else:
+        step.symbol, step.where = "", "end"
+
+
 def settle_symbol(step: Step, text: str) -> str:
     """Resolve a symbol step against the file: its name as the file has it, and its head line as
     the anchor (what the result and the second look show). The problem when it cannot be: no such
@@ -380,6 +409,18 @@ def settle_symbol(step: Step, text: str) -> str:
         step.anchor = next((ln.strip() for ln in reversed(lines) if ln.strip()), "")
         return ""
     found, near = code_symbols.find(step.path, text, step.symbol)
+    if not found and "." in step.symbol:
+        # #239 (live 2026-11-27, 2.18: `Service.ask` for `BlockService.ask`): a dotted name that is
+        # the end of exactly one symbol's name means that one; two or more stay the model's choice
+        tail = "." + step.symbol.split(".", 1)[1]
+        head = step.symbol.split(".", 1)[0]
+        ends = [
+            s
+            for s in code_symbols.symbols(step.path, text)
+            if s.name.endswith(tail) and s.name.split(".", 1)[0].endswith(head)
+        ]
+        if len(ends) == 1:
+            found = ends
     if len(found) == 1:
         step.symbol = found[0].name
         step.anchor = _head_line(lines, found[0])
@@ -442,6 +483,8 @@ def plan_problems(plan: Plan, files: dict[str, str | None]) -> list[str]:
         if text is None:
             problems.append(f"step {s.n}: {s.path} does not exist in the live code")
             continue
+        if s.where == "new":
+            settle_new(s, text)
         if s.symbol or s.where == "end":
             problem = settle_symbol(s, text)
             if problem:
@@ -518,6 +561,7 @@ def where_text(step: Step) -> str:
             "before": "new code right before",
             "after": "new code right after",
             "end": "at the end of the file, after",
+            "new": "new code next to",
         }[step.where]
         return f"{how} `{step.symbol}`"
     if step.where == "end":

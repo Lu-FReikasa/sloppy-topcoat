@@ -50,7 +50,7 @@ FORCE_HINT = (
     "\nWRITE THE REPORT NOW. No more questions: they are not answered any more. The places are in "
     "the findings. What the issue asks for does not exist in the code yet - that is the cause; "
     "plan the NEW code at the places found (each named by its symbol: function, Class.method, "
-    'component; new code "after" an existing symbol). If an earlier '
+    'component; new code with "where": "new" and "near": an existing symbol). If an earlier '
     "plan is in the findings, correct it instead of starting over."
 )
 WIKI_CHARS = 6000  # of the wiki paragraphs that name what the issue names, at the start
