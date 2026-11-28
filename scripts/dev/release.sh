@@ -11,6 +11,10 @@
 #   --image REF        the image to roll out (default sloppy-topcoat-hub:local-<sha>). A registry
 #                      image (ghcr.io/<owner>/sloppy-topcoat-hub:sha-<commit>, built by CI, D123)
 #                      is pulled instead of built; any other name is built locally as before.
+#                      A pulled image is pinned by its digest: the smoke test runs on
+#                      <repo>@sha256:<digest>, and the transfer refuses when the image ID changed
+#                      since the pull. REF may name the digest itself (<repo>@sha256:<digest>, e.g.
+#                      from the publish run log); it is then rolled out as <repo>:digest-<12 hex>.
 #
 # Where things are comes from the environment, never from the repository:
 #   TOPCOAT_PROD_SSH   user@host of the production Docker server        (required for the remote steps)
@@ -27,7 +31,7 @@ while [ $# -gt 0 ]; do
     --yes) yes=1; shift ;;
     --stop-after) stop_after="${2:?--stop-after needs a step}"; shift 2 ;;
     --image) image="${2:?--image needs a reference}"; shift 2 ;;
-    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 64 ;;
   esac
 done
@@ -45,6 +49,21 @@ pull=0
 case "$image" in
   */*) first="${image%%/*}"
        case "$first" in *.*|*:*|localhost) pull=1 ;; esac ;;
+esac
+# the repository of a reference: without digest and tag (a registry port is not a tag)
+repo_of() { local r="${1%%@*}"; case "${r##*/}" in *:*) r="${r%:*}" ;; esac; printf '%s' "$r"; }
+repo="$(repo_of "$image")"
+# what goes to the server: the image's name, or for a digest reference a tag made from the digest
+# (docker save | docker load keeps tags but no digests, so hub.env needs a tag to name the image)
+rollout="$image" pinned="" image_id=""
+case "$image" in
+  *@*)
+    hex="${image##*@sha256:}"
+    if [ "$hex" = "$image" ] || ! [[ "$hex" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "--image $image: a digest must be @sha256:<64 hex digits>" >&2; exit 64
+    fi
+    [ "$pull" -eq 1 ] || { echo "--image $image: a digest reference must name a registry image" >&2; exit 64; }
+    rollout="$repo:digest-${hex:0:12}" pinned="$image" ;;
 esac
 # an unknown --stop-after would never stop, so refuse it before anything runs
 steps="tag check build smoke wayback transfer"
@@ -106,6 +125,20 @@ finish check
 if [ "$pull" -eq 1 ]; then
   step pull "docker pull $image (built by CI)"
   ask "pull the image?" && run docker pull "$image"
+  [ "$rollout" = "$image" ] || run docker tag "$image" "$rollout"
+  # pin what was pulled: the smoke test runs on the digest, the transfer checks the image ID
+  if [ "$dry" -eq 1 ]; then
+    [ -n "$pinned" ] || pinned="$repo@sha256:<digest of the pull>"
+    image_id="<image ID of the pull>"
+    echo "   (dry run) docker image inspect $image: digest $pinned, image ID kept for the transfer"
+  else
+    if [ -z "$pinned" ]; then
+      pinned="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$image" 2>/dev/null | grep -F "$repo@sha256:" | head -1 || true)"
+    fi
+    image_id="$(docker image inspect --format '{{.Id}}' "$rollout" 2>/dev/null || true)"
+    [ -n "$pinned" ] && [ -n "$image_id" ] || { echo "   $image is not here or has no registry digest: pull it first" >&2; exit 65; }
+    echo "   pinned: $pinned (image ID $image_id)"
+  fi
   finish pull
 else
   step build "docker build -> $image"
@@ -115,7 +148,7 @@ fi
 
 # 4 --------------------------------------------------------------------------------------------
 step smoke "smoke test of the image (migrates, serves TLS, keeps its CA)"
-ask "run the smoke test?" && run scripts/smoke-test-hub-image.sh "$image"
+ask "run the smoke test?" && run scripts/smoke-test-hub-image.sh "${pinned:-$image}"
 finish smoke
 
 # 5 --------------------------------------------------------------------------------------------
@@ -129,12 +162,20 @@ fi
 finish wayback
 
 # 6 --------------------------------------------------------------------------------------------
-step transfer "send $image to the server (docker save | gzip | ssh)"
+step transfer "send $rollout to the server (docker save | gzip | ssh)"
 need_remote "$prod_ssh"
 if [ "$dry" -eq 1 ]; then
-  echo "   (dry run) docker save $image | gzip | ssh $prod_ssh 'cat > /tmp/topcoat-image.tar.gz'"
+  [ -z "$image_id" ] || echo "   (dry run) refuse if the image ID of $rollout is no longer the one of $pinned"
+  echo "   (dry run) docker save $rollout | gzip | ssh $prod_ssh 'cat > /tmp/topcoat-image.tar.gz'"
 elif ask "transfer the image to $prod_ssh?"; then
-  docker save "$image" | gzip | ssh "$prod_ssh" 'cat > /tmp/topcoat-image.tar.gz'
+  if [ -n "$image_id" ]; then
+    now_id="$(docker image inspect --format '{{.Id}}' "$rollout" 2>/dev/null || true)"
+    if [ "$now_id" != "$image_id" ]; then
+      echo "   REFUSED: $rollout is now image ${now_id:-<none>}, the smoke test ran on $image_id ($pinned)" >&2; exit 65
+    fi
+    echo "   $rollout is still $image_id, the image the smoke test ran on"
+  fi
+  docker save "$rollout" | gzip | ssh "$prod_ssh" 'cat > /tmp/topcoat-image.tar.gz'
 fi
 finish transfer
 
@@ -142,14 +183,14 @@ finish transfer
 step prod "update production with deploy/update-hub.sh (dump, revision check, health check, auto-rollback)"
 need_remote "$prod_ssh"
 if [ "$dry" -eq 1 ]; then
-  echo "   (dry run) ssh $prod_ssh 'cd $prod_dir && ./update-hub.sh --dry-run --load /tmp/topcoat-image.tar.gz $image' and then without --dry-run"
+  echo "   (dry run) ssh $prod_ssh 'cd $prod_dir && ./update-hub.sh --dry-run --load /tmp/topcoat-image.tar.gz $rollout' and then without --dry-run"
 else
-  ssh "$prod_ssh" "cd $prod_dir && ./update-hub.sh --dry-run --load /tmp/topcoat-image.tar.gz $image"
+  ssh "$prod_ssh" "cd $prod_dir && ./update-hub.sh --dry-run --load /tmp/topcoat-image.tar.gz $rollout"
   if [ "$yes" -eq 1 ]; then
     echo "   --yes does not cover production: it is always asked" >&2
   fi
-  read -r -p "The dry run passed. Update PRODUCTION to $image? [y/N] " go
+  read -r -p "The dry run passed. Update PRODUCTION to $rollout? [y/N] " go
   [ "$go" = "y" ] || { echo "stopped: production stays as it is" >&2; exit 1; }
-  ssh "$prod_ssh" "cd $prod_dir && ./update-hub.sh $image"
+  ssh "$prod_ssh" "cd $prod_dir && ./update-hub.sh $rollout"
 fi
-say "done: $image"
+say "done: $rollout"
