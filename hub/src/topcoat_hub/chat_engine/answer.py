@@ -40,12 +40,14 @@ from topcoat_hub import (
     effort_stages,
     handoff,
     local_tools,
+    offer_guard,
     project_changesets,
     project_issues,
     project_iterations,
     project_write,
     quality,
     reaction,
+    recent_change,
     report,
     research_chat,
     research_profile,
@@ -259,6 +261,7 @@ async def _answer(
     prepared_sets: list[Any] | None = None,
     refused: str = "",
     held: "Held | None" = None,
+    just_changed: bool = False,
 ) -> AsyncIterator[str]:
     """SSE for the browser: ``meta``, ``delta``…, ``done`` | ``error``. The answer is stored
     however the stream ends (complete, stopped by the user, or broken).
@@ -473,6 +476,22 @@ async def _answer(
                 sources = "\n".join(str(m.get("content") or "") for m in prompt.messages)
                 visible = "\n".join(str(m.get("content") or "") for m in prompt.messages[1:])
                 language = hub_language(turn.language, turn.last_user_text)
+                # #223: an offer to change something stays only if an available action does it
+                guarded = offer_guard.without_unbacked_offer(
+                    text,
+                    turn.actions,
+                    language,
+                    # a person with no tools at all has no system the answer could change:
+                    # "Shall I remove the second verse?" is about the conversation
+                    keep=not turn.decide_available
+                    or turn.application == "project"
+                    or (change_facts is not None and change_facts[0] > 0),
+                )
+                if guarded != text:
+                    log.info("chat: an offer no action backs was cut from the answer")
+                    yield chat.sse("discard", {})
+                    yield chat.sse("delta", {"text": guarded})
+                    text = guarded
                 note = chat.source_notes(
                     language,
                     chat.unsupported_backrefs(text, visible),
@@ -496,6 +515,13 @@ async def _answer(
                         )
                         text += claim_note
                         yield chat.sse("delta", {"text": claim_note})
+                if just_changed:  # #224: no new event a minute after the change is not "off"
+                    guarded, removed = recent_change.guard(text, language)
+                    if removed:
+                        log.warning("chat: 'off' right after a settings change: %s", removed)
+                        yield chat.sse("discard", {})
+                        yield chat.sse("delta", {"text": guarded})
+                        text = guarded
                 if prepared_sets and (
                     listed := project_changesets.listing(prepared_sets, language)
                 ):
@@ -798,6 +824,17 @@ def _scope_guard(turn: Turn, task: Any) -> tuple[str, list[str], list[str]] | No
         return None
     language = chat.hub_language(turn.language, turn.last_user_text)
     return language, list(coverage.get("asked") or []), not_asked
+
+
+def _just_changed(turn: Turn, result: chat_tools.CheckResult) -> bool:
+    """#224: the person says, in this message or the one before, that they changed a setting a
+    moment ago, and the check read the event log."""
+    if not any(
+        (e.source or {}).get("capability") == recent_change.EVENTS_LOG for e in result.evidence
+    ):
+        return False
+    said = [c for r, c in turn.history if r == "user"][-2:]
+    return any(recent_change.just_changed(c) for c in [*said, turn.last_user_text])
 
 
 def _not_noted(message_id: int, reason: str) -> dict[str, Any]:
@@ -1679,6 +1716,13 @@ async def _plan_check(
     available = tool_groups.apply_scope(everything, turn.scope)
     # the scope the fixed order is resolved against, also for a check the hub starts itself
     turn.decide_available = tuple(available)
+    # what the assistant may offer to change (D15/D83): the whitelisted actions a check of a chat
+    # may propose, run after the person's click; a project changes through its change sets
+    loop = getattr(state.agents, "loop", None)
+    if loop is not None:
+        turn.actions = tuple(
+            tool_groups.apply_scope(await loop.chat_actions(Caller.of(user, "agent")), turn.scope)
+        )
     turn.internet_node = tool_groups.pick_web_node(available)
     # the user may search the web but switched the internet off here: say so, so the assistant
     # does not claim it cannot, and can point to the switch
@@ -1701,6 +1745,7 @@ async def _plan_check(
     turn.capabilities = replace(
         turn.capabilities,
         tools=tool_groups.labels(keys),
+        actions=offer_guard.labels(turn.actions),
         knowledge="notes" in keys,
         web_search="web" in keys,
     )
@@ -2574,6 +2619,7 @@ async def _checked_answer(
                 after_done=after_done,
                 closing=card is not None or pointer is not None,
                 scope=_scope_guard(turn, check.result.task),
+                just_changed=_just_changed(turn, check.result),
                 change_facts=_change_facts(
                     [*waiting, *(p for p in offered if p.get("status") == "pending")],
                     check.result.task,
@@ -2619,6 +2665,7 @@ async def _checked_answer(
                         send_meta=False,
                         agent_task_id=check.task_id,
                         closing=True,
+                        just_changed=_just_changed(turn, check.result),
                     )
                 ) as answer:
                     async for ev in answer:

@@ -41,6 +41,10 @@ type Info struct {
 	// capability whose output cannot be cut (voice.speak: one WAV) sets it; the node never sends
 	// more than MaxOutputCeiling, whatever it says.
 	MaxOutputBytes int
+	// URLOrigin is true for a capability that reads only URLs this node handed out as hits, or
+	// ones the hub vouches for as the person's own (the action argument url_origin "person";
+	// security audit 2026-11-27, finding 03). The hub learns from it that it may send that argument.
+	URLOrigin bool
 }
 
 // MaxOutputCeiling bounds MaxOutputBytes: a result of this size plus its envelope stays well

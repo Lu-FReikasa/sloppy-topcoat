@@ -100,6 +100,13 @@ for part in "${PARTS[@]}"; do
       run "web: typecheck" web npm run typecheck
       run "web: vitest" web npm test
       run "web: build" web npm run build
+      # the layout checks need a Chromium (npx playwright install chromium; CHROMIUM=<path> for another)
+      if [ $FAST -eq 1 ]; then
+        SUMMARY+=("skip  -     web: shell-layout/sheets-layout (--fast)")
+      else
+        run "web: shell-layout" web npm run shell-layout
+        run "web: sheets-layout" web npm run sheets-layout
+      fi
       ;;
     hub)
       run "hub: uv sync" hub uv sync --frozen

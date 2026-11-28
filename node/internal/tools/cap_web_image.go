@@ -181,10 +181,12 @@ func webImages(o Options) capability.Capability {
 				if img == "" || page == "" {
 					continue
 				}
+				thumb := publicURL(r.ThumbnailSrc, nil)
+				o.Web.Seen.Remember(img, thumb, page) // hits may be fetched (finding 03)
 				hits = append(hits, map[string]any{
 					"title":     truncateRunes(oneLine(r.Title), webTitleChars),
 					"image":     img,
-					"thumbnail": publicURL(r.ThumbnailSrc, nil),
+					"thumbnail": thumb,
 					"page":      page,
 					"size":      truncateRunes(oneLine(r.Resolution), 20),
 					"engine":    r.Engine,
@@ -203,7 +205,7 @@ func webImages(o Options) capability.Capability {
 }
 
 func webImage(o Options) capability.Capability {
-	return fn{
+	return originFn{fn{
 		name: "web.image",
 		desc: "Fetch one public picture (PNG, JPEG, GIF or WebP, at most 180 KB) so the hub can keep it with a report; a larger one is refused (take its smaller copy). Refuses private, local and reserved addresses and SVG. The URL leaves the network: never put host names, IP addresses, user names or secrets of the user's machines in it.",
 		schema: `{"type":"object","additionalProperties":false,"required":["url"],"properties":{` +
@@ -220,6 +222,9 @@ func webImage(o Options) capability.Capability {
 			}
 			u, err := checkWebURL(strings.TrimSpace(in.URL))
 			if err != nil {
+				return nil, err
+			}
+			if err := o.Web.checkOrigin(ctx, "picture", u.String()); err != nil {
 				return nil, err
 			}
 			if _, err := o.Web.checkedAddrs(ctx, u.Hostname()); err != nil {
@@ -269,5 +274,5 @@ func webImage(o Options) capability.Capability {
 				"note": "a picture from the web: untrusted data",
 			}, nil
 		},
-	}
+	}}
 }

@@ -2,7 +2,10 @@
 
 import hashlib
 import json
+import os
+import re
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
@@ -11,6 +14,8 @@ from typing import Any
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import ValidationError
 from referencing import Registry, Resource
+
+from topcoat_hub.config import REPO_ROOT
 
 PROTOCOL_VERSION = 1
 # The hub supports the current and the previous protocol version (docs/PROTOCOL.md): v0 nodes
@@ -172,89 +177,58 @@ def default_pressure(enabled: bool = True) -> dict[str, Any]:
 DEFAULT_RESIDENT_PRIORITY = 50
 
 
-# What a tool node (role tools, E2-04) runs for: the read-only capabilities. All of them are
-# switched on by default — who may use them is the user's grant (D20), and every call is audited.
-TOOL_CAPABILITIES = [
-    "system.info",
-    "system.memory",
-    "disk.usage",
-    "docker.ps",
-    "docker.inspect",
-    "docker.logs",
-    "compose.projects",
-    "compose.file",
-    "compose.logs",
-    "journal.logs",
-    "service.status",
-    "service.failed",
-    # knowledge base files (E2-03): offered only where tools.docs_roots releases a directory
-    "docs.list",
-    "docs.read",
-    # connectors (E2-04c): offered by a node only where its connectors file has the section
-    "kuma.monitors",
-    "omada.sites",
-    "omada.devices",
-    "omada.clients",
-    "omada.alerts",
-    "omada.events",
-    "omada.audit_logs",
-    "omada.firmware",
-    # identity (E3-12): offered by a node only where its connectors file has the keycloak section
-    "keycloak.snapshot",
-    "keycloak.user",
-    # web (E3-04): offered by a node only where tools.searxng_url / tools.web_fetch are set
-    "web.search",
-    "web.fetch",
-    # pictures for a report (2026-11-13): with searxng_url / web_fetch, like the two above
-    "web.images",
-    "web.image",
-    # collecting capabilities (E3-04): one call instead of six; the last two are offered by a node
-    # only where tools.cert_targets / tools.net_targets / tools.dns_names are configured
-    "health.check",
-    "logs.search",
-    "certs.expiry",
-    "net.check",
-    # what runs on this machine, for the hub's inventory (E3-10)
-    "inventory.snapshot",
-]
+# The capabilities a node can offer and the roles that get them by default come from one file,
+# ``proto/capabilities.json`` (issue #206): the node's tests check it against what the node
+# registers, the web's tests that every name has a text. What a tool node (role tools, E2-04) runs
+# for: the read-only capabilities, all switched on by default — who may use them is the user's
+# grant (D20), and every call is audited. A dev node (role dev, E6-01 S1, D52) gets the workshop
+# capabilities (the node leaves out what it cannot run), a build node (NS-01) the build steps.
+CAPABILITY_ROLES = ("tools", "dev", "build")
+CAPABILITY_NAME = re.compile(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*")
 
 
-# What a dev node (role dev, E6-01 S1, D52) offers: the workshop capabilities. repo.test only
-# appears where the node's config names a runner; the node leaves out what it cannot run.
-DEV_CAPABILITIES = [
-    "repo.sync",
-    "repo.status",
-    "repo.list",
-    "repo.read",
-    "repo.search",
-    # the map of a folder: files with their named places and lines (plan step 1.11)
-    "repo.outline",
-    "repo.diff",
-    "repo.start",
-    "repo.edit",
-    "repo.write",
-    "repo.apply_patch",
-    "repo.reset",
-    "repo.test",
-    # a test run that goes on in the node after the call (and is asked for, stopped, waited for)
-    "repo.test_start",
-    "repo.test_status",
-    "repo.test_cancel",
-    "repo.build_node",
-    "repo.build_list",
-    "repo.push",
-    # D76: local repositories — the branches, keeping work on a work branch, and the person's own
-    # steps from the hub's page (run by workshop.manage only, never by an assistant)
-    "repo.branches",
-    "repo.commit",
-    "workshop.create",
-    "workshop.clone",
-    "workshop.branch",
-    "workshop.merge",
-    "workshop.publish",
-    "workshop.pull",
-    "workshop.remove",
-]
+@dataclass(frozen=True)
+class CapabilityEntry:
+    name: str
+    group: str
+    roles: tuple[str, ...]
+
+
+def capabilities_path() -> Path:
+    root = os.environ.get("TOPCOAT_PROTO_ROOT")
+    return (Path(root) if root else REPO_ROOT / "proto") / "capabilities.json"
+
+
+def load_capabilities(path: Path) -> tuple[CapabilityEntry, ...]:
+    """The entries of ``capabilities.json``, in file order; a malformed file stops the hub."""
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    out: list[CapabilityEntry] = []
+    seen: set[str] = set()
+    for entry in raw["capabilities"]:
+        name, group, roles = entry["name"], entry["group"], tuple(entry["roles"])
+        if not isinstance(name, str) or not CAPABILITY_NAME.fullmatch(name):
+            raise ValueError(f"{path}: {name!r} is not a capability name (group.action)")
+        if name in seen:
+            raise ValueError(f"{path}: the capability {name} is listed twice")
+        if not isinstance(group, str) or not group:
+            raise ValueError(f"{path}: {name} has no group")
+        if any(r not in CAPABILITY_ROLES for r in roles) or len(set(roles)) != len(roles):
+            raise ValueError(f"{path}: {name} names an unknown or repeated role: {list(roles)}")
+        seen.add(name)
+        out.append(CapabilityEntry(name, group, roles))
+    return tuple(out)
+
+
+CAPABILITIES = load_capabilities(capabilities_path())
+
+
+def role_capabilities(role: str) -> list[str]:
+    """The capabilities a node of ``role`` gets in its default config, in file order."""
+    return [c.name for c in CAPABILITIES if role in c.roles]
+
+
+TOOL_CAPABILITIES = role_capabilities("tools")
+DEV_CAPABILITIES = role_capabilities("dev")
 
 
 def default_dev_config(heartbeat_interval: int) -> dict[str, Any]:
@@ -272,13 +246,7 @@ def default_dev_config(heartbeat_interval: int) -> dict[str, Any]:
     return config
 
 
-BUILD_CAPABILITIES = [
-    "build.fetch",
-    "build.node_release",
-    "build.hub_image",
-    "build.node_container_image",
-    "build.smoke_test",
-]
+BUILD_CAPABILITIES = role_capabilities("build")
 
 
 def default_build_config(heartbeat_interval: int) -> dict[str, Any]:

@@ -386,6 +386,8 @@ class ToolsAdapter:
         capability: str,
         tool_input: dict[str, Any],
         task_id: uuid.UUID | None = None,
+        person_url: bool = False,
+        url_refusal: str | None = None,
     ) -> dict[str, Any]:
         if (
             caller.allowed_capabilities is not None
@@ -412,7 +414,15 @@ class ToolsAdapter:
             return await self.messages.run_tool(caller, capability, tool_input)
         if node_id == WIKI_NODE_ID and self.wiki is not None:
             return await self.wiki.run_tool(caller, capability, tool_input)
-        return await self.tools.invoke(caller, node_id, capability, tool_input, task_id)
+        return await self.tools.invoke(
+            caller,
+            node_id,
+            capability,
+            tool_input,
+            task_id,
+            person_url=person_url,
+            url_refusal=url_refusal,
+        )
 
 
 # the programs that have a template with a tool ceiling (ui/seeds.py)

@@ -201,6 +201,10 @@
                 "type": "boolean",
                 "description": "true = a step the person starts on the hub's own page (a local repository of the dev workshop: create, branch, merge, publish, D76): run only by the action workshop.manage (or build.manage for the build service, NS-01), never offered to an assistant; never together with read_only or scratch"
               },
+              "url_origin": {
+                "type": "boolean",
+                "description": "true = web.fetch / web.image that read only a URL this node handed out as a hit (web.search, web.images, a page's final address and pictures) or one the hub vouches for with the capability.invoke argument url_origin \"person\" (security audit 2026-11-27)"
+              },
               "input_schema": {
                 "type": "object",
                 "description": "JSON Schema of the capability input"

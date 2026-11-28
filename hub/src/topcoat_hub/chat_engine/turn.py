@@ -116,6 +116,9 @@ class Turn:
     accepted_hint: str = ""
     # where the conversation was started (a desktop window, conversation_context.py)
     context: dict[str, Any] | None = None
+    # the state-changing actions this user may have proposed in this conversation's scope
+    # (ToolService.proposable_tools): an offer to change something stays only if one does it (#223)
+    actions: tuple[dict[str, Any], ...] = ()
     # the conversation as a check's task reads it (task_pairs): answers without report cards
     task_history: list[tuple[str, str]] = field(default_factory=list)
     # D125: the history with the images where they stand (only when a model that sees answers),
