@@ -12,6 +12,7 @@ import (
 	"topcoat/node/internal/hf"
 	"topcoat/node/internal/protocol"
 	"topcoat/node/internal/providers/runner"
+	"topcoat/node/internal/voice"
 )
 
 // Long-running actions (docs/PROTOCOL.md "Long-running actions"): they answer
@@ -30,8 +31,15 @@ const maxBenchModels = 8
 var modelNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
 func (a *Agent) actModelsDownload(ctx context.Context, args map[string]json.RawMessage) (any, *protocol.Error, func()) {
-	if perr := onlyKeys(args, "source", "target_name"); perr != nil {
+	if perr := onlyKeys(args, "source", "target_name", "target_kind"); perr != nil {
 		return nil, perr, nil
+	}
+	kind := "model"
+	if _, present := args["target_kind"]; present {
+		var ok bool
+		if kind, ok = argString(args, "target_kind"); !ok || (kind != "model" && kind != voice.KindSTT && kind != voice.KindTTS) {
+			return nil, errorf(protocol.ErrInvalidArgs, "args.target_kind must be model, stt or tts"), nil
+		}
 	}
 	var src struct {
 		Type     string `json:"type"`
@@ -51,6 +59,10 @@ func (a *Agent) actModelsDownload(ctx context.Context, args map[string]json.RawM
 		if target, ok = argString(args, "target_name"); !ok {
 			return nil, errorf(protocol.ErrInvalidArgs, "args.target_name must be a string"), nil
 		}
+	}
+	if kind != "model" {
+		return a.voiceDownload(ctx, voice.DownloadRequest{Kind: kind, Repo: src.Repo, File: src.File,
+			Revision: src.Revision, TargetName: target})
 	}
 	hsrc := hf.Source{Repo: src.Repo, File: src.File, Revision: src.Revision}
 	if err := hsrc.Validate(); err != nil {
@@ -129,6 +141,79 @@ func (a *Agent) download(r runner.ModelRunner, req runner.DownloadRequest, name 
 	}
 	a.log.Info("model downloaded", "model", name, "bytes", m.SizeBytes)
 	progress("done", m.SizeBytes, m.SizeBytes, nil)
+	a.sendInventory(ctx)
+}
+
+// voiceDownload is models.download with target_kind stt or tts (#109): the file goes to
+// <data dir>/voice-models/<kind>, not to the runner. Events and refusals are those of a model
+// download; download_progress carries the kind.
+func (a *Agent) voiceDownload(ctx context.Context, req voice.DownloadRequest) (any, *protocol.Error, func()) {
+	d := a.opts.VoiceModels
+	if d == nil {
+		return nil, errorf(protocol.ErrNotImplemented, "this node cannot download voice models"), nil
+	}
+	name, err := d.Name(&req)
+	if err != nil {
+		return nil, errorf(protocol.ErrInvalidArgs, "%v", err), nil
+	}
+	cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	err = d.Check(cctx, req, name)
+	cancel()
+	switch {
+	case errors.Is(err, voice.ErrModelExists):
+		return nil, errorf(protocol.ErrInvalidArgs, "%v", err), nil
+	case errors.Is(err, voice.ErrInsufficientDisk):
+		return nil, errorf(protocol.ErrInsufficientDisk, "%v", err), nil
+	}
+	key := req.Kind + ":" + name
+	a.mu.Lock()
+	if a.downloads[key] {
+		a.mu.Unlock()
+		return nil, errorf(protocol.ErrBusy, "%s model %s is already being downloaded", req.Kind, name), nil
+	}
+	a.downloads[key] = true
+	a.mu.Unlock()
+	return map[string]any{"started": true, "model": name, "kind": req.Kind}, nil, func() {
+		a.bg.Add(1)
+		go func() {
+			defer a.bg.Done()
+			a.downloadVoice(d, req, name, key)
+		}()
+	}
+}
+
+func (a *Agent) downloadVoice(d VoiceModelDownloader, req voice.DownloadRequest, name, key string) {
+	defer func() {
+		a.mu.Lock()
+		delete(a.downloads, key)
+		a.mu.Unlock()
+	}()
+	ctx := a.ctx()
+	progress := func(status string, done, total int64, err error) {
+		data := map[string]any{"model": name, "kind": req.Kind, "status": status, "downloaded_bytes": done, "total_bytes": total}
+		if err != nil {
+			data["error"] = err.Error()
+		}
+		a.emit(protocol.EventDownloadProgress, data)
+	}
+	var lastDone, lastTotal int64
+	req.Progress = hf.Throttle(func(done, total int64) {
+		lastDone, lastTotal = done, total
+		if done < total {
+			progress("running", done, total, nil)
+		}
+	}, DownloadProgressInterval, a.opts.Now)
+	a.log.Info("voice model download started", "kind", req.Kind, "model", name, "repo", req.Repo, "file", req.File, "revision", req.Revision)
+	progress("running", 0, 0, nil)
+	size, err := d.Download(ctx, req, name)
+	if err != nil {
+		a.log.Error("voice model download failed", "kind", req.Kind, "model", name, "err", err)
+		progress("failed", lastDone, lastTotal, err)
+		return
+	}
+	a.log.Info("voice model downloaded", "kind", req.Kind, "model", name, "bytes", size)
+	progress("done", size, size, nil)
+	// the voice capabilities list their models in the inventory
 	a.sendInventory(ctx)
 }
 
@@ -293,4 +378,15 @@ func (a *Agent) abortBenchmark(reason string) {
 		a.log.Warn("aborting benchmark", "id", a.bench.id, "reason", reason)
 		a.bench.cancel(fmt.Errorf("aborted: %s", reason))
 	}
+}
+
+// VoiceModelDownloader fetches voice models (voice.Downloader; a fake in tests).
+type VoiceModelDownloader interface {
+	// Name validates req, fills in defaults (the pinned Piper revision) and returns the model name.
+	Name(req *voice.DownloadRequest) (string, error)
+	// Check refuses with voice.ErrModelExists or voice.ErrInsufficientDisk (wrapped); any other
+	// error means "could not check" and does not block.
+	Check(ctx context.Context, req voice.DownloadRequest, name string) error
+	// Download fetches the files and returns their size in bytes.
+	Download(ctx context.Context, req voice.DownloadRequest, name string) (int64, error)
 }

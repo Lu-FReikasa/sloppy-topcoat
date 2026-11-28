@@ -51,6 +51,9 @@ type Options struct {
 	// NewCapabilities builds the capability registry of a tool node from config.tools (E2-04);
 	// nil = this node offers none.
 	NewCapabilities func(*protocol.ToolsConfig) *capability.Registry
+	// VoiceModels downloads voice models (models.download with target_kind stt or tts, #109);
+	// nil = this node cannot.
+	VoiceModels VoiceModelDownloader
 	// NewImageRunner builds the image runner for config.images when it is switched on (D126);
 	// nil = this node build has none.
 	NewImageRunner func(*protocol.ImagesConfig) runner.ImageRunner
