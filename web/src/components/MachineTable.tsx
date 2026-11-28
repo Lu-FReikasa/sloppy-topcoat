@@ -168,7 +168,7 @@ function VramCell({ meters }: { meters: Meters }) {
 /** What runs now: the pieces of work, otherwise the loaded models, otherwise the tool groups. */
 function Doing({
   nodes,
-  work,
+  work: allWork,
   hasActivity,
 }: {
   nodes: NodeSummary[];
@@ -177,7 +177,10 @@ function Doing({
 }) {
   const { t } = useTranslation();
   const live = nodes.filter((n) => n.state !== "offline");
-  if (nodes.length > 0 && live.length === 0) {
+  const asleep = nodes.length > 0 && live.length === 0;
+  // an asleep machine shows nothing stale, only that the hub is waking it for a request (#102)
+  const work = asleep ? allWork.filter((w) => w.kind === "waking") : allWork;
+  if (asleep && work.length === 0) {
     return <span className="muted">{t("overview.offlineNoData")}</span>;
   }
   const models = Array.from(new Set(live.flatMap((n) => n.loaded.map((m) => m.name))));

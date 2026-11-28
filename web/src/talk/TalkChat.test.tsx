@@ -14,7 +14,8 @@ import { ApiClient } from "../api/client";
 import { jsonResponse, mockFetch, type Handler } from "../test/mockFetch";
 import { controlledSse, sseResponse } from "../test/sse";
 import type { ChatMessage, Conversation, ConversationDetail } from "../types";
-import { TalkPage } from "./TalkPage";
+import { TalkPage, failedText } from "./TalkPage";
+import i18n from "../i18n";
 
 const CONV: Conversation = {
   id: "c1",
@@ -118,6 +119,53 @@ describe("the answer", () => {
       tools: "auto",
     });
     expect(screen.queryByTestId("talk-live")).toBeNull();
+  });
+
+  it("says so when the machine woken for it did not come, naming it (#102)", async () => {
+    setup({
+      "POST /api/conversations/c1/messages": () =>
+        sseResponse([
+          [
+            "error",
+            {
+              code: "wake_timeout",
+              message:
+                "node-amd did not wake within 240 s to serve 'qwen-7b' (Wake-on-LAN sent; …)",
+              retry: true,
+            },
+          ],
+        ]),
+    });
+    await type("Next question");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(
+      "Die Maschine für dieses Modell (node-amd) wurde geweckt, ist aber nicht rechtzeitig online gekommen. Versuch es gleich noch einmal.",
+    );
+  });
+
+  it("says none came when several machines were woken (#102)", () => {
+    const t = i18n.getFixedT("en");
+    const error = {
+      code: "wake_timeout",
+      message: "node-amd, node-nvidia did not wake within 240 s to serve 'qwen-7b' (…)",
+    };
+    expect(failedText(error, t)).toBe(
+      "The machines for this model (node-amd, node-nvidia) were woken but none came online in time. Try again in a moment.",
+    );
+    expect(failedText({ code: "wake_timeout", message: "odd" }, t)).toBe(
+      "The machine for this model was woken but did not come online in time. Try again in a moment.",
+    );
+  });
+
+  it("keeps the general line for other failures", async () => {
+    setup({
+      "POST /api/conversations/c1/messages": () =>
+        sseResponse([["error", { code: "stream_broken", message: "lost", retry: false }]]),
+    });
+    await type("Next question");
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Das hat gerade nicht geklappt. Versuch es gleich noch einmal.",
+    );
   });
 
   it("is sent with Enter but not with Shift+Enter", async () => {

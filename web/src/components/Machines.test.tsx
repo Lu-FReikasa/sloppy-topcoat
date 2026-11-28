@@ -274,6 +274,33 @@ describe("Overview by machine", () => {
     expect(row.textContent).not.toContain("GB");
   });
 
+  it("shows an asleep machine that the hub is waking, and nothing else of its work (#102)", async () => {
+    const view: ActivityView = {
+      ...activityView,
+      nodes: [
+        {
+          name: "node-host",
+          state: "offline",
+          work: [
+            { node: "node-host", model: "llama-8b", kind: "chat", seconds: 300 },
+            { node: "node-host", model: "gemma-12b", kind: "waking", seconds: 7 },
+          ],
+        },
+      ],
+    };
+    const mock = mockFetch({
+      "GET /api/machines": () => jsonResponse(VIEW),
+      "GET /api/nodes/metrics": () => jsonResponse({ window_seconds: 1800, nodes: {} }),
+      "GET /api/activity": () => jsonResponse(view),
+    });
+    const api = new ApiClient({ token: "t", fetchImpl: mock.fetch });
+    render(<Overview nodes={[{ ...host, state: "offline" }, tool]} loaded error={null} api={api} />);
+    const row = await screen.findByTestId("machine-host");
+    await waitFor(() => expect(within(row).getAllByTestId("machine-work")).toHaveLength(1));
+    expect(within(row).getByTestId("machine-work").textContent).toBe("Wird geweckt … gemma-12b · 7 s");
+    expect(row.textContent).not.toContain("llama-8b");
+  });
+
   it("lets an admin say which machine is a VM and where it runs", async () => {
     const view: MachinesView = {
       machines: [
