@@ -38,6 +38,7 @@ from topcoat_hub import (
     app_catalogue,
     message_tools,
     project_write_tools,
+    recent_change,
     report,
     report_service,
     research_profile,
@@ -1410,6 +1411,7 @@ class AgentLoop:
                             prompts.tools_hint(s.prompt, tools),
                             prompts.workshop_hint(s.prompt, tools, s.repos),
                             prompts.wifi_hint(s.prompt, tools),
+                            prompts.settings_change_hint(s.prompt, tools),
                             prompts.names_hint(s.name_notes),
                         )
                         if h
@@ -2062,6 +2064,7 @@ class AgentLoop:
             # a table nobody asked for (live 2026-11-10: a one-column table with an empty row)
             diagnosis.pop("table")
         await self._scope(s, diagnosis)
+        _not_confirmed_yet(s, diagnosis)
         diagnosis["notes"].extend(
             f"what a source can show: {n}" for n in prompts.source_notes(s.texts)
         )
@@ -2367,3 +2370,27 @@ class _Run:
     # calls that did not deliver a result (a link that did not load, a refused or failed tool):
     # the diagnosis, the card and the answer say so instead of passing over them
     failed: list[dict[str, Any]] = field(default_factory=list)
+
+
+def _not_confirmed_yet(s: "_Run", diagnosis: dict[str, Any]) -> None:
+    """#224: the person changed a setting a moment ago and the run read the event log: a summary
+    or finding that says the setting is off becomes "not confirmed yet" (missing new events show
+    nothing that soon), and the notes say why."""
+    if recent_change.EVENTS_LOG not in s.used or not recent_change.just_changed_in_task(s.prompt):
+        return
+    language = hub_language("", s.prompt.split("\n\n(", 1)[0])
+    changed = False
+    for f in diagnosis.get("findings") or []:
+        claim = str(f.get("claim") or "")
+        text = recent_change.qualify_claim(claim, language)
+        if text != claim:
+            f["claim"], changed = text, True
+    summary = str(diagnosis.get("summary") or "")
+    guarded, removed = recent_change.guard(summary, language)
+    if removed:
+        diagnosis["summary"], changed = guarded, True
+    if changed:
+        diagnosis.setdefault("notes", []).append(
+            "the person changed the setting a moment ago: no new event yet is not confirmed, "
+            "not off"
+        )
