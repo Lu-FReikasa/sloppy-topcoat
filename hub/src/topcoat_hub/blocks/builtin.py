@@ -684,8 +684,10 @@ ISSUE_STEPS: dict[str, Any] = {
                 ' "steps": [{"path": "<file as in the parts>", "symbol": "<the name of the '
                 "place: Class.method, function, component, Component.innerFunction, CONSTANT, "
                 "a JSON key path like issues.tests, a Markdown heading, a CSS selector, or "
-                'imports>", "where": "in" | "before" | "after" | "end", "do": "<one or two '
-                'sentences: what to change there>", "after": [<numbers of steps it builds on>]}],'
+                'imports>", "where": "in" | "before" | "after" | "end" | "new", "near": "<only '
+                'for new: the existing symbol the new code goes after>", "do": "<one or two '
+                'sentences: what to change there>", "needs": [<numbers of earlier steps of this '
+                "plan it builds on: 1, 2, ...; never line numbers>]}],"
                 '\n "test": {"path": "hub/tests/test_<new name>.py", "do": "<what the test '
                 'checks: it fails today and passes after the fix>"}}\n'
                 "Rules: one step per place (a new function, a changed method, a call); 1 to "
@@ -693,7 +695,9 @@ ISSUE_STEPS: dict[str, Any] = {
                 "symbol as it stands in the code read, never by a line or a line number: "
                 '"where": "in" changes the symbol itself; "before"/"after" adds new code (a new '
                 'function) right before or after it; "end" adds at the end of the file (the '
-                'symbol may then be empty); an import is "in" the symbol "imports". The hub '
+                'symbol may then be empty); "new" adds code that does not exist yet: "symbol" '
+                'is its new name, "near" the existing symbol it goes after (no near: the end of '
+                'the file); an import is "in" the symbol "imports". The hub '
                 "finds the lines and lists the nearest names when a symbol is not there. A fix "
                 "that failed before keeps its edits: plan only what repairs it. Paths lie under "
                 "hub/, proto/, docs/ or web/src/ "
@@ -859,13 +863,15 @@ INVESTIGATE_ROUND: dict[str, Any] = {
                 ' "summary": "<German, one sentence: what the fix does>",\n'
                 ' "steps": [{"path": "<file>", "symbol": "<Class.method, function, component, '
                 'JSON key path, heading, CSS selector or imports, as the findings name it>", '
-                '"where": "in" | "before" | "after" | "end", "do": "<what to change there>", '
-                '"after": []}],\n'
+                '"where": "in" | "before" | "after" | "end" | "new", "near": "<for new: an '
+                'existing symbol>", "do": "<what to change there>", "needs": [<earlier step '
+                "numbers>]}],\n"
                 ' "test": {"path": "hub/tests/test_<new name>.py", "do": "<what the test '
                 'checks>"}}}\n'
                 f"A plan has 1 to {MAX_FIX_STEPS} steps, one place each, in the order they are "
                 'done; a place is named by its symbol, never by a line number ("in" changes it, '
-                '"before"/"after" adds new code next to it, "end" at the end of the file). Paths '
+                '"before"/"after" adds new code next to it, "end" at the end of the file, "new" '
+                'names code that does not exist yet, placed after "near"). Paths '
                 "lie under hub/, proto/, docs/ or web/src/ (the "
                 "GUI; then the test is web/src/<dir>/<name>.test.tsx); the test file "
                 "is new."
