@@ -88,6 +88,18 @@ func waitTransfer(t *testing.T, hc *hubConn, role, status string) map[string]any
 	}
 }
 
+// assertNoTransfer checks that the node holds no transfer slot. Called right after a final
+// done/failed event: a node frees the slot before it reports the end, so a hub may start the
+// next transfer at once (#107).
+func assertNoTransfer(t *testing.T, a *Agent) {
+	t.Helper()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.xfer != nil {
+		t.Fatalf("transfer %s is still open after its final event", a.xfer.id)
+	}
+}
+
 func TestModelTransferBetweenTwoAgents(t *testing.T) {
 	src := newXferNode(t, xferAllowed, 100<<30)
 	dst := newXferNode(t, xferAllowed, 100<<30)
@@ -123,7 +135,9 @@ func TestModelTransferBetweenTwoAgents(t *testing.T) {
 	if d := waitTransfer(t, dst.hc, "receive", "done"); d["transferred_bytes"] != float64(len(data)) || d["total_bytes"] != float64(len(data)) {
 		t.Fatalf("%v", d)
 	}
+	assertNoTransfer(t, dst.h.agent)
 	waitTransfer(t, src.hc, "send", "done")
+	assertNoTransfer(t, src.h.agent)
 	inv := dst.hc.waitType(t, protocol.TypeInventory)
 	if !strings.Contains(string(inv.Body), "copied-model") {
 		t.Fatal("inventory of the target lacks the model")
@@ -143,12 +157,8 @@ func TestModelTransferBetweenTwoAgents(t *testing.T) {
 		}
 		return true
 	})
-	// The source is free again, and the name is taken on the target.
-	eventually(t, "source idle", func() bool {
-		src.h.agent.mu.Lock()
-		defer src.h.agent.mu.Unlock()
-		return src.h.agent.xfer == nil
-	})
+	// The source is free again (already when it reported done), and the name is taken on the target.
+	assertNoTransfer(t, src.h.agent)
 	res = dst.hc.action(t, "models.receive", receiveArgs("copied-model", len(data), sum, strings.Repeat("b", 64), ep))
 	if res.OK || res.Error.Code != protocol.ErrInvalidArgs {
 		t.Fatalf("duplicate: %+v", res)
@@ -176,6 +186,7 @@ func TestModelTransferFailures(t *testing.T) {
 	if d := waitTransfer(t, dst.hc, "receive", "failed"); d["error_code"] != "no_route" {
 		t.Fatalf("%v", d)
 	}
+	assertNoTransfer(t, dst.h.agent)
 	// A refusal by the source (wrong token) is an internal error with a clear message.
 	args := strings.Replace(receiveArgs("m3", 200000, sum, cert, ep), xferToken, strings.Repeat("x", 43), 1)
 	if res := dst.hc.action(t, "models.receive", args); !res.OK {
@@ -184,6 +195,7 @@ func TestModelTransferFailures(t *testing.T) {
 	if d := waitTransfer(t, dst.hc, "receive", "failed"); d["error_code"] != "internal" || !strings.Contains(d["error"].(string), "401") {
 		t.Fatalf("%v", d)
 	}
+	assertNoTransfer(t, dst.h.agent)
 	// A hash that differs from the one the source announces (last: the source counts this
 	// request as delivered and closes).
 	if res := dst.hc.action(t, "models.receive", receiveArgs("m2", 200000, strings.Repeat("a", 64), cert, ep)); !res.OK {
@@ -192,6 +204,7 @@ func TestModelTransferFailures(t *testing.T) {
 	if d := waitTransfer(t, dst.hc, "receive", "failed"); d["error_code"] != "hash_mismatch" {
 		t.Fatalf("%v", d)
 	}
+	assertNoTransfer(t, dst.h.agent)
 	if _, err := os.Stat(filepath.Join(dst.dir, "m2.gguf")); !os.IsNotExist(err) {
 		t.Fatal("a file exists after a hash mismatch")
 	}

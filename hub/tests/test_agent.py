@@ -577,11 +577,18 @@ def test_the_stream_of_the_admin_carries_their_own_task_progress(client: TestCli
     queue = client.app.state.bus.subscribe()
     tid = start(client).json()["id"]
     wait_for(client, tid, "done")
-    while not queue.empty():
-        event, data = queue.get_nowait()
-        if event.startswith("agent_"):
-            events.append(f"{event}:{data.get('status') or data.get('seq')}")
-            assert data["_user"]
+
+    # The loop commits `done` before it publishes the event, so the API can report done while
+    # the event is still on its way: collect until it is there instead of draining once (#107).
+    def drained() -> None:
+        while not queue.empty():
+            event, data = queue.get_nowait()
+            if event.startswith("agent_"):
+                events.append(f"{event}:{data.get('status') or data.get('seq')}")
+                assert data["_user"]
+        assert "agent_task:done" in events, events
+
+    eventually(drained, timeout=5)
     assert (
         "agent_task:queued" in events
         and "agent_task:running" in events

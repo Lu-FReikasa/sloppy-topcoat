@@ -309,6 +309,34 @@ def test_unavailable_model_is_a_clear_503_and_the_message_is_kept(
     ]
 
 
+def test_a_503_comes_after_the_placeholder_is_gone(
+    client: TestClient, connect, monkeypatch
+) -> None:
+    """The run that failed settles after it reported the error; the 503 waits for that, so a
+    look at the conversation right after it never shows the empty placeholder (#107)."""
+    import asyncio
+
+    from topcoat_hub.api import chat as chat_api
+
+    settle = chat_api._settle
+
+    async def slow_settle(*args: Any) -> Any:
+        await asyncio.sleep(0.3)
+        return await settle(*args)
+
+    monkeypatch.setattr(chat_api, "_settle", slow_settle)
+    node = online_node(client, connect, "node-a", loaded=["small"])
+    use_model(client)
+    node.state = "busy_gaming"
+    node.heartbeat()
+    eventually(lambda: _state(client, "node-a", "busy_gaming"))
+    conv = new_conv(client)
+    status, _, _ = ask(client, conv, "Hallo?")
+    assert status == 503
+    msgs = client.get(f"/api/conversations/{conv}", headers=AUTH).json()["messages"]
+    assert [m["role"] for m in msgs] == ["user"]
+
+
 def _state(client: TestClient, name: str, state: str) -> None:
     nodes = {n["name"]: n["state"] for n in client.get("/api/nodes", headers=AUTH).json()}
     assert nodes[name] == state
