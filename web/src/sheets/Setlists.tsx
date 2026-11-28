@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ApiClient } from "../api/client";
 import { sheetsHref } from "../route";
-import { groupSheets } from "./group";
 import { canReorder, moveItem, resolveSetlist, SETLIST_VIEWS, viewOrder, type SetlistView } from "./setlist";
 import type { Setlist, SetlistItem, SheetSummary } from "./types";
 
@@ -65,8 +64,8 @@ interface Props {
   onError: (e: unknown) => void;
 }
 
-/** The person's setlists: pick one, create, rename, delete; add the open sheet (that version or
- *  always the newest of its song), reorder by drag or Alt+↑/↓, open a song (the setlist then stays
+/** The person's setlists: pick one, create, rename, delete; add the open song (each item plays
+ *  the version in use of its song, #159), reorder by drag or Alt+↑/↓, open a song (the setlist then stays
  *  beside it), play it on the stage from the start or from a song, print it. Every change
  *  is saved at once; a refused one reloads the setlists from the hub. A setlist can also be looked
  *  at sorted by title or artist and searched (#149): only the view changes, each row keeps its
@@ -233,7 +232,6 @@ function SetlistEditor({
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState(setlist.name);
-  const [newest, setNewest] = useState(true);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const focusAt = useRef<number | null>(null);
   const rows = useRef<(HTMLLIElement | null)[]>([]);
@@ -270,11 +268,6 @@ function SetlistEditor({
   const drop = (i: number) => items.filter((_, k) => k !== i);
 
   const open = openId ? list.find((s) => s.id === openId) : undefined;
-  const openVersion = useMemo(() => {
-    if (!open) return 0;
-    const g = groupSheets(list).find((x) => x.versions.some((s) => s.id === open.id));
-    return g ? g.versions.findIndex((s) => s.id === open.id) + 1 : 0;
-  }, [open, list]);
   const playable = entries.some((e) => e.sheet);
 
   return (
@@ -369,11 +362,6 @@ function SetlistEditor({
                     <span className="muted">{t("sheets.setlists.missing")}</span>
                   )}
                   {view === "artist" && e.sheet?.artist && <span className="muted small setlist-artist">{e.sheet.artist}</span>}
-                  {e.sheet && (e.item.newest || e.versions > 1) && (
-                    <span className="muted small">
-                      {e.item.newest ? t("sheets.setlists.newest", { n: e.version }) : t("sheets.version", { n: e.version })}
-                    </span>
-                  )}
                 </span>
                 <span className="setlist-tools">
                   <button type="button" onClick={() => onPlay(i)} disabled={!e.sheet} aria-label={t("sheets.setlists.playFrom")} title={t("sheets.setlists.playFrom")}>
@@ -401,11 +389,8 @@ function SetlistEditor({
       )}
       {open ? (
         <div className="sheets-form setlist-add">
-          <select value={newest ? "newest" : "this"} onChange={(e) => setNewest(e.target.value === "newest")} aria-label={t("sheets.setlists.which")}>
-            <option value="newest">{t("sheets.setlists.newestOption")}</option>
-            <option value="this">{t("sheets.setlists.thisOption", { n: openVersion })}</option>
-          </select>
-          <button type="button" onClick={() => onChange({ items: [...items, { sheet_id: open.id, newest }] })} data-testid="setlist-add">
+          {/* newest: true keeps the stored item honest for a hub or an older page that still reads it */}
+          <button type="button" onClick={() => onChange({ items: [...items, { sheet_id: open.id, newest: true }] })} data-testid="setlist-add">
             {t("sheets.setlists.add", { title: open.title })}
           </button>
         </div>

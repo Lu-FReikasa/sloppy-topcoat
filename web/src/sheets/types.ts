@@ -115,7 +115,8 @@ export interface SheetPatch {
   artist?: string;
 }
 
-/** A song of a setlist: this sheet, or (newest) the newest version of its song when played. */
+/** A song of a setlist, named by one of its sheets. It plays the version in use of that song
+ *  (#159); `newest` is kept from the time an item could pin a version and is no longer read. */
 export interface SetlistItem {
   sheet_id: string;
   newest: boolean;

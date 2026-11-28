@@ -4331,6 +4331,7 @@
     "tab": {
       "sheet": "Sheet",
       "sources": "Sources ({{n}})",
+      "versions": "Versions ({{n}})",
       "chordpro": "ChordPro"
     },
     "kind": {
@@ -4384,7 +4385,6 @@
       "plain": "Chords over lyrics",
       "save": "Save"
     },
-    "version": "v{{n}}",
     "filter": {
       "search": "Search songs",
       "artist": "Artist",
@@ -4445,10 +4445,6 @@
       "keys": "Drag to reorder, or Alt + ↑/↓ on a song.",
       "add": "Add \"{{title}}\"",
       "addHint": "Open a sheet to add it to the setlist.",
-      "which": "Version",
-      "newestOption": "Always the newest version",
-      "thisOption": "This version (v{{n}})",
-      "newest": "newest (v{{n}})",
       "up": "Move up",
       "down": "Move down",
       "remove": "Remove from the setlist",
@@ -4468,10 +4464,17 @@
     },
     "back": "Back to the list",
     "close": "Close",
-    "versions": "Versions",
     "new": {
       "open": "New sheet …",
       "title": "New sheet"
+    },
+    "versionsTab": {
+      "hint": "The newest version is the one in use: the library, setlists, the stage and print open it. Older versions are kept to compare with.",
+      "open": "open",
+      "inUse": "in use",
+      "from": "What changed from the version of {{when}} to the open one:",
+      "older": "This is an older version of the song.",
+      "openInUse": "Open the version in use"
     }
   },
   "images": {

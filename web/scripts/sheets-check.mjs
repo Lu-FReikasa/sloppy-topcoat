@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Layout check of Sheets (sheets/SheetsPage.tsx) in a real browser, issue #168:
 // - the library table: no column title breaks inside a word, the key ("B · Capo 2") stays on one
-//   line, the versions (v1 v2) do not stack, and the table fits its column (no sideways scroll);
+//   line, a song with two versions is one row without version links (#159), and the table fits its
+//   column (no sideways scroll);
 // - the stage: every tool, "Leave" last, ends inside the window (German "Verlassen" ended at
 //   453 px on a 320-430 px phone) and is not covered (the windows shell's taskbar lay over it),
 //   and on a touch screen the tools are not dimmed.
@@ -112,9 +113,9 @@ function measureLibrary() {
     wrapRight: Math.min(wrap.right, window.innerWidth),
     heads: [...table.querySelectorAll("th")].filter(shown).filter((th) => lines(th) > 1).map((th) => th.textContent.trim()),
     keys: [...table.querySelectorAll(".sheets-col-key")].filter((td) => lines(td) > 1).map((td) => td.textContent.trim()),
-    versions: [...table.querySelectorAll(".sheets-versions")]
-      .filter(shown)
-      .filter((v) => new Set([...v.children].map((a) => Math.round(a.getBoundingClientRect().top))).size > 1).length,
+    // one row per song, its title the only link (#159)
+    rows: table.querySelectorAll("tbody tr").length,
+    links: [...table.querySelectorAll("tbody tr")].filter((tr) => tr.querySelectorAll("a").length !== 1).length,
   };
 }
 
@@ -189,7 +190,8 @@ try {
         if (lib.tableRight > lib.wrapRight + 0.5) fail(`${where} library`, `the table ends at ${Math.round(lib.tableRight)}, its column at ${Math.round(lib.wrapRight)}`);
         for (const th of lib.heads) fail(`${where} library`, `the column title "${th}" breaks`);
         for (const k of lib.keys) fail(`${where} library`, `the key "${k}" breaks`);
-        if (lib.versions) fail(`${where} library`, `${lib.versions} version list(s) stack`);
+        if (lib.rows !== 4) fail(`${where} library`, `${lib.rows} rows for 4 songs`);
+        if (lib.links) fail(`${where} library`, `${lib.links} row(s) with more links than the title`);
       }
 
       // open the song like a person does: its title in the library
