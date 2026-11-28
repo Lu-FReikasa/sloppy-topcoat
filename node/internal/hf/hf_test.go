@@ -198,3 +198,64 @@ func TestThrottle(t *testing.T) {
 		t.Fatalf("%v", calls)
 	}
 }
+
+// gitHub serves one small file kept in git (no LFS entry): its oid is the git blob id.
+func gitHub(t *testing.T, content []byte, oid string) *Client {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/models/org/repo/paths-info/main", func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		fmt.Fprintf(w, `[{"type":"file","oid":%q,"size":%d,"path":%q}]`, oid, len(content), r.PostForm.Get("paths"))
+	})
+	mux.HandleFunc("GET /org/repo/resolve/main/v.onnx.json", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(content)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return &Client{BaseURL: srv.URL, HTTP: srv.Client()}
+}
+
+func TestDownloadGitBlobOnlyWhenAllowed(t *testing.T) {
+	content := []byte(`{"phoneme_id_map":{}}`)
+	oid := "146f85f70a8f13261cde9c6f2412abbd36b3dfb8" // printf '%s' <content> | git hash-object --stdin
+	c := gitHub(t, content, oid)
+	s := Source{Repo: "org/repo", File: "v.onnx.json"}
+	dest := filepath.Join(t.TempDir(), "v.onnx.json")
+	if _, err := c.Download(context.Background(), s, dest, nil); err == nil || !strings.Contains(err.Error(), "no SHA-256") {
+		t.Fatalf("without AllowGitBlob: %v", err)
+	}
+	s.AllowGitBlob = true
+	info, err := c.Download(context.Background(), s, dest, nil)
+	if err != nil || info.GitSHA1 != oid {
+		t.Fatalf("%+v %v", info, err)
+	}
+	if b, _ := os.ReadFile(dest); string(b) != string(content) {
+		t.Fatalf("%q", b)
+	}
+	// a wrong blob id fails the check and leaves no file
+	c = gitHub(t, content, strings.Repeat("0", 40))
+	dest2 := filepath.Join(t.TempDir(), "v.onnx.json")
+	if _, err := c.Download(context.Background(), s, dest2, nil); !errors.Is(err, ErrChecksum) {
+		t.Fatalf("got %v", err)
+	}
+	if _, err := os.Stat(dest2 + ".part"); !os.IsNotExist(err) {
+		t.Fatal("partial file kept")
+	}
+}
+
+func TestSourceValidateFile(t *testing.T) {
+	ok := Source{Repo: "rhasspy/piper-voices", File: "de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx", Revision: "a60bfb135881"}
+	if err := ok.ValidateFile(".onnx"); err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []Source{
+		{Repo: "a/b", File: "ggml-base.bin"},  // wrong extension for .onnx
+		{Repo: "a/b", File: "x/../ggml.onnx"}, // escapes
+		{Repo: "a/b", File: ".onnx"},          // extension only
+		{Repo: "a/b", File: "v.onnx", Revision: "a/b"},
+	} {
+		if err := s.ValidateFile(".onnx"); err == nil {
+			t.Errorf("accepted %+v", s)
+		}
+	}
+}

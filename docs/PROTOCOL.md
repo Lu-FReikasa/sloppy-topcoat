@@ -98,7 +98,7 @@ using the machine, E2-05 B) · `offline` (hub-side only). Precedence when severa
 | `models.list` | – | refresh model inventory |
 | `models.load` | `model`, optional `context_length`, `n_parallel`, `ttl_seconds` | load a model via the runner |
 | `models.unload` | `model` or `all: true` | unload |
-| `models.download` | `source` = `{"type": "huggingface", "repo", "file", optional "revision"}`, optional `target_name` | start download in the background, progress via `download_progress` events |
+| `models.download` | `source` = `{"type": "huggingface", "repo", "file", optional "revision"}`, optional `target_name`, optional `target_kind` (`model` default, `stt`, `tts`; #109) | start download in the background, progress via `download_progress` events |
 | `models.delete` | `model` | delete local files (requires `confirm: true`) |
 | `capability.invoke` | `capability`, `input`, `url_origin`? (`"person"`, only for a capability whose inventory entry has `url_origin: true`) | run one read-only capability of a tool node (E2-04, see "Tool nodes"; `url_origin`: see "Web capabilities") |
 | `capability.execute` | `capability`, `input`, `proposal` (uuid), `hash` (SHA-256 hex) | run one **state-changing** capability the user confirmed (E3-01b, see "Proposals and confirmed execution"); the mirror of `capability.invoke` |
@@ -126,6 +126,19 @@ the hub's action timeout does not apply to the work itself.
   `<data dir>/models/<name>.gguf`, resumed from a `.part` file after interruptions and
   verified against the SHA-256 Hugging Face publishes for the file (LFS `oid`); a mismatch
   deletes the partial file and reports `failed`.
+- `models.download` with `target_kind` `stt` or `tts` (#109) fetches a **voice model** instead, the
+  same way (resumable `.part`, SHA-256, disk check, `busy`, `insufficient_disk`) into
+  `<data dir>/voice-models/<kind>/` (see "Voice capabilities"): `stt` takes a whisper ggml `.bin`
+  (`ggerganov/whisper.cpp`, `ggml-base.bin`), `tts` a Piper voice's `.onnx`, and its `<file>.json`
+  comes along. The name is `target_name` or the file name without `.bin` / `.onnx`; a name that
+  exists in that folder is refused with `invalid_args`. A voice from `rhasspy/piper-voices` without a
+  `revision` is fetched at the pinned `a60bfb135881`; the voice config comes first and is refused
+  (`failed`, before the `.onnx` is fetched) if a phoneme of its `phoneme_id_map` is more than one code
+  point, which the pinned piper binary aborts on. The config is not an LFS file: it is verified
+  against its git blob id (SHA-1 of `blob <size>\0` + content), which is allowed only for that file and
+  up to 1 MiB. The result and every `download_progress` carry `kind`; after `done` the node sends its
+  inventory (the voice capabilities list their models). A node without the feature answers
+  `invalid_args` (unknown `target_kind`), one that cannot download voice models `not_implemented`.
 - `models.delete` → args `model`, `confirm: true`; deletes only files inside the node's own
   `models/` directory (never files in the configured `model_dirs`). Loaded models are
   unloaded first.
@@ -361,8 +374,10 @@ Windows CPU or CUDA 12; no Vulkan build) and Piper (`2023.11.14-2`, the last sta
 short process per request**: no server, no port; audio is written to a temporary directory and removed
 after the request. The builds (up to about 685 MB) are installed in the background when `voice` is switched on;
 the capabilities themselves never download and answer "not installed yet" until the build is there. Models: `<data dir>/voice-models/stt/*.bin` (whisper ggml) and `tts/*.onnx` with
-their `*.onnx.json`. Piper voices must come from a `rhasspy/piper-voices` revision written for that
-binary (before 2026-11-17, e.g. `a60bfb135881`): newer voice configs use phonemes it cannot read.
+their `*.onnx.json`, placed by hand or downloaded with `models.download` and `target_kind` `stt` /
+`tts` (#109, see "Long-running actions"). Piper voices must come from a `rhasspy/piper-voices` revision
+written for that binary (before 2026-11-17, e.g. `a60bfb135881`): newer voice configs use phonemes it
+cannot read.
 
 **Tool mode of the agent (hub).** How the agent talks to a model is set per model — hub setting
 `agent_tool_modes`, `GET/PUT /api/agent/settings` (PUT admin) — to `native` (one function per
@@ -1226,6 +1241,7 @@ Additive changes in v1 (no version bump):
 - D125 (#50): inventory `models[].projector`, `config.runner.projectors`.
 - D126 (#44): `config.images`, inventory `images`.
 - D127 (#53): `config.tools.voice`, capabilities `voice.transcribe`, `voice.speak`.
+- #109: `models.download.target_kind` (`stt`, `tts`), `kind` in its result and in `download_progress`.
 - E3-05 (hub only): memory notes `kind`, `stage`, `expires_at`, `verify_with`, usage and feedback
   counters, status `archived`; `POST /api/memory/{id}/feedback`, `/archive`, `/api/memory/care`;
   runs of kind `care`; agent task origin `care`.

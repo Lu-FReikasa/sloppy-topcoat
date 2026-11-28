@@ -31,6 +31,7 @@ import (
 	"topcoat/node/internal/buildcap"
 	"topcoat/node/internal/buildsvc"
 	"topcoat/node/internal/datadir"
+	"topcoat/node/internal/hf"
 	"topcoat/node/internal/hubtls"
 	"topcoat/node/internal/hubupdate"
 	"topcoat/node/internal/inputhelper"
@@ -383,6 +384,8 @@ func cmdRun(ctx context.Context, args []string, stderr io.Writer) int {
 		opts.NewRunner = realRunner(d.Path, opts.GPU, opts.SysInfo, logger)
 		opts.NewCapabilities = realCapabilities(logger, d.Path, opts.GPU)
 		opts.NewImageRunner = realImageRunner(d.Path, opts.GPU, logger)
+		// UNVERIFIED on real hardware: voice model downloads against the real huggingface.co
+		opts.VoiceModels = &voice.Downloader{DataDir: d.Path, HF: &hf.Client{Token: os.Getenv("HF_TOKEN")}}
 	}
 
 	var bus *servicebus.Bus
