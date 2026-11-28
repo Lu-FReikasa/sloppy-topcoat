@@ -366,3 +366,52 @@ def test_the_whole_guide_comes_in_one_read() -> None:
     whole = topcoat_self.guide("all")
     assert [t["topic"] for t in whole["topics"]] == list(topcoat_self.FEATURES)
     assert all(t["text"] and t["where"] for t in whole["topics"])
+
+
+def test_every_machine_says_whether_its_kind_can_be_switched_in_the_gui(
+    client: TestClient, connect, migrated_db: str
+) -> None:
+    """#222: asked whether a node's compute role can change after the install, the assistant
+    guessed "remove and re-add the node". The node page has the switch; topcoat.state says so."""
+    from sqlalchemy import select, update
+
+    from tests.fakenode import online_node
+    from tests.test_tools import tools_node
+    from topcoat_hub.models import Node
+
+    online_node(client, connect, "node-gpu", loaded=["a-model"])
+    tools_node(client, connect, "vm-tools")
+    online_node(client, connect, "node-old")
+
+    async def without_roles() -> None:  # a config the switch cannot work on (no roles list)
+        async with client.app.state.sessionmaker() as db:
+            node = (await db.execute(select(Node).where(Node.name == "node-old"))).scalar_one()
+            config = {k: v for k, v in node.config.items() if k != "roles"}
+            await db.execute(update(Node).where(Node.id == node.id).values(config=config))
+            await db.commit()
+
+    client.portal.call(without_roles)
+    out = state(client, admin(), what="nodes")
+    # the short rows name only the exception; the full row says it either way
+    kinds = {m["node"]: (m["kind"], m.get("kind_switchable", True)) for m in out["all_machines"]}
+    assert kinds == {
+        "node-gpu": ("compute", True),
+        "vm-tools": ("tools", True),
+        "node-old": ("tools", False),
+    }
+    assert "no reinstall or re-adding" in out["note"]
+    assert "kind_switchable" not in next(m for m in out["all_machines"] if m["node"] == "node-gpu")
+    full = state(client, admin(), what="nodes", id="node-gpu")["all_machines"][0]
+    assert full["kind_switchable"] is True and full["kind"] == "compute"
+    assert full["kind_switch"] == topcoat_self.KIND_SWITCH_WHERE
+    assert "Rights & capabilities" in full["kind_switch"]
+    assert (
+        state(client, admin(), what="nodes", id="node-old")["all_machines"][0]["kind_switch"]
+        is None
+    )
+    # someone who is no admin is told who changes it, not handed the machines
+    bob_id, _ = make_user(migrated_db, "bob3")
+    plain = state(client, Caller(bob_id, False, "agent"), what="nodes")
+    assert "all_machines" not in plain and "changed by an admin" in plain["note"]
+    # the guide says the same: a switch, not a choice at install time
+    assert "kind_switchable" in topcoat_self.guide("machines")["text"]

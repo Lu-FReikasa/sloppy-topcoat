@@ -56,6 +56,7 @@ from topcoat_hub import (
     research_profile,
     secretary,
     tool_groups,
+    unchecked_advice,
     wiki_tools,
 )
 from topcoat_hub.activity import ActivityLog, CheckTrace, ThinkingTrace
@@ -1706,6 +1707,14 @@ async def _answer(
                     yield chat.sse("discard", {})
                     yield chat.sse("delta", {"text": guarded})
                     text = guarded
+                if closing:  # #222: under a report, advice no evidence holds is marked as such;
+                    # before the hub's own lines below, which are not the model's advice
+                    marked, unchecked = unchecked_advice.mark(text, sources, language)
+                    if unchecked:
+                        log.warning("chat: advice under a report without evidence: %s", unchecked)
+                        yield chat.sse("discard", {})
+                        yield chat.sse("delta", {"text": marked})
+                        text = marked
                 note = chat.source_notes(
                     language,
                     chat.unsupported_backrefs(text, visible),
