@@ -1,17 +1,16 @@
-// Setlists: the order of songs for one evening. The hub stores each song as a sheet plus "this
-// version" or "the newest version"; which version is newest is decided here, where the sheets are
-// grouped into songs (group.ts), so a new version shows up in every setlist that wants the newest.
+// Setlists: the order of songs for one evening. The hub stores each song as one of its sheets (and a
+// `newest` flag from the time a setlist could pin a version, #159). A song has one version in use,
+// its newest (group.ts groups the sheets into songs), and every item plays that one, whichever
+// version it was added with: a new version shows up in every setlist at once.
 
-import { groupSheets, matchesSearch, type SheetGroup } from "./group";
+import { groupSheets, inUse, matchesSearch, type SheetGroup } from "./group";
 import type { SetlistItem, SheetSummary } from "./types";
 
 export interface SetlistEntry {
   item: SetlistItem;
-  /** The sheet played for this item; null when it is not in the list (deleted meanwhile). */
+  /** The sheet played for this item, the version in use of its song; null when the sheet the
+   *  item names is not in the list (deleted meanwhile). */
   sheet: SheetSummary | null;
-  /** Which version of its song the sheet is (1 = oldest), and how many there are. */
-  version: number;
-  versions: number;
 }
 
 /** The items as they are played, each resolved to the sheet it opens. */
@@ -21,9 +20,7 @@ export function resolveSetlist(items: SetlistItem[], list: SheetSummary[]): Setl
   for (const g of groups) for (const s of g.versions) songOf.set(s.id, g);
   return items.map((item) => {
     const g = songOf.get(item.sheet_id);
-    if (!g) return { item, sheet: null, version: 0, versions: 0 };
-    const sheet = item.newest ? g.versions[g.versions.length - 1]! : g.versions.find((s) => s.id === item.sheet_id)!;
-    return { item, sheet, version: g.versions.indexOf(sheet) + 1, versions: g.versions.length };
+    return { item, sheet: (g && inUse(g)) ?? null };
   });
 }
 

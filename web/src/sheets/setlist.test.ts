@@ -26,20 +26,18 @@ const LIST = [
 ];
 
 describe("setlists", () => {
-  it("plays a pinned version as it is and a newest item as the newest version of its song", () => {
+  it("plays the version in use of its song, whichever version an item names and whatever its flag", () => {
     const got = resolveSetlist(
       [
         { sheet_id: "a1", newest: false },
         { sheet_id: "a1", newest: true },
-        { sheet_id: "gone", newest: false },
+        { sheet_id: "a2", newest: false },
+        { sheet_id: "b", newest: false },
+        { sheet_id: "gone", newest: true },
       ],
       LIST,
     );
-    expect(got.map((e) => [e.sheet?.id ?? null, e.version, e.versions])).toEqual([
-      ["a1", 1, 2],
-      ["a2", 2, 2],
-      [null, 0, 0],
-    ]);
+    expect(got.map((e) => e.sheet?.id ?? null)).toEqual(["a2", "a2", "a2", "b", null]);
   });
 
   it("pages in setlist order, past a deleted sheet, and through a song played twice", () => {

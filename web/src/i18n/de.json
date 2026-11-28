@@ -4331,6 +4331,7 @@
     "tab": {
       "sheet": "Sheet",
       "sources": "Quellen ({{n}})",
+      "versions": "Versionen ({{n}})",
       "chordpro": "ChordPro"
     },
     "kind": {
@@ -4384,7 +4385,6 @@
       "plain": "Akkorde über Text",
       "save": "Speichern"
     },
-    "version": "v{{n}}",
     "filter": {
       "search": "Songs suchen",
       "artist": "Interpret",
@@ -4445,10 +4445,6 @@
       "keys": "Zum Umsortieren ziehen, oder Alt + ↑/↓ auf einem Lied.",
       "add": "„{{title}}“ hinzufügen",
       "addHint": "Öffne ein Sheet, um es zur Setliste hinzuzufügen.",
-      "which": "Version",
-      "newestOption": "Immer die neueste Version",
-      "thisOption": "Diese Version (v{{n}})",
-      "newest": "neueste (v{{n}})",
       "up": "Nach oben",
       "down": "Nach unten",
       "remove": "Aus der Setliste entfernen",
@@ -4468,10 +4464,17 @@
     },
     "back": "Zurück zur Liste",
     "close": "Schließen",
-    "versions": "Versionen",
     "new": {
       "open": "Neues Sheet …",
       "title": "Neues Sheet"
+    },
+    "versionsTab": {
+      "hint": "Die neueste Version ist die verwendete: Bibliothek, Setlisten, Bühne und Druck öffnen sie. Ältere Versionen bleiben zum Vergleichen.",
+      "open": "offen",
+      "inUse": "verwendet",
+      "from": "Was sich von der Version vom {{when}} zur offenen geändert hat:",
+      "older": "Das ist eine ältere Version des Songs.",
+      "openInUse": "Die verwendete Version öffnen"
     }
   },
   "images": {

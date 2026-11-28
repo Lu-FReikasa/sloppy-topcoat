@@ -26,7 +26,7 @@ import {
   type Fit,
   type SortMode,
 } from "./fit";
-import { artistsOf, type SheetGroup } from "./group";
+import { artistsOf, groupSheets, inUse, songOf, type SheetGroup } from "./group";
 import { PrintDialog, type PrintSong } from "./PrintSheets";
 import { asWritten, collapseRepeats, type BodyItem } from "./collapse";
 import { setlistGroups } from "./setlist";
@@ -149,6 +149,8 @@ export function SheetsPage({ api, id }: Props) {
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => undefined);
   }, [setStage]);
   const groups = useMemo(() => visibleGroups(list ?? [], query, artist, sort), [list, query, artist, sort]);
+  // the versions of the open sheet's song, oldest first (empty until the list is there)
+  const versions = useMemo(() => (id && list ? (songOf(groupSheets(list), id)?.versions ?? []) : []), [id, list]);
   const playGroups = useMemo(() => (playing ? setlistGroups(playing.setlist.items, list ?? []) : null), [playing, list]);
   const play = (setlist: Setlist, from: number) => {
     const songs = setlistGroups(setlist.items, list ?? []);
@@ -252,7 +254,7 @@ export function SheetsPage({ api, id }: Props) {
                 {setlists}
               </aside>
             )}
-            <OpenSheet key={id} api={api} id={id} onChanged={reload} onStage={() => setStage(true)} />
+            <OpenSheet key={id} api={api} id={id} versions={versions} onChanged={reload} onStage={() => setStage(true)} />
           </div>
         </div>
       ) : (
@@ -338,11 +340,11 @@ export function SheetsPage({ api, id }: Props) {
   );
 }
 
-/** The songs to print, in the given order: the newest version of each (a setlist's songs hold
+/** The songs to print, in the given order: the version in use of each (a setlist's songs hold
  *  only the sheet it plays). A song's key tells apart a sheet that is in a setlist twice. */
 function songsOf(groups: SheetGroup[]): PrintSong[] {
   return groups.flatMap((g) => {
-    const s = g.versions[g.versions.length - 1];
+    const s = inUse(g);
     return s ? [{ key: g.key, id: s.id, title: g.title, artist: g.artist }] : [];
   });
 }
@@ -384,9 +386,6 @@ interface ListFilter {
   setSort: (m: SortMode) => void;
 }
 
-/** The sheet a song opens with: its newest version, as the stage and the setlists play it. */
-const newestOf = (g: SheetGroup) => g.versions[g.versions.length - 1];
-
 function SheetTable({
   list,
   groups,
@@ -404,25 +403,9 @@ function SheetTable({
   const { query, setQuery, artist, setArtist, sort, setSort } = filter;
   const artists = useMemo(() => artistsOf(list), [list]);
   const keyOf = (s: SheetSummary) => [s.key, s.capo ? t("sheets.capoN", { n: s.capo }) : ""].filter(Boolean).join(" · ");
-  // v1 v2 …: in their own column on a wide page, under the title (like the artist) on a narrow one
-  const versionLinks = (g: SheetGroup) =>
-    g.versions.length > 1 && (
-      <span className="sheets-versions">
-        {g.versions.map((v, i) => (
-          <a
-            key={v.id}
-            href={sheetsHref(v.id)}
-            onClick={onOpen}
-            title={[keyOf(v), t(`sheets.instrument.${v.instrument}`), v.version_note].filter(Boolean).join(" · ")}
-          >
-            {t("sheets.version", { n: i + 1 })}
-          </a>
-        ))}
-      </span>
-    );
   const openFirst = (e: React.KeyboardEvent) => {
     if (e.key !== "Enter") return;
-    const s = groups[0] && newestOf(groups[0]);
+    const s = groups[0] && inUse(groups[0]);
     if (!s) return;
     e.preventDefault();
     onOpen();
@@ -473,14 +456,12 @@ function SheetTable({
                 {t("sheets.filter.artist")}
               </th>
               <th scope="col">{t("sheets.key")}</th>
-              <th scope="col" className="sheets-col-versions">
-                {t("sheets.versions")}
-              </th>
             </tr>
           </thead>
           <tbody>
             {groups.map((g) => {
-              const s = newestOf(g)!;
+              // one row per song: the title opens the version in use, older ones are not offered here
+              const s = inUse(g)!;
               return (
                 <tr key={g.key}>
                   <td className="sheets-col-title">
@@ -488,11 +469,9 @@ function SheetTable({
                       {g.title}
                     </a>
                     {g.artist && <span className="sheets-row-artist muted small">{g.artist}</span>}
-                    {g.versions.length > 1 && <span className="sheets-row-versions small">{versionLinks(g)}</span>}
                   </td>
                   <td className="sheets-col-artist">{g.artist}</td>
                   <td className="sheets-col-key">{keyOf(s)}</td>
-                  <td className="sheets-col-versions">{versionLinks(g)}</td>
                 </tr>
               );
             })}
@@ -628,13 +607,27 @@ function PasteForm({ api, onSaved, onError }: { api: ApiClient; onSaved: () => v
   );
 }
 
-function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string; onChanged: () => void; onStage: () => void }) {
+/** The open sheet. `versions` are the versions of its song, oldest first: with more than one, a
+ *  "Versions" tab compares the open one with the others (read-only, #159). */
+function OpenSheet({
+  api,
+  id,
+  versions,
+  onChanged,
+  onStage,
+}: {
+  api: ApiClient;
+  id: string;
+  versions: SheetSummary[];
+  onChanged: () => void;
+  onStage: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const [sheet, setSheet] = useState<SheetDetail | null>(null);
   const [instrument, setInstrument] = useState<Instrument | null>(null);
   const [transpose, setTranspose] = useState(0);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"sheet" | "sources" | "chordpro">("sheet");
+  const [tab, setTab] = useState<"sheet" | "sources" | "versions" | "chordpro">("sheet");
   const [printing, setPrinting] = useState(false);
   const [collapse, setCollapse] = useState(false);
   const fail = useCallback((e: unknown) => setError(describeError(toActionError(e), t, i18n)), [t, i18n]);
@@ -645,6 +638,10 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
 
   if (!sheet) return error ? <p className="error">{error}</p> : <p className="muted">{t("sheets.loading")}</p>;
   const v = sheet.view;
+  // the version in use of the song; an older one is still opened by an old link (a research's)
+  const current = versions[versions.length - 1];
+  const older = versions.length > 1 && !!current && current.id !== id;
+  const tabs = versions.length > 1 ? (["sheet", "sources", "versions", "chordpro"] as const) : (["sheet", "sources", "chordpro"] as const);
   const shownInstrument = instrument ?? sheet.instrument;
   const toggleCapo = () =>
     api.sheetUpdate(id, { capo_view: !sheet.capo_view }).then(() => {
@@ -678,6 +675,11 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
           {v.capo_view && v.key && <span className="muted">{t("sheets.soundingIn", { key: v.key })}</span>}
           {sheet.version_note && <span className="muted">{sheet.version_note}</span>}
         </div>
+        {older && (
+          <p className="sheet-older small" data-testid="sheet-older">
+            {t("sheets.versionsTab.older")} <a href={sheetsHref(current.id)}>{t("sheets.versionsTab.openInUse")}</a>
+          </p>
+        )}
         <div className="sheet-controls">
           <button type="button" onClick={onStage} data-testid="sheet-stage-open">
             {t("sheets.stage.open")}
@@ -720,9 +722,9 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
         </div>
         <Flow sheet={sheet} />
         <div className="sheet-tabs" role="tablist">
-          {(["sheet", "sources", "chordpro"] as const).map((k) => (
+          {tabs.map((k) => (
             <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>
-              {t(`sheets.tab.${k}`, { n: sheet.sources })}
+              {t(`sheets.tab.${k}`, { n: k === "versions" ? versions.length : sheet.sources })}
             </button>
           ))}
         </div>
@@ -739,6 +741,7 @@ function OpenSheet({ api, id, onChanged, onStage }: { api: ApiClient; id: string
       {error && <p className="error">{error}</p>}
       {tab === "sheet" && <Body items={collapse ? collapseRepeats(v.sections) : asWritten(v.sections)} />}
       {tab === "sources" && <Sources api={api} sheet={sheet} />}
+      {tab === "versions" && <Versions api={api} id={id} versions={versions} />}
       {tab === "chordpro" && <pre className="sheet-chordpro">{v.chordpro}</pre>}
     </article>
   );
@@ -830,7 +833,7 @@ function Sources({ api, sheet }: { api: ApiClient; sheet: SheetDetail }) {
   const [error, setError] = useState("");
   useEffect(() => {
     if (open === null) return;
-    api.sheetCompare(sheet.id, open).then(
+    api.sheetCompare(sheet.id, { source: open }).then(
       (data) => setCmp({ source: open, data }),
       (e) => setError(describeError(toActionError(e), t, i18n)),
     );
@@ -858,6 +861,69 @@ function Sources({ api, sheet }: { api: ApiClient; sheet: SheetDetail }) {
       </ul>
       {error && <p className="error">{error}</p>}
       {open !== null && cmp?.source === open && <Comparison cmp={cmp.data} />}
+    </div>
+  );
+}
+
+/** The versions of the open sheet's song, oldest first, each with when it was made, its key and
+ *  its note. Comparing one shows what changed from it to the open sheet. Only to look at: the
+ *  version in use is always the newest (#159). */
+function Versions({ api, id, versions }: { api: ApiClient; id: string; versions: SheetSummary[] }) {
+  const { t, i18n } = useTranslation();
+  const [open, setOpen] = useState<string | null>(null);
+  // the comparison with the version it belongs to: a slow answer for another one is not shown
+  const [cmp, setCmp] = useState<{ other: string; data: SheetComparison } | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (open === null) return;
+    // the picked version first, the open one second: the differences read "then → now"
+    api.sheetCompare(open, { other: id }).then(
+      (data) => setCmp({ other: open, data }),
+      (e) => setError(describeError(toActionError(e), t, i18n)),
+    );
+  }, [api, id, open, t, i18n]);
+  const when = (s: SheetSummary) => {
+    const at = s.created_at ?? s.updated_at;
+    return at ? new Date(at).toLocaleString(i18n.language, { dateStyle: "medium", timeStyle: "short" }) : "";
+  };
+  const inUseId = versions[versions.length - 1]?.id;
+  return (
+    <div className="sheet-sources sheet-versions" data-testid="sheet-versions">
+      <p className="muted small">{t("sheets.versionsTab.hint")}</p>
+      <ul>
+        {versions.map((s) => (
+          <li key={s.id} className={open === s.id ? "is-open" : undefined}>
+            {s.id === id ? (
+              <span className="sheets-badge">{t("sheets.versionsTab.open")}</span>
+            ) : (
+              <button type="button" className="link-button" onClick={() => {
+                  setError("");
+                  setOpen(open === s.id ? null : s.id);
+                }}
+                aria-expanded={open === s.id}
+              >
+                {t("sheets.compare")}
+              </button>
+            )}{" "}
+            <span>{when(s)}</span>
+            {s.key && <span className="muted small"> · {[s.key, s.capo ? t("sheets.capoN", { n: s.capo }) : ""].filter(Boolean).join(" · ")}</span>}
+            {s.version_note && <span className="muted small"> · {s.version_note}</span>}
+            {s.id === inUseId && (
+              <>
+                {" "}
+                <span className="sheets-badge">{t("sheets.versionsTab.inUse")}</span>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      {error && <p className="error">{error}</p>}
+      {open !== null && cmp?.other === open && (
+        <>
+          <p className="small">{t("sheets.versionsTab.from", { when: when(versions.find((s) => s.id === open) ?? versions[0]!) })}</p>
+          <Comparison cmp={cmp.data} />
+        </>
+      )}
     </div>
   );
 }

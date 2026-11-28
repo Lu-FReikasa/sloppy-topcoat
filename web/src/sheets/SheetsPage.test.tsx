@@ -114,7 +114,7 @@ describe("Sheets", () => {
     expect(artistsOf(groups.flatMap((g) => g.versions))).toEqual(["Oasis", "the beatles"]);
   });
 
-  it("shows the library full width: search first, songs as a table with their versions, unfinished researches", async () => {
+  it("shows the library full width: search first, one row per song, unfinished researches", async () => {
     const failed: SheetResearchJob = { ...JOB, id: "j2", song: "Lost Song", status: "failed", error: "no web", sheet_id: null };
     const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song", artist: "Other Band", key: "E", capo: 0, created_at: "2026-11-19T12:00:00Z" };
     const { api } = client({
@@ -136,20 +136,14 @@ describe("Sheets", () => {
     // search comes before sort and artist
     const fields = [...screen.getByTestId("sheets").querySelectorAll(".sheets-filter > *")].map((el) => el.getAttribute("aria-label"));
     expect(fields[0]).toMatch(/Search songs|Songs suchen/);
-    // one row per song; the title opens the newest version, v1 and v2 open each one
+    // one row per song; the title opens the version in use (the newest), no version links (#159)
     const rows = within(table).getAllByRole("row").slice(1);
     expect(rows.map((r) => r.querySelector(".sheets-col-title a")?.textContent)).toEqual(["Example Song", "Zebra Song"]);
     expect(rows[0]!.querySelector(".sheets-col-title a")?.getAttribute("href")).toBe("#/sheets/s3");
     expect(rows[0]!.querySelector(".sheets-col-key")?.textContent).toBe("C");
-    // v1 v2 sit in their own column on a wide page and under the title on a narrow one (CSS picks one)
-    for (const place of [".sheets-col-versions", ".sheets-row-versions"]) {
-      expect([...rows[0]!.querySelectorAll(`${place} a`)].map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
-        ["v1", "#/sheets/s1"],
-        ["v2", "#/sheets/s3"],
-      ]);
-    }
-    expect(rows[1]!.querySelector(".sheets-col-versions")?.textContent).toBe("");
-    expect(rows[1]!.querySelector(".sheets-row-versions")).toBeNull();
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(3);
+    expect(rows[0]!.querySelectorAll("a")).toHaveLength(1);
+    expect(table.textContent).not.toMatch(/\bv[12]\b/);
 
     // a finished research is its sheet in the list; a failed one stays with its reason
     const jobs = screen.getByTestId("sheets-jobs");
@@ -274,6 +268,68 @@ describe("Sheets", () => {
     expect(within(cmp).getByText("second adds detail")).toBeTruthy();
   });
 
+  it("compares the open sheet with the other versions of its song, read-only", async () => {
+    // "Example Song" in two versions: s1 older, s3 newer (in use); "Zebra Song" once
+    const s1 = { ...SUMMARY, version_note: "live", created_at: "2026-11-20T10:00:00Z" };
+    const s3 = { ...SUMMARY, id: "s3", key: "C", capo: 0, version_note: "", created_at: "2026-11-21T10:00:00Z" };
+    const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song", created_at: "2026-11-19T10:00:00Z" };
+    const cmp = {
+      against: { sheet: "s3" },
+      key_a: "A",
+      key_b: "C",
+      shift: 3,
+      capo_a: 2,
+      capo_b: 0,
+      lyrics_similarity: 1,
+      chords_similarity: 0.8,
+      differences: [{ kind: "chords", where: "Verse 1, line 1", a: "G D", b: "G Dsus4", note: "" }],
+      counts: { chords: 1 },
+    };
+    const { api, calls } = client({
+      "GET /api/sheets": { sheets: [s3, zebra, s1] },
+      "GET /api/sheets/research": { jobs: [] },
+      "GET /api/sheets/s3": { ...detail(true, ["G", "D"]), id: "s3" },
+      "GET /api/sheets/s1": detail(true, ["G", "D"]),
+      "GET /api/sheets/s9": { ...detail(true, ["G", "D"]), id: "s9" },
+      "GET /api/sheets/s1/compare?other=s3": cmp,
+    });
+    const { unmount } = render(<SheetsPage api={api} id="s3" />);
+    let sheet = await screen.findByTestId("sheet");
+    // the version in use: no note about an older one; the tab counts the song's versions
+    expect(within(sheet).queryByTestId("sheet-older")).toBeNull();
+    fireEvent.click(await within(sheet).findByRole("tab", { name: /^(Versions|Versionen) \(2\)$/ }));
+    const tab = within(sheet).getByTestId("sheet-versions");
+    const rows = within(tab).getAllByRole("listitem");
+    expect(rows).toHaveLength(2);
+    // the open one is marked and not offered; the older one is offered for comparison
+    expect(within(rows[1]!).queryByRole("button")).toBeNull();
+    expect(rows[1]!.textContent).toMatch(/in use|verwendet/);
+    expect(rows[0]!.textContent).toMatch(/live/);
+    fireEvent.click(within(rows[0]!).getByRole("button", { name: /Compare|Vergleichen/ }));
+    const diff = await within(tab).findByTestId("sheet-compare");
+    expect(within(diff).getByText("G Dsus4")).toBeTruthy();
+    // the older version first, the open one second; nothing is changed
+    expect(calls.some((c) => c.url.endsWith("/api/sheets/s1/compare?other=s3"))).toBe(true);
+    expect(calls.filter((c) => c.method !== "GET")).toEqual([]);
+    // there is no "use this version": the newest is always the one in use
+    expect(within(tab).queryByRole("button", { name: /use|verwenden/i })).toBeNull();
+    unmount();
+
+    // an old link opens an older version: it says so and links to the version in use
+    const second = render(<SheetsPage api={api} id="s1" />);
+    sheet = await screen.findByTestId("sheet");
+    const older = await within(sheet).findByTestId("sheet-older");
+    expect(within(older).getByRole("link").getAttribute("href")).toBe("#/sheets/s3");
+    second.unmount();
+
+    // a song with one version has no Versions tab (once the list is there: the Setlist button)
+    render(<SheetsPage api={api} id="s9" />);
+    sheet = await screen.findByTestId("sheet");
+    await screen.findByRole("button", { name: /^Setlist$/ });
+    expect(within(sheet).getAllByRole("tab")).toHaveLength(3);
+    expect(within(sheet).queryByRole("tab", { name: /Versions|Versionen/ })).toBeNull();
+  });
+
   it("starts a research", async () => {
     const { api, calls } = client({
       "GET /api/sheets": { sheets: [] },
@@ -357,7 +413,7 @@ describe("Sheets", () => {
     expect(window.location.hash).toBe("#/sheets/s9");
   });
 
-  it("plays a setlist on the stage: the pedal pages in setlist order, the newest version, a song twice", async () => {
+  it("plays a setlist on the stage: the pedal pages in setlist order, the version in use, a song twice", async () => {
     // "Example Song" in two versions (s1 older, s2 newer), "Zebra Song" once
     const s2 = { ...SUMMARY, id: "s2", created_at: "2026-11-21T10:00:00Z" };
     const zebra = { ...SUMMARY, id: "s9", title: "Zebra Song", created_at: "2026-11-20T10:00:00Z" };
@@ -367,7 +423,8 @@ describe("Sheets", () => {
       name: "Gig",
       items: [
         { sheet_id: "s9", newest: false },
-        { sheet_id: "s1", newest: true },
+        // an item from the time a setlist could pin a version: it still plays the version in use
+        { sheet_id: "s1", newest: false },
         { sheet_id: "s9", newest: false },
       ],
       updated_at: null,
@@ -392,8 +449,9 @@ describe("Sheets", () => {
       "Example Song",
       "Zebra Song",
     ]);
-    // the newest item names the version it plays now
-    expect(items.textContent).toMatch(/(newest|neueste) \(v2\)/);
+    // no version is named: each item plays the version in use of its song (#159)
+    expect(items.textContent).not.toMatch(/\bv\d\b|newest|neueste/);
+    expect(within(items).getByRole("link", { name: "Example Song" }).getAttribute("href")).toBe("#/sheets/s2");
     fireEvent.click(within(panel).getByTestId("setlist-play"));
     // paging happens inside the stage: the address stays until the stage is left
     const at = async (n: number) =>
@@ -558,14 +616,15 @@ describe("Sheets", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Setlist$/ }));
     const panel = await screen.findByTestId("setlists");
     await within(panel).findByTestId("setlist-items");
-    fireEvent.change(within(panel).getByLabelText(/^(Version)$/), { target: { value: "this" } });
+    // no choice of version when adding: the item plays the song's version in use
+    expect(within(panel).queryByLabelText(/^(Version)$/)).toBeNull();
     fireEvent.click(within(panel).getByTestId("setlist-add"));
     const patches = () => calls.filter((c) => c.method === "PATCH").map((c) => c.body);
     await waitFor(() =>
       expect(patches().at(-1)).toEqual({
         items: [
           { sheet_id: "s9", newest: false },
-          { sheet_id: "s1", newest: false },
+          { sheet_id: "s1", newest: true },
         ],
       }),
     );
@@ -574,7 +633,7 @@ describe("Sheets", () => {
     await waitFor(() =>
       expect(patches().at(-1)).toEqual({
         items: [
-          { sheet_id: "s1", newest: false },
+          { sheet_id: "s1", newest: true },
           { sheet_id: "s9", newest: false },
         ],
       }),

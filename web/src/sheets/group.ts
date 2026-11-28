@@ -22,6 +22,17 @@ export interface SheetGroup {
   versions: SheetSummary[];
 }
 
+/** The version of a song in use: its newest. The library, the setlists, the stage and print open
+ *  this one; older versions are only looked at in the open sheet's "Versions" tab (#159). */
+export function inUse(g: SheetGroup): SheetSummary | undefined {
+  return g.versions[g.versions.length - 1];
+}
+
+/** The song a sheet is a version of, or undefined when the sheet is not in the list. */
+export function songOf(groups: SheetGroup[], id: string): SheetGroup | undefined {
+  return groups.find((g) => g.versions.some((s) => s.id === id));
+}
+
 /** The sheets grouped by song (title and artist), the songs by title. */
 export function groupSheets(list: SheetSummary[]): SheetGroup[] {
   const groups = new Map<string, SheetGroup>();

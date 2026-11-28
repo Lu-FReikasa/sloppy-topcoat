@@ -676,11 +676,11 @@ export class ApiClient {
     return this.request<void>("DELETE", `/api/sheets/${encodeURIComponent(id)}`);
   }
 
-  sheetCompare(id: string, source: number): Promise<SheetComparison> {
-    return this.request<SheetComparison>(
-      "GET",
-      `/api/sheets/${encodeURIComponent(id)}/compare?source=${source}`,
-    );
+  /** The sheet against one of its sources (by index) or another sheet of the person (an older or
+   *  newer version of the song): what differs from `id` to the other. */
+  sheetCompare(id: string, against: { source: number } | { other: string }): Promise<SheetComparison> {
+    const qs = "source" in against ? `source=${against.source}` : `other=${encodeURIComponent(against.other)}`;
+    return this.request<SheetComparison>("GET", `/api/sheets/${encodeURIComponent(id)}/compare?${qs}`);
   }
 
   setlists(): Promise<{ setlists: Setlist[] }> {

@@ -116,26 +116,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-.sheets-versions {
-  display: inline-flex;
-  flex-wrap: nowrap;
-  white-space: nowrap;
-  gap: 0.15rem 0.6rem;
-}
-
-.sheets-versions a {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-/* the artist and the versions under the title on narrow screens, in their own columns on wide ones */
+/* the artist under the title on narrow screens, in its own column on wide ones */
 .sheets-row-artist {
   display: block;
   overflow-wrap: anywhere;
-}
-
-.sheets-row-versions {
-  display: block;
 }
 
 /* on a narrow page the column titles lose their letter spacing; they and the key ("B · Capo 2")
@@ -151,19 +135,16 @@
   }
 }
 
-.sheets-col-artist,
-.sheets-col-versions {
+.sheets-col-artist {
   display: none;
 }
 
 @container (min-width: 560px) {
-  .sheets-row-artist,
-  .sheets-row-versions {
+  .sheets-row-artist {
     display: none;
   }
 
-  .sheets-col-artist,
-  .sheets-col-versions {
+  .sheets-col-artist {
     display: table-cell;
   }
 }
@@ -378,6 +359,8 @@
 
 .sheet-tabs {
   display: flex;
+  /* four tabs with "Versions" (#159): on a phone they wrap instead of running off the page */
+  flex-wrap: wrap;
   gap: 0.25rem;
   border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
 }
@@ -469,6 +452,10 @@
 .sheet-chordpro {
   white-space: pre-wrap;
   font-size: 0.85rem;
+}
+
+.sheet-older {
+  margin: 0.35rem 0 0;
 }
 
 .sheet-sources ul {
