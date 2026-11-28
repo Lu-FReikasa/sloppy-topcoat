@@ -97,6 +97,21 @@ func (a *Agent) claimTransfer(id, role string) (*transferRun, context.Context, *
 	return run, ctx, nil
 }
 
+// xferEnd is how a transfer ended: the final transfer_progress event.
+type xferEnd struct {
+	status string // "done" or "failed"
+	done   int64
+	code   string
+	err    error
+}
+
+// finishTransfer frees the transfer slot and then reports the end. In this order a hub that
+// starts the next transfer as soon as it sees done/failed never finds this one still open.
+func (a *Agent) finishTransfer(run *transferRun, total int64, end xferEnd) {
+	a.releaseTransfer(run)
+	a.emitTransfer(run.id, run.role, end.status, end.done, total, end.code, end.err)
+}
+
 func (a *Agent) releaseTransfer(run *transferRun) {
 	run.cancel(nil)
 	a.mu.Lock()
@@ -200,16 +215,18 @@ func (a *Agent) actModelsSend(_ context.Context, args map[string]json.RawMessage
 		a.bg.Add(1)
 		go func() {
 			defer a.bg.Done()
-			defer a.releaseTransfer(run)
-			a.runSend(ctx, run, model, path, size, token, peers)
+			defer a.releaseTransfer(run) // a no-op after finishTransfer; frees the slot on a panic
+			a.finishTransfer(run, size, a.runSend(ctx, run, model, path, size, token, peers))
 		}()
 	}
 }
 
-func (a *Agent) runSend(ctx context.Context, run *transferRun, model, path string, size int64, token string, peers []string) {
+// runSend serves the file until the target has it; the caller reports the end. The socket is
+// closed when it returns.
+func (a *Agent) runSend(ctx context.Context, run *transferRun, model, path string, size int64, token string, peers []string) xferEnd {
 	id := run.id
 	var last lastProgress
-	fail := func(err error) {
+	fail := func(err error) xferEnd {
 		code := xferInternal
 		if ctx.Err() != nil {
 			code, err = xferCanceled, context.Cause(ctx)
@@ -217,13 +234,12 @@ func (a *Agent) runSend(ctx context.Context, run *transferRun, model, path strin
 			code = xferTimeout
 		}
 		a.log.Warn("model send failed", "transfer_id", id, "model", model, "code", code, "err", err)
-		a.emitTransfer(id, "send", "failed", last.get(), size, code, err)
+		return xferEnd{status: "failed", done: last.get(), code: code, err: err}
 	}
 	a.log.Info("model send: hashing", "transfer_id", id, "model", model, "bytes", size)
 	sum, err := hashFile(ctx, path, size)
 	if err != nil {
-		fail(err)
-		return
+		return fail(err)
 	}
 	tc := a.transferSettings()
 	progress := a.throttledProgress(id, "send", &last)
@@ -233,8 +249,7 @@ func (a *Agent) runSend(ctx context.Context, run *transferRun, model, path strin
 		Progress: func(done, total int64) { progress(done, total) },
 	})
 	if err != nil {
-		fail(err)
-		return
+		return fail(err)
 	}
 	defer srv.Close()
 	addrs := a.addresses()
@@ -247,11 +262,10 @@ func (a *Agent) runSend(ctx context.Context, run *transferRun, model, path strin
 		"port": srv.Port(), "addresses": addrs, "cert_sha256": srv.CertSHA256(),
 	})
 	if err := srv.Wait(); err != nil {
-		fail(err)
-		return
+		return fail(err)
 	}
 	a.log.Info("model sent", "transfer_id", id, "model", model)
-	a.emitTransfer(id, "send", "done", size, size, "", nil)
+	return xferEnd{status: "done", done: size}
 }
 
 // transferSettings is the effective config.transfer.
@@ -370,8 +384,12 @@ func (a *Agent) actModelsReceive(ctx context.Context, args map[string]json.RawMe
 		a.bg.Add(1)
 		go func() {
 			defer a.bg.Done()
-			defer a.releaseTransfer(run)
-			a.runReceive(rctx, run, name, dir, dest, size, sum, token, certFP, endpoints)
+			defer a.releaseTransfer(run) // a no-op after finishTransfer; frees the slot on a panic
+			end := a.runReceive(rctx, run, name, dir, dest, size, sum, token, certFP, endpoints)
+			a.finishTransfer(run, size, end)
+			if end.status == "done" {
+				a.sendInventory(a.jobCtx())
+			}
 		}()
 	}
 }
@@ -411,7 +429,8 @@ func (a *Agent) checkTransferDisk(dir, dest string, size int64) error {
 	return nil
 }
 
-func (a *Agent) runReceive(ctx context.Context, run *transferRun, name, dir, dest string, size int64, sum, token, certFP string, endpoints []string) {
+// runReceive pulls the file from the source; the caller reports the end.
+func (a *Agent) runReceive(ctx context.Context, run *transferRun, name, dir, dest string, size int64, sum, token, certFP string, endpoints []string) xferEnd {
 	id := run.id
 	var last lastProgress
 	progress := a.throttledProgress(id, "receive", &last)
@@ -434,10 +453,8 @@ func (a *Agent) runReceive(ctx context.Context, run *transferRun, name, dir, des
 			code = xferTimeout
 		}
 		a.log.Warn("model receive failed", "transfer_id", id, "model", name, "code", code, "err", err)
-		a.emitTransfer(id, "receive", "failed", last.get(), size, code, err)
-		return
+		return xferEnd{status: "failed", done: last.get(), code: code, err: err}
 	}
 	a.log.Info("model received", "transfer_id", id, "model", name)
-	a.emitTransfer(id, "receive", "done", size, size, "", nil)
-	a.sendInventory(a.jobCtx())
+	return xferEnd{status: "done", done: size}
 }

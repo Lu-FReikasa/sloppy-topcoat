@@ -2105,8 +2105,21 @@ async def _stream_turn(
     run = await _launch(request, user, turn, pipeline.pipeline(request, user, turn, tools, outcome))
     failed = await asyncio.shield(outcome)
     if failed is not None:
+        await _until_settled(run)
         return failed
     return _sse_response(run.subscribe(0))
+
+
+SETTLE_WAIT_SECONDS = 5.0
+
+
+async def _until_settled(run: AnswerRun) -> None:
+    """A run that failed before its first byte ends right after it says so; its placeholder
+    message is removed only when it is settled. Wait for that, so that whoever got the error and
+    reads the conversation (or tries again) finds only what was kept (#107). Waiting never
+    cancels the run."""
+    if run.task is not None:
+        await asyncio.wait({run.task}, timeout=SETTLE_WAIT_SECONDS)
 
 
 HUB_NOTICE = (
@@ -2150,6 +2163,7 @@ async def speak_up(
         )
         if await asyncio.shield(outcome) is None:
             break
+        await _until_settled(run)
         run = None
     if run is None:
         return False

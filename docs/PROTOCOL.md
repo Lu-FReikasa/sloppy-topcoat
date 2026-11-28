@@ -1152,7 +1152,8 @@ a message id has an effect).
   transferred_bytes, total_bytes, error_code?, error?}` from both sides, throttled to about 2 s.
   `error_code` is one of `no_route`, `hash_mismatch`, `insufficient_disk`, `timeout`, `canceled`,
   `busy`, `internal`. The hub accepts `send` events from the source and `receive` events from the
-  target only, for a transfer it is coordinating.
+  target only, for a transfer it is coordinating. A node sends its final `done` or `failed` only after it has freed its
+  transfer slot (and closed the socket of a send), so the hub may start the next transfer at once.
 
 **Inventory.** `hardware.addresses`: unicast IPs of the node (no loopback, no link-local), at most 16.
 The GUI node summary exposes it as `addresses`, and `allowed_actions` from the node's config.
