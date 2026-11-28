@@ -100,7 +100,7 @@ using the machine, E2-05 B) · `offline` (hub-side only). Precedence when severa
 | `models.unload` | `model` or `all: true` | unload |
 | `models.download` | `source` = `{"type": "huggingface", "repo", "file", optional "revision"}`, optional `target_name` | start download in the background, progress via `download_progress` events |
 | `models.delete` | `model` | delete local files (requires `confirm: true`) |
-| `capability.invoke` | `capability`, `input` | run one read-only capability of a tool node (E2-04, see "Tool nodes") |
+| `capability.invoke` | `capability`, `input`, `url_origin`? (`"person"`, only for a capability whose inventory entry has `url_origin: true`) | run one read-only capability of a tool node (E2-04, see "Tool nodes"; `url_origin`: see "Web capabilities") |
 | `capability.execute` | `capability`, `input`, `proposal` (uuid), `hash` (SHA-256 hex) | run one **state-changing** capability the user confirmed (E3-01b, see "Proposals and confirmed execution"); the mirror of `capability.invoke` |
 | `build.manage` | `capability`, `input` | run one step of the build service (NS-01, D80; see "Build service"): only a capability named `build.*` with `manage: true`; the hub starts it only on a signed-in admin's click on the Releases page; the build service never signs |
 | `hub.manage` | `capability`, `input` | run the roll-out of the hub on the production host (NS-01, phase 5): only the capability `hub.update` (`image`, `digest`, optional `dry_run`), which checks that the image on the host has the digest that was built and tested and then runs `deploy/update-hub.sh` (revision check, dump, health check, automatic way back); the hub sends it only on the admin's own click |
@@ -965,6 +965,31 @@ domain (`.lan`, `.local`, `.internal`, `.home.arpa`, `.localdomain`, `.intranet`
 error code **`private_data`** (`common.schema.json`; the message names the kinds, never the value;
 the node's log does not hold the input either). The hub keeps no input of a `private_data` result in
 the audit row or the task step.
+
+**Where a fetched URL comes from (security audit 2026-11-27).** A model that read an injected page
+could write what it read elsewhere (a file, a note, the chat) into a URL and fetch it; the check above
+sees addresses and secret shapes, not that. So a model's `web.fetch` (and the picture of
+`research.report.image`) reads only a URL it was **given**: a hit of this run's `web.search`
+(`results[].url`) or `web.images` (`image`, `thumbnail`, `page`), the final address or a picture
+(`images[].url`) of a page this run read, or a URL in the **person's own message**. Compared after
+lower-casing scheme and host and dropping the fragment and user part; the query must match exactly.
+Anything else is refused before the node is asked, after the private-data check, with the code
+`url_not_given` ("this URL did not come from this run: …", the model is told to search for the page
+first); the refusal is an audit row whose input is withheld, and the task step keeps no input either
+(a made-up URL may carry what the run read). The hub keeps these per run (`web_access.WebOrigins`,
+in the agent loop and the incognito chat; a picture of `research.report.image` is refused as
+`web_limit`); the person's URLs are the
+URLs of the task prompt, except for runs whose prompt the hub wrote from a model's text (`review`,
+`planner`, `child`, `care`), and in the incognito chat the person's messages of the tab.
+The node checks again: a node whose inventory entry for `web.fetch` / `web.image` says
+`url_origin: true` reads only a URL it handed out itself as a hit (the same kinds, kept 6 h, at most
+4096) unless the `capability.invoke` action carries `url_origin: "person"`, set by the hub outside
+the capability's input, so no model can set it: for a call the person makes by hand (GUI, API key),
+for a URL from the person's message, and for a URL the hub builds itself from the person's request
+(the lyrics lookup of Sheets). Otherwise the node answers `invalid_args` with the same reason. The
+hub sends `url_origin` only to a node that announces it (an older node would refuse the key).
+**Update the hub before the nodes**: an older hub never vouches, so a new node fetches only its own
+hits for it.
 
 **The web budget (hub, per run).** At most `TOPCOAT_AGENT_MAX_WEB_SEARCHES` (3) searches and
 `TOPCOAT_AGENT_MAX_WEB_FETCHES` (2) pages per question, and none once a fetched page with ≥ 500

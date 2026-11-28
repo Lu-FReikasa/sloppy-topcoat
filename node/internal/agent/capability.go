@@ -31,7 +31,7 @@ func (a *Agent) capabilityInfos() []protocol.CapabilityInfo {
 	for _, n := range reg.Names() {
 		c, _ := reg.Get(n)
 		info := capability.InfoOf(c)
-		out = append(out, protocol.CapabilityInfo{Name: n, Description: info.Description, ReadOnly: info.ReadOnly, Scratch: info.Scratch, Manage: info.Manage, InputSchema: c.InputSchema()})
+		out = append(out, protocol.CapabilityInfo{Name: n, Description: info.Description, ReadOnly: info.ReadOnly, Scratch: info.Scratch, Manage: info.Manage, URLOrigin: info.URLOrigin, InputSchema: c.InputSchema()})
 	}
 	return out
 }
@@ -40,7 +40,7 @@ func (a *Agent) capabilityInfos() []protocol.CapabilityInfo {
 // capability must be switched on in config.capabilities and read-only — a capability that changes
 // something is never run by this action (D15: it needs a confirmation of that single action).
 func (a *Agent) actCapabilityInvoke(ctx context.Context, args map[string]json.RawMessage) (any, *protocol.Error, func()) {
-	if perr := onlyKeys(args, "capability", "input", "repo"); perr != nil {
+	if perr := onlyKeys(args, "capability", "input", "repo", "url_origin"); perr != nil {
 		return nil, perr, nil
 	}
 	return a.runCapability(ctx, args, runInvoke)
@@ -167,6 +167,18 @@ func (a *Agent) runCapability(ctx context.Context, args map[string]json.RawMessa
 			return nil, errorf(protocol.ErrInvalidArgs, "repo must hold url and branch"), nil
 		}
 		ctx = workshop.WithSpec(ctx, spec)
+	}
+	// the hub vouches that a web URL is the person's own, not one a model made up (finding 03);
+	// only capability.invoke takes it (the other actions refuse the key above)
+	if raw, has := args["url_origin"]; has {
+		var origin string
+		if err := json.Unmarshal(raw, &origin); err != nil || origin != "person" {
+			return nil, errorf(protocol.ErrInvalidArgs, `url_origin must be "person"`), nil
+		}
+		if !tools.URLOriginCapabilities[name] {
+			return nil, errorf(protocol.ErrInvalidArgs, "capability %s takes no url_origin", name), nil
+		}
+		ctx = tools.WithPersonURL(ctx)
 	}
 	select {
 	case a.capSem <- struct{}{}:

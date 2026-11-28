@@ -118,6 +118,9 @@ func NewRegistry(o Options) *capability.Registry {
 		c = ExecCommander{}
 	}
 	o.Commander = c
+	if o.Web.Seen == nil { // one memory for all web capabilities of this node
+		o.Web.Seen = NewURLMemory()
+	}
 	if o.Connectors != nil && o.Connectors.Omada != nil {
 		o.omada = newOmadaClient(o.Connectors.Omada)
 	}

