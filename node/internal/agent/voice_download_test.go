@@ -76,22 +76,30 @@ func TestVoiceModelDownloadOverSession(t *testing.T) {
 	if res := hc.action(t, "models.download", voiceArgs("tts", "a/b", "de_DE-thorsten-medium.onnx")); res.OK || res.Error.Code != protocol.ErrBusy {
 		t.Fatalf("%+v", res)
 	}
+	if res := hc.action(t, "models.download", voiceArgs("stt", "a/b", "de_DE-thorsten-medium.bin")); !res.OK {
+		t.Fatalf("a whisper model of the voice's name: %+v", res.Error)
+	}
 	close(vm.release)
-	for {
+	done := map[string]bool{}
+	for len(done) < 2 {
 		d := hc.waitEvent(t, protocol.EventDownloadProgress)
-		if d["kind"] != "tts" || d["model"] != "de_DE-thorsten-medium" {
+		if d["model"] != "de_DE-thorsten-medium" || (d["kind"] != "tts" && d["kind"] != "stt") {
 			t.Fatalf("%v", d)
 		}
 		if d["status"] == "done" {
 			if d["downloaded_bytes"].(float64) != 10 {
 				t.Fatalf("%v", d)
 			}
-			break
+			done[d["kind"].(string)] = true
 		}
 	}
 	hc.waitType(t, protocol.TypeInventory)
 	vm.mu.Lock()
-	if len(vm.got) != 1 || vm.got[0].Revision != voice.PiperVoicesRevision {
+	revs := map[string]string{}
+	for _, g := range vm.got {
+		revs[g.Kind] = g.Revision
+	}
+	if len(vm.got) != 2 || revs["tts"] != voice.PiperVoicesRevision || revs["stt"] != "main" {
 		t.Fatalf("%+v", vm.got)
 	}
 	vm.mu.Unlock()

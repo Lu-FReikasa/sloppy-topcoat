@@ -78,7 +78,7 @@ func (d *Downloader) Name(req *DownloadRequest) (string, error) {
 		ext = ".bin"
 	case KindTTS:
 		ext = ".onnx"
-		if req.Revision == "" && req.Repo == PiperVoicesRepo {
+		if req.Revision == "" && strings.EqualFold(req.Repo, PiperVoicesRepo) { // Hugging Face repo names ignore case
 			req.Revision = PiperVoicesRevision
 		}
 	default:

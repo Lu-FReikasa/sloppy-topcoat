@@ -134,6 +134,10 @@ func TestDownloadPiperVoiceExplicitRevisionWins(t *testing.T) {
 	if _, err := d.Name(&req); err != nil || req.Revision != "v1.0.0" {
 		t.Fatalf("%v %+v", err, req)
 	}
+	upper := DownloadRequest{Kind: KindTTS, Repo: "Rhasspy/Piper-Voices", File: "v.onnx"}
+	if _, err := d.Name(&upper); err != nil || upper.Revision != PiperVoicesRevision {
+		t.Fatalf("other case: %v %+v", err, upper)
+	}
 	other := DownloadRequest{Kind: KindTTS, Repo: "someone/voices", File: "v.onnx"}
 	if _, err := d.Name(&other); err != nil || other.Revision != "main" {
 		t.Fatalf("%v %+v", err, other)
