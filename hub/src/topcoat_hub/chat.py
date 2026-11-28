@@ -374,7 +374,17 @@ _BACKREF = re.compile(
     r"last\s+(?:time|attempt)",
     re.IGNORECASE,
 )
-_PATH = re.compile(r"(?<![\w:/.])(?:/[\w.@-]+)+(?:/[\w.@-]+)*|(?<![\w:/.])[\w.@-]+(?:/[\w.@-]+)+")
+# A path starts where a word starts: at the line start or after white space, a backtick, a quote,
+# an opening bracket, Markdown emphasis, `=` (`--config=/etc/x.toml`), `>` (`<code>/etc/hosts`,
+# `2>/dev/null`), `|`, `,`, `;` or `~`. Never after a letter or a hyphen of any kind, so German
+# "Verbindungs-/Trennungen" (often with U+2011 or a soft hyphen), "Ein-/Ausgang" or "und/oder" is
+# no path. An `_` counts only when no path character stands before it: otherwise every position in
+# a long run of underscores would be a start and the search would take quadratic time.
+_PATH_START = (
+    r"(?<![^\s`'\"\u201a\u201e\u2018\u2019\u201c\u201d\u00ab\u00bb\u2039\u203a(\[{<*_=>|,;~])"
+    r"(?<![\w.@-]_)"
+)
+_PATH = re.compile(_PATH_START + r"(?:/[\w.@-]+)+|" + _PATH_START + r"[\w.@-]+(?:/[\w.@-]+)+")
 _WORD = re.compile(r"\w{5,}", re.UNICODE)
 
 
