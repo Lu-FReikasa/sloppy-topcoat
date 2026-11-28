@@ -179,7 +179,7 @@ def _real_run(
     )
     id_file = tmp_path / "id"
     id_file.write_text("sha256:aaaa\n", encoding="utf-8")
-    smoke = "#!/usr/bin/env bash\n" + (
+    smoke = f"#!/usr/bin/env bash\nprintf '%s\\n' \"$1\" > '{tmp_path / 'smoke.arg'}'\n" + (
         f"echo sha256:bbbb > '{id_file}'\n" if smoke_moves_tag else ""
     )
     (repo / "scripts" / "smoke-test-hub-image.sh").write_text(smoke, encoding="utf-8", newline="\n")
@@ -221,6 +221,9 @@ def test_the_transfer_sends_the_image_the_smoke_test_ran_on(tmp_path: Path) -> N
     assert f"pinned: {CI_REPO}@sha256:{DIGEST} (image ID sha256:aaaa)" in r.stdout
     log = (tmp_path / "docker.log").read_text(encoding="utf-8").splitlines()
     assert f"save {CI_REPO}:sha-0123456" in log
+    # the smoke test ran on the pinned digest, not on the tag
+    smoked = (tmp_path / "smoke.arg").read_text(encoding="utf-8").strip()
+    assert smoked == f"{CI_REPO}@sha256:{DIGEST}"
 
 
 def test_a_digest_reference_is_tagged_after_the_pull(tmp_path: Path) -> None:
