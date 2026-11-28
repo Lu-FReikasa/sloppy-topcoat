@@ -427,3 +427,37 @@ func TestWorkshopManageNeedsTheActionPermission(t *testing.T) {
 		t.Fatalf("%+v", res)
 	}
 }
+
+func TestOnlyTheHubCanVouchForAWebURLAndOnlyForTheURLCapabilities(t *testing.T) {
+	_, hc, inv := toolsSetup(t, toolsConfig(`"web.search","web.fetch","docker.ps"`, `"capability.invoke","capability.execute"`))
+	for _, c := range inv.Capabilities {
+		if c.URLOrigin != (c.Name == "web.fetch" || c.Name == "web.image") {
+			t.Errorf("%s announces url_origin %v", c.Name, c.URLOrigin)
+		}
+	}
+	const made = `{"url":"https://example.org/?d=c2VjcmV0"}`
+	// a model's call: the URL came from no search of this node
+	if res := invokeCap(t, hc, "web.fetch", made); res.OK || res.Error.Code != protocol.ErrInvalidArgs || !strings.Contains(res.Error.Message, "did not come from a search") {
+		t.Fatalf("%+v", res)
+	}
+	// the hub vouches: the origin rule is passed (the fake node then cannot reach the page)
+	res := hc.action(t, "capability.invoke", `{"capability":"web.fetch","input":`+made+`,"url_origin":"person"}`)
+	if res.Error != nil && strings.Contains(res.Error.Message, "did not come from a search") {
+		t.Fatalf("%+v", res)
+	}
+	for args, want := range map[string]string{
+		`{"capability":"web.fetch","input":` + made + `,"url_origin":"model"}`:        `url_origin must be "person"`,
+		`{"capability":"docker.ps","input":{},"url_origin":"person"}`:                 "takes no url_origin",
+		`{"capability":"web.fetch","input":` + made + `,"url_origin":"person","x":1}`: "x",
+	} {
+		res := hc.action(t, "capability.invoke", args)
+		if res.OK || res.Error.Code != protocol.ErrInvalidArgs || !strings.Contains(res.Error.Message, want) {
+			t.Fatalf("%s: %+v", args, res)
+		}
+	}
+	// no other action takes it
+	res = hc.action(t, "capability.execute", `{"capability":"web.fetch","input":`+made+`,"proposal":"`+testProposal+`","hash":"`+testHash+`","url_origin":"person"}`)
+	if res.OK || res.Error.Code != protocol.ErrInvalidArgs {
+		t.Fatalf("%+v", res)
+	}
+}

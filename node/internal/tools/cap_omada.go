@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"topcoat/node/internal/providers/capability"
 )
@@ -96,11 +97,16 @@ func (c *omadaClient) authorize(ctx context.Context) error {
 	return nil
 }
 
+// cut keeps at most n bytes of s and never splits a character: a cut inside one became U+FFFD in
+// the JSON the hub reads (issue #226).
 func cut(s string, n int) string {
-	if len(s) > n {
-		return s[:n] + "…"
+	if len(s) <= n {
+		return s
 	}
-	return s
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n] + "…"
 }
 
 // get is a GET of an /openapi/v1/{omadacId}/… path; it logs in when there is no valid token and
@@ -200,7 +206,8 @@ func omadaList(result json.RawMessage) ([]map[string]any, int) {
 
 // resolveSite picks the site by name or id from the controller's own list, so a path never holds
 // anything the controller did not name itself. No name: the configured one, else the only one.
-func (c *omadaClient) resolveSite(ctx context.Context, asked string) (omadaSite, error) {
+// The note says which site was read when it is not the one asked for (issue #226).
+func (c *omadaClient) resolveSite(ctx context.Context, asked string) (omadaSite, string, error) {
 	c.mu.Lock()
 	cached := c.sites
 	c.mu.Unlock()
@@ -208,7 +215,7 @@ func (c *omadaClient) resolveSite(ctx context.Context, asked string) (omadaSite,
 	if sites == nil {
 		res, err := c.get(ctx, "/sites", url.Values{"page": {"1"}, "pageSize": {"100"}})
 		if err != nil {
-			return omadaSite{}, err
+			return omadaSite{}, "", err
 		}
 		items, _ := omadaList(res)
 		for _, it := range items {
@@ -228,16 +235,70 @@ func (c *omadaClient) resolveSite(ctx context.Context, asked string) (omadaSite,
 	}
 	if want == "" {
 		if len(sites) == 1 {
-			return sites[0], nil
+			return sites[0], "", nil
 		}
-		return omadaSite{}, inputErr("the controller has %d sites; name one of: %s", len(sites), siteNames(sites))
+		return omadaSite{}, "", inputErr("the controller has %d sites; name one of: %s", len(sites), siteNames(sites))
 	}
 	for _, s := range sites {
 		if strings.EqualFold(s.Name, want) || s.ID == want {
-			return s, nil
+			return s, "", nil
 		}
 	}
-	return omadaSite{}, inputErr("no site %q on the controller; sites: %s", want, siteNames(sites))
+	// A name whose non-ASCII characters were lost on the way ("Zuh?use", "Zuh\uFFFDuse") still
+	// names a site when it fits exactly one of them.
+	if strings.ContainsAny(want, "?\uFFFD") {
+		var fit []omadaSite
+		for _, s := range sites {
+			if garbledFits(want, s.Name) {
+				fit = append(fit, s)
+			}
+		}
+		if len(fit) == 1 {
+			return fit[0], fmt.Sprintf("no site %q on the controller; read the site %q, whose name it fits", want, fit[0].Name), nil
+		}
+	}
+	// One site: a guessed ("default") or garbled name can only mean that one (live 2026-11-27).
+	if len(sites) == 1 {
+		return sites[0], fmt.Sprintf("no site %q on the controller; read its only site %q", want, sites[0].Name), nil
+	}
+	return omadaSite{}, "", inputErr("no site %q on the controller; sites: %s", want, siteNames(sites))
+}
+
+// garbledFits says whether name could be the site name full after an encoding step replaced
+// characters by "?" or U+FFFD: each run of them stands for one or more characters that are not
+// ASCII (a character of several bytes may have become several marks); the rest matches in any case.
+func garbledFits(garbled, full string) bool {
+	g, f := []rune(garbled), []rune(full)
+	// seen[i][j] marks a pair already tried and failed: without it "?ü?ü…" against a long run of
+	// "ü" backtracks exponentially (the asked name comes from the model).
+	seen := make([][]bool, len(g)+1)
+	for i := range seen {
+		seen[i] = make([]bool, len(f)+1)
+	}
+	var fits func(i, j int) bool
+	fits = func(i, j int) bool {
+		if i == len(g) {
+			return j == len(f)
+		}
+		if seen[i][j] {
+			return false
+		}
+		seen[i][j] = true
+		if g[i] == '?' || g[i] == '\uFFFD' {
+			k := i
+			for k < len(g) && (g[k] == '?' || g[k] == '\uFFFD') {
+				k++
+			}
+			for end := j + 1; end <= len(f) && f[end-1] > 0x7f; end++ {
+				if fits(k, end) {
+					return true
+				}
+			}
+			return false
+		}
+		return j < len(f) && strings.EqualFold(string(g[i]), string(f[j])) && fits(i+1, j+1)
+	}
+	return fits(0, 0)
 }
 
 func siteNames(sites []omadaSite) string {
@@ -356,9 +417,10 @@ func omadaCap(o Options, name, desc, extraProps string, kind omadaKind, run func
 				return nil, errNoConnector("omada")
 			}
 			var site omadaSite
+			var siteNote string
 			if name != "omada.sites" { // listing the sites needs none
 				var err error
-				if site, err = o.omada.resolveSite(ctx, in.Site); err != nil {
+				if site, siteNote, err = o.omada.resolveSite(ctx, in.Site); err != nil {
 					return nil, err
 				}
 			}
@@ -369,6 +431,10 @@ func omadaCap(o Options, name, desc, extraProps string, kind omadaKind, run func
 			cleaned, masked := finishOutput(out, o.Connectors.secrets())
 			if m, ok := cleaned.(map[string]any); ok {
 				m["masked"] = masked
+				if siteNote != "" { // the answer says which site was read (issue #226)
+					m["site"] = site.Name
+					m["site_note"] = siteNote
+				}
 			}
 			return cleaned, nil
 		},

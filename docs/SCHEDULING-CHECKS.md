@@ -31,7 +31,7 @@ each step.
 | SCH-03 | the fake-node scenarios of the brief; the context test (a prompt is sized for the node it runs on) | M-SCH-03 |
 | SCH-04 | migration up and down on a copy of the production database; old settings gone | M-SCH-04 |
 | SCH-05 | the three fake setups (one node/one slot, one node/two slots, two nodes) | M-SCH-05 |
-| UI-01 | `npm run lint`, `typecheck`, `test`, `build`, `npm run layout` | M-UI-01 |
+| UI-01 | `npm run lint`, `typecheck`, `test`, `build`, `npm run layout` (removed in #208: `npm run shell-layout` and `sheets-layout` run in CI now) | M-UI-01 |
 | UI-02 | same web gate | M-UI-02 |
 | OBS-01 | hub tests of the view; privacy test (another person's content is never shown) | M-OBS-01 |
 | SCH-06 | bench tests on fakes | M-SCH-06 |

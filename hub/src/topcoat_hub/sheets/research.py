@@ -54,7 +54,7 @@ _VERSION_WORDS = {
 class Web(Protocol):
     async def search(self, query: str) -> list[dict[str, Any]]: ...
 
-    async def fetch(self, url: str, markup: bool) -> dict[str, Any]: ...
+    async def fetch(self, url: str, markup: bool, built: bool = False) -> dict[str, Any]: ...
 
 
 Judge = Callable[[str], Awaitable[str]]
@@ -378,7 +378,7 @@ async def _reference(web: Web, req: Request, say: Callable[[str], None]) -> dict
     try:
         # as it came (format html passes JSON through): with synced lyrics the answer is longer
         # than the text form's limit, and a cut JSON is no JSON
-        out = await web.fetch(url, markup=True)
+        out = await web.fetch(url, markup=True, built=True)
     except Exception as exc:
         say(f"no reference lyrics: {exc}")
         return None

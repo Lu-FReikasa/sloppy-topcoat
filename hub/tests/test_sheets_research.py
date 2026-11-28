@@ -67,11 +67,14 @@ class FakeWeb:
     def __init__(self, pages: dict[str, str], hits: list[str], lyrics: str | None = REFERENCE):
         self.pages, self.hits, self.lyrics = pages, hits, lyrics
         self.fetched: list[tuple[str, bool]] = []
+        self.built: list[str] = []
 
     async def search(self, query: str) -> list[dict[str, Any]]:
         return [{"url": u, "title": u} for u in self.hits]
 
-    async def fetch(self, url: str, markup: bool) -> dict[str, Any]:
+    async def fetch(self, url: str, markup: bool, built: bool = False) -> dict[str, Any]:
+        if built:
+            self.built.append(url)
         self.fetched.append((url, markup))
         if url.startswith("https://lrclib.net/"):
             if self.lyrics is None:
@@ -162,6 +165,8 @@ async def test_research_reads_versions_identifies_and_chooses() -> None:
     assert urls == [UG1, UG2, UG3, COVER, PRE]
     # all as they came: the lrclib answer too (with synced lyrics it passed the text limit)
     assert all(markup for _, markup in web.fetched)
+    # only the lookup the hub built itself is vouched for; the hits the node knows (finding 03)
+    assert [u for u in web.built] == [u for u, _ in web.fetched if "lrclib.net" in u]
     by = {s.found.url: s for s in out.sources}
     assert "other_artist" in by[COVER].flags and by[COVER].excluded
     assert "simplified" in by[UG3].flags and by[UG3].excluded
