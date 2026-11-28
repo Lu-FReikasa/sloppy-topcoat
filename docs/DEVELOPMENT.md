@@ -193,6 +193,20 @@ Admin endpoints use `require_admin`, which accepts only the admin token — a ke
 | POST | `/api/node/challenge` | none | single-use nonce for the node session |
 | WS | `/api/node/ws` | signed nonce (node key) | node session (see docs/PROTOCOL.md) |
 
+### The API contract: `proto/api/openapi.json`
+
+The hub's OpenAPI document is committed, so the web client has something to be checked against.
+After a change to a hub route or to a model it returns or takes (and after a FastAPI or pydantic
+update), regenerate it and commit the result:
+
+    cd hub && uv run python -m topcoat_hub.openapi_contract
+
+`--check` only compares. Two tests hold the contract: `hub/tests/test_openapi_contract.py` fails
+when the app's schema differs from the file, and `web/src/api/contract.test.ts` fails when
+`client.ts` calls a path or method the file does not have (it reads the calls from the source; a new
+transport helper beside `request`, `chatStream` and `imageBlob` goes into its `TRANSPORT` table).
+WebSocket routes are not part of OpenAPI; the file lists them under `x-topcoat-websockets`.
+
 ## Overlay deploy (a short loop to a running hub)
 
 Building an image, moving it and recreating the hub takes the better part of an hour. For a hobby hub
