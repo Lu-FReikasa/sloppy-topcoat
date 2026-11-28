@@ -2193,6 +2193,7 @@
     "failed": "Das hat gerade nicht geklappt. Versuch es gleich noch einmal.",
     "wakeTimeoutAny": "Die Maschine für dieses Modell wurde geweckt, ist aber nicht rechtzeitig online gekommen. Versuch es gleich noch einmal.",
     "wakeTimeout": "Die Maschine für dieses Modell ({{nodes}}) wurde geweckt, ist aber nicht rechtzeitig online gekommen. Versuch es gleich noch einmal.",
+    "wakeTimeoutMany": "Die Maschinen für dieses Modell ({{nodes}}) wurden geweckt, aber keine ist rechtzeitig online gekommen. Versuch es gleich noch einmal.",
     "jump": "Zum Neuesten springen",
     "via": "über {{node}}",
     "viaWhy": "{{node}} hat geantwortet, weil {{from}} nicht verfügbar war.",

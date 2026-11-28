@@ -94,15 +94,17 @@ export interface SectionBreak {
   pauseMinutes: number;
 }
 
-/** The line between a chat of the continuous conversation and the next one. */
 /** The calm line under an answer that failed: a node woken for it that did not come gets its own
  *  (#102), everything else the general "try again". */
 export function failedText(error: StreamError, t: TFunction): string {
   if (error.code !== "wake_timeout") return t("talk.failed");
   const nodes = wakeTimeoutNodes(error.message);
-  return nodes ? t("talk.wakeTimeout", { nodes }) : t("talk.wakeTimeoutAny");
+  if (!nodes) return t("talk.wakeTimeoutAny");
+  // the hub ends the wait as soon as one of them comes, so with several none came
+  return t(nodes.includes(", ") ? "talk.wakeTimeoutMany" : "talk.wakeTimeout", { nodes });
 }
 
+/** The line between a chat of the continuous conversation and the next one. */
 function breakBetween(
   index: number,
   before: ThreadSection,

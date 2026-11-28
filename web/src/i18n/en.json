@@ -2193,6 +2193,7 @@
     "failed": "That did not work just now. Try again in a moment.",
     "wakeTimeoutAny": "The machine for this model was woken but did not come online in time. Try again in a moment.",
     "wakeTimeout": "The machine for this model ({{nodes}}) was woken but did not come online in time. Try again in a moment.",
+    "wakeTimeoutMany": "The machines for this model ({{nodes}}) were woken but none came online in time. Try again in a moment.",
     "jump": "Jump to the latest",
     "via": "via {{node}}",
     "viaWhy": "Answered by {{node}} because {{from}} was not available.",
