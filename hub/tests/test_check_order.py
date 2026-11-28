@@ -167,7 +167,7 @@ def test_the_order_fields_are_offered_only_with_targets():
 def test_a_call_without_fixed_fields_keeps_the_old_path():
     from types import SimpleNamespace
 
-    from topcoat_hub.api.chat import _order_of
+    from topcoat_hub.chat_engine.answer import _order_of
 
     turn = SimpleNamespace(decide_available=tuple(SCOPE), last_user_text="Wie ist der Stand?")
     order, focus = _order_of(turn, '{"what": "disk space"}')
@@ -196,7 +196,7 @@ def test_the_activity_record_of_a_check_keeps_its_order():
 def test_with_one_machine_in_scope_the_hub_names_it_when_the_model_does_not():
     from types import SimpleNamespace
 
-    from topcoat_hub.api.chat import _order_of
+    from topcoat_hub.chat_engine.answer import _order_of
 
     one = [_cap("node-amd", "windows.events"), _cap("node-amd", "topcoat.state")]
     turn = SimpleNamespace(decide_available=tuple(one), last_user_text="Audio?")
@@ -223,7 +223,7 @@ def test_a_question_about_a_longer_time_widens_the_default_window():
 def test_without_a_target_the_hub_takes_the_machine_the_question_names():
     from types import SimpleNamespace
 
-    from topcoat_hub.api.chat import _order_of
+    from topcoat_hub.chat_engine.answer import _order_of
 
     # two machines in the scope; the question names one of them in its own spelling
     turn = SimpleNamespace(
@@ -239,7 +239,7 @@ def test_without_a_target_the_hub_takes_the_machine_the_question_names():
 def test_without_a_target_the_other_fields_are_kept_on_any_machine():
     from types import SimpleNamespace
 
-    from topcoat_hub.api.chat import _order_of
+    from topcoat_hub.chat_engine.answer import _order_of
 
     turn = SimpleNamespace(decide_available=tuple(SCOPE), last_user_text="Läuft alles?")
     order, _ = _order_of(turn, '{"what": "state", "window": "7d", "tools": ["docker"]}')
@@ -253,7 +253,7 @@ def test_without_a_target_the_other_fields_are_kept_on_any_machine():
 def test_a_question_about_topcoat_itself_gets_no_machine():
     from types import SimpleNamespace
 
-    from topcoat_hub.api.chat import _order_of
+    from topcoat_hub.chat_engine.answer import _order_of
 
     one = [_cap("node-amd", "windows.events"), _cap("node-amd", "topcoat.state")]
     question = "Ich würde gerne die Namen von Node-AMD hier in Topcoat ändern. Geht das?"

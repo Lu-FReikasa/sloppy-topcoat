@@ -563,12 +563,12 @@ def test_the_assistant_is_told_every_group_it_can_use() -> None:
 
 
 def test_a_report_card_the_model_wrote_itself_is_cut_from_the_answer() -> None:
-    from topcoat_hub.api.chat import REPORT_LEAD, strip_fake_card
+    from topcoat_hub.chat_engine.common import REPORT_LEAD, strip_fake_card
 
     fake = f"Ich schaue nach.\n\n{REPORT_LEAD}\n**Summary:** Suche läuft"
     assert strip_fake_card(fake) == "Ich schaue nach."
     assert strip_fake_card("Normale Antwort") == "Normale Antwort"
-    from topcoat_hub.api.chat import starts_with_fake_card
+    from topcoat_hub.chat_engine.common import starts_with_fake_card
 
     assert starts_with_fake_card(f"{REPORT_LEAD}\n**Summary:** alles hochgeladen\n\nFertig.")
     assert not starts_with_fake_card("Ich schaue nach.")

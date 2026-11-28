@@ -49,7 +49,7 @@ def test_a_question_is_needed_and_nothing_else_is_taken(client: TestClient) -> N
 
 
 def test_what_a_check_in_research_becomes_by_quality() -> None:
-    from topcoat_hub.api.chat import research_mode
+    from topcoat_hub.chat_engine.answer import research_mode
 
     assert research_mode("research", "thorough", False) == "job"
     assert research_mode("research", "balanced", False) == "offer"

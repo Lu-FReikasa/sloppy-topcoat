@@ -312,7 +312,7 @@ def test_api_times_are_utc_whatever_the_zone_of_the_connection() -> None:
     from a test do not leak a different offset)."""
     from datetime import datetime, timedelta, timezone
 
-    from topcoat_hub.api.chat import _iso
+    from topcoat_hub.chat_engine.common import _iso
 
     tokyo = timezone(timedelta(hours=9))
     assert _iso(datetime(2026, 10, 2, 9, 30, tzinfo=tokyo)) == "2026-10-02T00:30:00+00:00"

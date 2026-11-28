@@ -50,7 +50,9 @@ _DATA_KEYS = ("seq", "second_look", "flow", "node", "type", "step", "calls", "ev
 # for it with repo.search.
 _POINTERS: dict[str, list[dict[str, str]]] = {
     "thinking": [{"path": "hub/src/topcoat_hub/activity.py", "find": "class ThinkingTrace"}],
-    "lead_in": [{"path": "hub/src/topcoat_hub/api/chat.py", "find": 'activity.add("lead_in"'}],
+    "lead_in": [
+        {"path": "hub/src/topcoat_hub/chat_engine/answer.py", "find": 'activity.add("lead_in"'}
+    ],
     "plan": [{"path": "hub/src/topcoat_hub/activity.py", "find": "class CheckTrace"}],
     "tool": [
         {"path": "hub/src/topcoat_hub/activity.py", "find": "class CheckTrace"},
@@ -58,14 +60,18 @@ _POINTERS: dict[str, list[dict[str, str]]] = {
     ],
     "check": [
         {"path": "hub/src/topcoat_hub/chat_tools.py", "find": '"tools_start"'},
-        {"path": "hub/src/topcoat_hub/api/chat.py", "find": "async def _verify_answer"},
+        {"path": "hub/src/topcoat_hub/chat_engine/answer.py", "find": "async def _verify_answer"},
     ],
-    "retry": [{"path": "hub/src/topcoat_hub/api/chat.py", "find": "async def _answer"}],
+    "retry": [{"path": "hub/src/topcoat_hub/chat_engine/answer.py", "find": "async def _answer"}],
     "steer": [{"path": "hub/src/topcoat_hub/api/chat.py", "find": "async def steer_check"}],
     "note": [{"path": "hub/src/topcoat_hub/activity.py", "find": "class CheckTrace"}],
-    "announce": [{"path": "hub/src/topcoat_hub/api/chat.py", "find": 'activity.add("announce"'}],
+    "announce": [
+        {"path": "hub/src/topcoat_hub/chat_engine/answer.py", "find": 'activity.add("announce"'}
+    ],
 }
-_SECOND_LOOK = [{"path": "hub/src/topcoat_hub/api/chat.py", "find": "async def _verify_answer"}]
+_SECOND_LOOK = [
+    {"path": "hub/src/topcoat_hub/chat_engine/answer.py", "find": "async def _verify_answer"}
+]
 
 # The way of every answer through the hub, in order, for the assistant to walk along.
 PIPELINE: list[dict[str, str]] = [
@@ -77,8 +83,8 @@ PIPELINE: list[dict[str, str]] = [
     {
         "step": "scope, model, node and the effort are settled; the prompt is assembled "
         "(rules, notes of the memory, hand-over of an earlier section)",
-        "path": "hub/src/topcoat_hub/api/chat.py",
-        "find": "async def _prepare",
+        "path": "hub/src/topcoat_hub/chat_engine/turn.py",
+        "find": "async def prepare",
     },
     {
         "step": "the hand-over from the running summary of the chat",

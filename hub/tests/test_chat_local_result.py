@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from topcoat_hub import local_tools
-from topcoat_hub.api.chat import _local_result
+from topcoat_hub.chat_engine.answer import _local_result
 from topcoat_hub.topcoat_self import TOPCOAT_NODE_ID
 
 

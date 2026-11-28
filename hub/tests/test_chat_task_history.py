@@ -6,7 +6,7 @@ before was gone, and "as we just discussed" sent the run searching the notes."""
 from types import SimpleNamespace
 
 from topcoat_hub import chat
-from topcoat_hub.api.chat import CONFIRMATIONS, task_pairs
+from topcoat_hub.chat_engine.common import CONFIRMATIONS, task_pairs
 from topcoat_hub.chat_tools import (
     TASK_HISTORY_CHARS,
     conversation_for_task,

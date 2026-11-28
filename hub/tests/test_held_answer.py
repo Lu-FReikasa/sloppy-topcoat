@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from topcoat_hub.api.chat import Held, _held_for, _revise
+from topcoat_hub.chat_engine.answer import Held, _held_for, _revise
 from topcoat_hub.gateway import GatewayError
 
 

@@ -13,7 +13,7 @@ from tests.test_gateway import _bench
 from tests.test_model_selection_baseline import POLICY, _is_in_state
 from tests.test_model_selection_baseline import world as world  # the fixture, shared
 from topcoat_hub import applications, memory_tags
-from topcoat_hub.api.chat import PROGRAM_NAMES
+from topcoat_hub.chat_engine.answer import PROGRAM_NAMES
 from topcoat_hub.model_resolver import Choice, ModelFacts, best_model, is_embedding_name
 
 # --- auto: the model that is large enough and still fast enough ------------------------------
