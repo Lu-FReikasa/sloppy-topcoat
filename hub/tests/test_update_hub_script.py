@@ -11,10 +11,21 @@ SCRIPT = ROOT / "deploy" / "update-hub.sh"
 CI = "ghcr.io/example-owner/sloppy-topcoat-hub"
 LOCAL = "sloppy-topcoat-hub"
 
+# FAKE_IMAGES has one line per tag: "<repo>:<tag> <id> [<other name of the same image>...]".
+# `docker images` lists "<repo>:<tag> <id>"; `docker image inspect` finds an image by any of its
+# names, by "<repo>" for "<repo>:latest", and prints its id like the real one.
 FAKE_DOCKER = """#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$FAKE_LOG"
 case "$1" in
-  images) cat "$FAKE_IMAGES" ;;
+  images) while read -r ref id _; do printf '%s %s\\n' "$ref" "$id"; done < "$FAKE_IMAGES" ;;
+  image)
+    ref="${!#}"
+    while read -r name id others; do
+      for n in "$name" $others; do
+        if [ "$n" = "$ref" ] || [ "$n" = "$ref:latest" ]; then echo "$id"; exit 0; fi
+      done
+    done < "$FAKE_IMAGES"
+    exit 1 ;;
   compose) case "$*" in *pg_dump*) echo dump ;; esac ;;
 esac
 exit 0
@@ -26,7 +37,8 @@ def update(tmp_path: Path, prev: str, new: str, images: list[str]) -> tuple[str,
     output and the images it removed."""
     deploy = tmp_path / "deploy"
     deploy.mkdir()
-    (deploy / "update-hub.sh").write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+    script = SCRIPT.read_text(encoding="utf-8")
+    (deploy / "update-hub.sh").write_text(script, encoding="utf-8", newline="\n")
     (deploy / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
     (deploy / "hub.env").write_text(f"TOPCOAT_IMAGE={prev}\n", encoding="utf-8")
     bin_dir = tmp_path / "bin"
@@ -34,7 +46,9 @@ def update(tmp_path: Path, prev: str, new: str, images: list[str]) -> tuple[str,
     for name, body in (("docker", FAKE_DOCKER), ("curl", "#!/usr/bin/env bash\nexit 0\n")):
         (bin_dir / name).write_text(body, encoding="utf-8", newline="\n")
         (bin_dir / name).chmod(0o755)
-    (tmp_path / "images.txt").write_text("".join(f"{i}\n" for i in images), encoding="utf-8")
+    # every tag is its own image unless the line already names its id
+    lines = [i if " " in i else f"{i} sha256:{n:064x}" for n, i in enumerate(images, 1)]
+    (tmp_path / "images.txt").write_text("".join(f"{i}\n" for i in lines), encoding="utf-8")
     log = tmp_path / "docker.log"
     env = {k: v for k, v in os.environ.items() if not k.startswith("TOPCOAT_")} | {
         "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
@@ -93,3 +107,32 @@ def test_a_registry_with_a_port_is_not_taken_for_a_tag(tmp_path: Path) -> None:
     images = [new, prev, f"{repo}:sha-0000000", "localhost:5000/other:x"]
     _, removed = update(tmp_path, prev, new, images)
     assert removed == [f"{repo}:sha-0000000"]
+
+
+def test_an_untagged_previous_name_keeps_its_latest_tag(tmp_path: Path) -> None:
+    """hub.env may name the running image without a tag; docker lists it as ":latest". That tag
+    is the way back and must stay."""
+    prev, new = CI, f"{CI}:sha-2222222"
+    images = [new, f"{CI}:latest", f"{CI}:sha-0000000"]
+    _, removed = update(tmp_path, prev, new, images)
+    assert removed == [f"{CI}:sha-0000000"]
+
+
+def test_a_digest_name_keeps_every_tag_of_that_image(tmp_path: Path) -> None:
+    """A previous or new image named by digest is found by its id, so none of its tags goes."""
+    prev, new = f"{CI}@sha256:{'a' * 64}", f"{CI}@sha256:{'b' * 64}"
+    images = [
+        f"{CI}:sha-1111111 sha256:{'1' * 64} {prev}",
+        f"{CI}:sha-2222222 sha256:{'2' * 64} {new}",
+        f"{CI}:main sha256:{'2' * 64}",
+        f"{CI}:sha-0000000 sha256:{'3' * 64}",
+    ]
+    _, removed = update(tmp_path, prev, new, images)
+    assert removed == [f"{CI}:sha-0000000"]
+
+
+def test_nothing_is_removed_when_the_previous_image_cannot_be_read(tmp_path: Path) -> None:
+    prev, new = f"{CI}:sha-1111111", f"{CI}:sha-2222222"
+    out, removed = update(tmp_path, prev, new, [new, f"{CI}:sha-0000000"])
+    assert removed == []
+    assert "no old images removed" in out
