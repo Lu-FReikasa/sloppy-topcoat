@@ -10,7 +10,7 @@
 //
 //   npm run build && npm run shell-layout      (needs the `playwright` package and a Chromium)
 //
-// The hub is faked (./lib/fake-hub.mjs). Like `npm run layout` it is not part of CI (no browsers).
+// The hub is faked (./lib/fake-hub.mjs). CI runs it in the web job (Chromium installed by the job).
 // SIZES=320x640,1280x800, LANGS=en and LOOKS=terminal limit the run; DIST=<dir> checks another build; SHOTS=<dir> keeps a screenshot of each step.
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -27,7 +27,7 @@ function loadPlaywright() {
       /* try the next place */
     }
   }
-  console.error("shell-check needs the `playwright` package (npm i -g playwright) and a Chromium.");
+  console.error("shell-check needs the `playwright` package (`npm ci` installs it) and a Chromium (`npx playwright install chromium`).");
   process.exit(2);
 }
 const { chromium } = loadPlaywright();
@@ -63,9 +63,15 @@ function measure() {
       if (getComputedStyle(p).textOverflow === "ellipsis" && getComputedStyle(p).overflowX !== "visible") return true;
     return false;
   };
+  // text kept for screen readers only (clipped to a 1 px box, e.g. the status words on a phone) is
+  // hidden on purpose too
+  const screenReaderOnly = (el) => {
+    const s = getComputedStyle(el);
+    return s.clipPath === "inset(50%)" || (s.position === "absolute" && el.clientWidth <= 1 && s.overflow === "hidden");
+  };
   for (const el of document.querySelectorAll(".ws-top, .ws-top *")) {
     const r = el.getBoundingClientRect();
-    if (r.width === 0 || getComputedStyle(el).visibility === "hidden" || shortened(el)) continue;
+    if (r.width === 0 || getComputedStyle(el).visibility === "hidden" || shortened(el) || screenReaderOnly(el)) continue;
     if (r.right > window.innerWidth + 0.5 || r.left < -0.5) cut.push(`${el.className || el.tagName} leaves the window`);
     // text that shortens with an ellipsis is meant to; anything else wider than its box is cut
     if (el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).textOverflow !== "ellipsis" && el.clientWidth > 0)

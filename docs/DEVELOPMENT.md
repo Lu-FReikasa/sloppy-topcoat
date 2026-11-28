@@ -20,10 +20,10 @@ Node.js ≥ 22.12, Docker (for the dev database), GNU make, golangci-lint v2 (on
 ## Check before you push
 
 `make check` (= `scripts/dev/local-ci.sh`) runs what CI runs, locally: node (vet, vet for
-Windows, `-race`, golangci-lint, cross-compile), web (lint, typecheck, vitest, build), hub
-(ruff, migrations up/down, pytest on 4 parallel workers) and the integration test. `make check-fast`
-skips `-race`, pytest and the integration test (about 3 minutes). The hub parts start a
-throw-away PostgreSQL on port 55432 (needs the `postgresql` and pgvector packages). Not covered
+Windows, `-race`, golangci-lint, cross-compile), web (lint, typecheck, vitest, build, the layout
+checks), hub (ruff, migrations up/down, pytest on 4 parallel workers) and the integration test.
+`make check-fast` skips `-race`, pytest, the layout checks and the integration test (about 3
+minutes). The hub parts start a throw-away PostgreSQL on port 55432 (needs the `postgresql` and pgvector packages). Not covered
 here, CI only: the Windows tests and the Docker image smoke test. pytest runs with
 `pytest-xdist`; every worker gets its own database (`topcoat_test_gw0`, ...), and parametrized
 test ids must be stable (no `uuid4()` in `parametrize`).
@@ -260,7 +260,9 @@ Known flaky tests (they pass alone, fail rarely under load): see the list below.
 CI (`.github/workflows/ci.yml`) runs the same: hub (ruff, migrations up/check/down, pytest
 against a `pgvector/pgvector:pg16` service), node (vet, `go test -race`, golangci-lint,
 cross-compile `linux/amd64` and `windows/amd64` with `CGO_ENABLED=0`), web (eslint, tsc,
-vitest, build) and the integration test.
+vitest, build, and the layout checks `shell-layout` and `sheets-layout` in Chromium, see "Layout
+checks in CI") and the integration test. The overlay checks (`overlay-layout`, `overlay-capture`) are
+not part of CI.
 
 ### Flaky hub tests
 
@@ -469,19 +471,24 @@ python scripts/dev/make_kb_index.py --root /srv/notes --check              # exi
 section whose heading or first lines mention a name or alias becomes a reference of that entry.
 Then re-index the source (or wait for the periodic run) so the hub sees the new file.
 
-## Layout check of the chat
+## Layout checks in CI
 
-`web/scripts/layout-check.mjs` opens the built GUI in a real Chromium (the hub is faked, all `/api`
-calls are answered from memory) and checks the chat at widths 360-2560 px and heights 600-1400 px:
-the page never scrolls, the message list scrolls inside, the message box is full width with 3 to about
-10 lines and its controls on a row below, every click target is at least 40 px, the server choice stays
-inside the window, a new conversation shows the box directly under the placeholder. It needs the
-`playwright` package and a Chromium (not installed in CI, so it is a manual check, not a CI job):
+Two layout checks open the built GUI in a real Chromium against the faked hub
+(`web/scripts/lib/fake-hub.mjs`, every `/api` call is answered from memory) and run in the web job of
+CI after the build, so a layout regression they catch turns the job red: `npm run shell-layout` (the
+navigation shell, below) and `npm run sheets-layout` (Sheets: the library table fits and does not
+break its titles or keys, the stage's tools end inside the window and are not covered, both shells,
+English and German, phone and desktop widths). Together they take about two minutes. `playwright` is
+a devDependency, so `npm ci` installs it; the browser comes once with `npx playwright install chromium`
+(CI installs the headless shell with `--with-deps --only-shell`). `CHROMIUM=<path>` uses another
+Chromium binary.
 
 ```
-cd web && npm run build && npm run layout                      # all 160 combinations
-WIDTHS=360,1280 HEIGHTS=600 SHOTS=/tmp/shots npm run layout    # a few, with screenshots
+cd web && npm run build && npm run shell-layout && npm run sheets-layout
 ```
+
+The older chat check (`npm run layout`, `layout-check.mjs`) was removed in #208: it measured the chat
+page of the first GUI, which the navigation shell replaced, and timed out waiting for its message box.
 
 ## Layout check of the navigation shell
 
@@ -489,8 +496,8 @@ WIDTHS=360,1280 HEIGHTS=600 SHOTS=/tmp/shots npm run layout    # a few, with scr
 the faked hub: the shell fills the window and a chat's message box stays inside it, the header never
 scrolls sideways or cuts text (320 px up, English and German, a long user name), the phone drawer opens
 below the header and the drawer and the user menu close on Escape and on a tap outside, with the focus
-back on the button that opened them. All three looks, seven sizes from 320x640 to 1366x768. A manual
-check like the one above, not a CI job:
+back on the button that opened them. All three looks, seven sizes from 320x640 to 1366x768. CI runs
+it (see above):
 
 ```
 cd web && npm run build && npm run shell-layout                     # all 216 checks
@@ -510,7 +517,7 @@ screens (1920x1080, 2560x1440 at 150 %, 1366x768, 1280x800), three looks, German
 is on, the page paints no ground that covers the screen, nothing scrolls, the taskbar and the programs stay
 on the screen and off the taskbar, no text is cut in title bars, taskbar or navigation, no page errors.
 The faked hub sends the hub's security headers (`security_headers.py`), so every GUI check (overlay,
-shell, sheets, layout) also fails on a Content-Security-Policy refusal: a change that needs a script,
+shell, sheets) also fails on a Content-Security-Policy refusal: a change that needs a script,
 picture or connection from somewhere else shows up here, not first on the hub.
 `SHOTS` keeps each step twice: see-through, and `-desk.png` over a busy desktop with the client's tint.
 

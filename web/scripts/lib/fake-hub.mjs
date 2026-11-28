@@ -1,6 +1,7 @@
-// The faked hub of the layout check (E3-04 ...) and of the workshop browser (E6-02): the pages of
+// The faked hub of the layout checks and of the workshop browser (E6-02): the pages of
 // the GUI are served from the built `dist` directory and every /api call is answered from memory,
-// so a page can be measured without a hub. Shared on purpose: `layout-check.mjs` and the helper of
+// so a page can be measured without a hub. Shared on purpose: the layout checks (`shell-check.mjs`,
+// `sheets-check.mjs`, `overlay-check.mjs`) and the helper of
 // the browser container (`deploy/workshop/browser`) use the same data.
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -93,7 +94,7 @@ const MEMORY = {
 };
 const HASH1 = "a1".repeat(32);
 const HASH2 = "b2".repeat(32);
-export const long = (text, n = 3) => (text + " ").repeat(n).trim();
+const long = (text, n = 3) => (text + " ").repeat(n).trim();
 const ci = (id, kind, text, o = {}) => ({
   id, text, status: "active", evidence: "doc", confidence: 1, source_type: "user", source_ref: {}, version: 2,
   confirmed_count: 0, last_confirmed_at: null, disputed_with: null, superseded_by: null, embedder: null,
