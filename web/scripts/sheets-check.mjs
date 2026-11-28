@@ -9,7 +9,7 @@
 //
 //   npm run build && npm run sheets-layout      (needs the `playwright` package and a Chromium)
 //
-// The hub is faked (./lib/fake-hub.mjs). Like `npm run shell-layout` it is not part of CI (no browsers).
+// The hub is faked (./lib/fake-hub.mjs). CI runs it in the web job (Chromium installed by the job).
 // SIZES=320x640,1280x800, LANGS=en, SHELLS=nav and LOOKS=terminal limit the run; DIST=<dir> checks another
 // build; SHOTS=<dir> keeps a screenshot of each step.
 import { createRequire } from "node:module";
@@ -27,7 +27,7 @@ function loadPlaywright() {
       /* try the next place */
     }
   }
-  console.error("sheets-check needs the `playwright` package (npm i -g playwright) and a Chromium.");
+  console.error("sheets-check needs the `playwright` package (`npm ci` installs it) and a Chromium (`npx playwright install chromium`).");
   process.exit(2);
 }
 const { chromium } = loadPlaywright();

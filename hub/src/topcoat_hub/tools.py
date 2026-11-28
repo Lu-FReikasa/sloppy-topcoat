@@ -89,6 +89,12 @@ class ToolError(Exception):
         self.call_id = call_id  # the audit row of a refused confirmed run
 
 
+# the capabilities whose URL leaves the network and whose node may check where it comes from: its
+# own search hits, or ``url_origin: "person"`` from the hub (security audit 2026-11-27, finding 03)
+URL_ORIGIN_CAPABILITIES = frozenset({"web.fetch", "web.image"})
+URL_NOT_GIVEN = "url_not_given"  # the code of a refused URL of that kind
+
+
 @dataclass(frozen=True)
 class Caller:
     """Who asks. ``admin`` is the dev-token admin on the GUI; a key is never one."""
@@ -360,6 +366,8 @@ class ToolService:
         private: str | None = None,
         max_input_bytes: int = MAX_INPUT_BYTES,
         wait_seconds: float | None = None,
+        person_url: bool = False,
+        url_refusal: str | None = None,
     ) -> dict[str, Any]:
         """Run one read-only capability. ``quiet`` is for the hub's own periodic reads (the
         inventory, E3-10): a call that works leaves no audit row (it would be one per node per
@@ -368,7 +376,13 @@ class ToolService:
         person's private question); a call that carries private data is still refused. ``private``
         keeps the call in the audit but neither its input nor its output (the voice path, D127:
         audio and what was said are never stored); its text says why. ``max_input_bytes`` and
-        ``wait_seconds`` are for the few capabilities whose input is a recording, not a name."""
+        ``wait_seconds`` are for the few capabilities whose input is a recording, not a name.
+        ``person_url``: the URL of a ``web.fetch`` / ``web.image`` is the person's own (from their
+        message, or built by the hub from their request), not one a model made up; a call the
+        person makes by hand (GUI, API) always is (finding 03, :data:`URL_ORIGIN_CAPABILITIES`).
+        ``url_refusal``: the run's reason why the URL may not be read (it came from no search hit
+        of the run and not from the person, ``web_access.WebOrigins``); checked after the
+        private-data guard, refused as ``url_not_given`` and audited without the input."""
         audit = self._skip_audit if unrecorded else self._audit
         async with self.sessionmaker() as db:
             node = await db.get(Node, node_id)
@@ -437,8 +451,20 @@ class ToolService:
                 if exc.code == "private_data":  # the audit keeps that it happened, not the secret
                     audited_input = {"withheld": "the input held private data and is not kept"}
                 raise await refuse(exc.status, exc.code, exc.message) from exc
+        if url_refusal:
+            # a URL the model made up may carry what the run read (finding 03): not kept either
+            audited_input = {"withheld": "the URL came from no search and not from the person"}
+            raise await refuse(422, URL_NOT_GIVEN, url_refusal)
 
         args: dict[str, Any] = {"capability": capability, "input": tool_input}
+        if (
+            capability in URL_ORIGIN_CAPABILITIES
+            and info.get("url_origin") is True
+            and (person_url or caller.via != "agent")
+        ):
+            # a node that checks where a URL comes from fetches only its own search hits unless
+            # the hub vouches for the URL; outside the input, so no model can set it (finding 03)
+            args["url_origin"] = "person"
         if capability.startswith("repo."):
             # the dev workshop (D52): the hub says which repository this is and hands the node its
             # address and token with this one call; the audit row above holds the input only

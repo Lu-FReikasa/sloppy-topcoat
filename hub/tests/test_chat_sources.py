@@ -1,6 +1,8 @@
 """B-C: a back-reference that nothing in the conversation backs and a file path no result shows are
 marked by the hub; nothing is judged by a model."""
 
+import time
+
 from fastapi.testclient import TestClient
 
 from tests.conftest import AUTH
@@ -33,6 +35,32 @@ def test_a_path_that_no_result_shows_is_marked_and_a_shown_one_is_not() -> None:
     )
     assert found == ["web/css/looks.css", "/etc/hosts"]
     assert chat.unsupported_paths("Ratio 3/4 und und/oder.", sources) == []
+
+
+def test_a_slash_inside_a_word_is_no_path_but_one_at_a_word_start_is() -> None:
+    """#225: "Verbindungs-/Trennungen" was read as the path `/Trennungen`; a model often writes
+    the hyphen as U+2011, U+2010, a soft hyphen or a dash."""
+    for hyphen in ("-", "\u2011", "\u2010", "\u00ad", "\u2013"):
+        answer = f"Die Verbindungs{hyphen}/Trennungen am Ein{hyphen}/Ausgang, und/oder beides."
+        assert chat.unsupported_paths(answer, "") == [], hyphen
+    found = chat.unsupported_paths("Siehe /etc/hosts, `hub/src/x.py` und see /var/log/syslog.", "")
+    assert found == ["/etc/hosts", "hub/src/x.py", "/var/log/syslog"]
+    assert chat.unsupported_paths("(/etc/hosts) und **/etc/fstab** und „/etc/passwd“", "") == [
+        "/etc/hosts",
+        "/etc/fstab",
+        "/etc/passwd",
+    ]
+    assert chat.unsupported_paths(
+        "--config=/etc/topcoat/hub.toml, x 2>/dev/null|/etc/hosts, ~/.ssh/id.pub", ""
+    ) == ["/etc/topcoat/hub.toml", "/dev/null", "/etc/hosts"]
+
+
+def test_a_long_run_of_underscores_or_hyphens_is_searched_in_linear_time() -> None:
+    """The start rule must not make every character of a long run a candidate start."""
+    for run in ("_" * 50_000, "a_" * 25_000, "-" * 50_000, "\u2011" * 50_000):
+        started = time.monotonic()
+        assert chat.unsupported_paths(run, "") == []
+        assert time.monotonic() - started < 1.0
 
 
 def test_the_note_names_the_phrase_and_the_path_in_the_users_language() -> None:

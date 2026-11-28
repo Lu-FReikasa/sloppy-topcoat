@@ -38,6 +38,7 @@ from topcoat_hub import (
     app_catalogue,
     message_tools,
     project_write_tools,
+    recent_change,
     report,
     report_service,
     research_profile,
@@ -63,8 +64,13 @@ from topcoat_hub.models import AgentTask, DevRepo, User
 from topcoat_hub.project_tools import PROJECT_NODE, PROJECT_NODE_ID
 from topcoat_hub.report_doc import WRITE_UP_KEY
 from topcoat_hub.steering import SteeringBoard
-from topcoat_hub.tools import Caller, ToolError
+from topcoat_hub.tools import URL_NOT_GIVEN, Caller, ToolError
 from topcoat_hub.topcoat_self import GUIDE_CAPABILITY, TOPCOAT_NODE
+
+# runs whose prompt the hub wrote from a model's text (a review of an answer, a planner's order,
+# a coordinator's sub-question, a care run): a URL in it is not the person's, so it is not fetched
+# without a search hit (finding 03)
+HUB_PROMPT_ORIGINS = frozenset({"review", "planner", "child", "care"})
 
 log = logging.getLogger(__name__)
 # the project tool a finish may name instead of calling it (_propose_sets)
@@ -879,6 +885,10 @@ class AgentLoop:
             stop_at_usable=lim.stop_web_at_usable,
             max_attempts=lim.max_web_attempts,
         )
+        if origin not in HUB_PROMPT_ORIGINS:
+            # the URLs the person gave with the question may be fetched; the run finds the rest
+            # through its own searches (finding 03: no URL the model made up)
+            state.web.origins.of_person(prompt)
         state.research_depth = research_depth
         state.progress_mark = state.informative
         mode = await self._tool_mode(model)
@@ -1266,6 +1276,11 @@ class AgentLoop:
             log.exception("agent: could not read the notes about the names of the question")
             return {}
 
+    async def chat_actions(self, caller: Caller) -> list[dict[str, Any]]:
+        """What a check of a chat may propose for this caller (:meth:`_proposable`): the only
+        changes the chat's assistant may offer (#223)."""
+        return await self._proposable(caller, "chat")
+
     async def _proposable(self, caller: Caller, origin: str) -> list[dict[str, Any]]:
         """The state-changing actions this task's user could confirm (E3-01b), only when the hub
         has proposals switched on. A task from the tasks page may propose all of them (the card
@@ -1396,6 +1411,7 @@ class AgentLoop:
                             prompts.tools_hint(s.prompt, tools),
                             prompts.workshop_hint(s.prompt, tools, s.repos),
                             prompts.wifi_hint(s.prompt, tools),
+                            prompts.settings_change_hint(s.prompt, tools),
                             prompts.names_hint(s.name_notes),
                         )
                         if h
@@ -1742,13 +1758,27 @@ class AgentLoop:
             s.calls += 1
         s.used.add(a.capability)
         try:
+            # finding 03: a page only from this run's hits or the person's message
+            vouched = (
+                a.capability == web_access.FETCH
+                and isinstance(a.input, dict)
+                and s.web.origins.is_person(str(a.input.get("url") or ""))
+            )
+            not_given = s.web.url_refusal(a.capability, a.input)
             result = await self.tools.invoke(
-                s.caller, uuid.UUID(match["node_id"]), a.capability, a.input, s.task_id
+                s.caller,
+                uuid.UUID(match["node_id"]),
+                a.capability,
+                a.input,
+                s.task_id,
+                **({"person_url": True} if vouched else {}),
+                **({"url_refusal": not_given} if not_given else {}),
             )
             if polling and result.get("ok"):
                 result = await self._wait_for_test(s, match["node_id"], a, result)
         except ToolError as exc:
-            if exc.code == "private_data":  # the refused input is not kept: it held private data
+            if exc.code in ("private_data", URL_NOT_GIVEN):
+                # the refused input is not kept: it held private data, or may (a made-up URL)
                 label, info = f"{a.capability} on {a.node}", {**info, "input": {}}
             s.web.note_failure(a.capability)
             s.web.note_refused(a.input, exc.message)
@@ -2034,6 +2064,7 @@ class AgentLoop:
             # a table nobody asked for (live 2026-11-10: a one-column table with an empty row)
             diagnosis.pop("table")
         await self._scope(s, diagnosis)
+        _not_confirmed_yet(s, diagnosis)
         diagnosis["notes"].extend(
             f"what a source can show: {n}" for n in prompts.source_notes(s.texts)
         )
@@ -2339,3 +2370,27 @@ class _Run:
     # calls that did not deliver a result (a link that did not load, a refused or failed tool):
     # the diagnosis, the card and the answer say so instead of passing over them
     failed: list[dict[str, Any]] = field(default_factory=list)
+
+
+def _not_confirmed_yet(s: "_Run", diagnosis: dict[str, Any]) -> None:
+    """#224: the person changed a setting a moment ago and the run read the event log: a summary
+    or finding that says the setting is off becomes "not confirmed yet" (missing new events show
+    nothing that soon), and the notes say why."""
+    if recent_change.EVENTS_LOG not in s.used or not recent_change.just_changed_in_task(s.prompt):
+        return
+    language = hub_language("", s.prompt.split("\n\n(", 1)[0])
+    changed = False
+    for f in diagnosis.get("findings") or []:
+        claim = str(f.get("claim") or "")
+        text = recent_change.qualify_claim(claim, language)
+        if text != claim:
+            f["claim"], changed = text, True
+    summary = str(diagnosis.get("summary") or "")
+    guarded, removed = recent_change.guard(summary, language)
+    if removed:
+        diagnosis["summary"], changed = guarded, True
+    if changed:
+        diagnosis.setdefault("notes", []).append(
+            "the person changed the setting a moment ago: no new event yet is not confirmed, "
+            "not off"
+        )

@@ -28,7 +28,7 @@ export const DEFAULT_MATRIX = [
 ];
 
 export const LIMITS = {
-  minTarget: 40, // px, as in layout-check
+  minTarget: 40, // px, the smallest click target the GUI allows
   minFont: 12, // px
   minContrast: 4.5, // WCAG AA for body text
   maxPerCheck: 8, // violations kept per check and size

@@ -110,14 +110,21 @@ func frames(parts ...[2]string) []byte {
 	return b
 }
 
+// invoke runs a capability with the URL of a web call vouched for as the person's (url_origin
+// "person"), so the tests of everything else need no search first; invokeAs tests the origin rule.
 func invoke(t *testing.T, o Options, name, input string) (map[string]any, error) {
+	t.Helper()
+	return invokeAs(WithPersonURL(context.Background()), t, o, name, input)
+}
+
+func invokeAs(parent context.Context, t *testing.T, o Options, name, input string) (map[string]any, error) {
 	t.Helper()
 	r := NewRegistry(o)
 	c, ok := r.Get(name)
 	if !ok {
 		t.Fatalf("no capability %s", name)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 	defer cancel()
 	raw, err := c.Invoke(ctx, json.RawMessage(input))
 	if err != nil {
