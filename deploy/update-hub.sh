@@ -15,7 +15,9 @@
 #   4. TOPCOAT_IMAGE in the env file is switched and only the hub is recreated;
 #   5. the hub must answer its health URL within TOPCOAT_HEALTH_WAIT seconds - if not, the previous
 #      image is put back and checked the same way (exit 1);
-#   6. only then are older hub images removed: the new and the previous one always stay.
+#   6. only then are older hub images removed: the new and the previous one always stay, compared
+#      by image id with all their tags. Pruned are TOPCOAT_IMAGE_REPO (local builds) and the
+#      repository of the new image (a CI image from a registry, e.g. ghcr.io/<owner>/sloppy-topcoat-hub).
 #
 # Environment: TOPCOAT_ENV_FILE (default: hub.env next to this script), TOPCOAT_BACKUP_DIR
 # (default: ../backup), TOPCOAT_HEALTH_URL (default: https://127.0.0.1:8443/api/health),
@@ -119,7 +121,30 @@ else
   exit 1
 fi
 
-for img in $(docker images --format '{{.Repository}}:{{.Tag}}' | grep "^$image_repo:" || true); do
-  if [ "$img" != "$new_image" ] && [ "$img" != "$prev_image" ]; then docker rmi "$img" >/dev/null 2>&1 && say "removed old image $img"; fi
-done
+# the repository of an image reference: the name without its tag (a port in the registry host,
+# localhost:5000/..., is not a tag) and without a digest
+repo_of() { local r="${1%%@*}"; case "${r##*/}" in *:*) r="${r%:*}" ;; esac; printf '%s' "$r"; }
+# prune the local-build repository and the repository of the new image (a CI image from a
+# registry, D123), each only once. The new and the previous image always stay: they are compared
+# by image id, so no tag of theirs goes, also when hub.env names one without a tag (":latest") or
+# by digest. If either id cannot be read, nothing is removed.
+id_of() { docker image inspect --format '{{.Id}}' "$1" 2>/dev/null || true; }
+new_id="$(id_of "$new_image")" prev_id="$(id_of "$prev_image")"
+if [ -z "$new_id" ] || [ -z "$prev_id" ]; then
+  say "could not read the image id of $new_image or $prev_image: no old images removed"
+else
+  prune_repos="$image_repo"
+  new_repo="$(repo_of "$new_image")"
+  [ "$new_repo" = "$image_repo" ] || prune_repos="$prune_repos $new_repo"
+  images="$(docker images --no-trunc --format '{{.Repository}}:{{.Tag}} {{.ID}}' || true)"
+  for repo in $prune_repos; do
+    while read -r img id; do
+      [ -n "$img" ] && [ "$(repo_of "$img")" = "$repo" ] || continue
+      case "$img" in *:\<none\>) continue ;; esac
+      if [ "$id" != "$new_id" ] && [ "$id" != "$prev_id" ] && [ "$img" != "$new_image" ] && [ "$img" != "$prev_image" ]; then
+        docker rmi "$img" >/dev/null 2>&1 && say "removed old image $img"
+      fi
+    done <<< "$images"
+  done
+fi
 say "kept for the way back: $prev_image"

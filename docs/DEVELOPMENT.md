@@ -419,7 +419,9 @@ part is a host such as `ghcr.io`; it says so when the image's `sha-<commit>` is 
 the checks ran on) → smoke test → the running production image is saved on the server
 (the way back) → the new image is sent (`docker save | gzip | ssh`) → production through
 `deploy/update-hub.sh` (revision check, database dump, health check, automatic rollback; a dry run
-of it comes first and production is always asked, `--yes` or not). The servers come from
+of it comes first and production is always asked, `--yes` or not; after a healthy switch it
+removes older images of `TOPCOAT_IMAGE_REPO` and of the new image's repository, so CI images
+from the registry do not pile up, and always keeps the new and the previous one). The servers come from
 `TOPCOAT_PROD_SSH`, `TOPCOAT_PROD_DIR`, `TOPCOAT_BACKUP_REMOTE` (see the header of the script);
 nothing real is in the repository. It needs bash with `docker`, `ssh` and `make` (WSL or Git Bash
 on Windows). The test only checks the order of the steps, build or pull, and that a dry run
