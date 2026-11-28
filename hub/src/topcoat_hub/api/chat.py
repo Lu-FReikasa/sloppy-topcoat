@@ -43,6 +43,7 @@ from topcoat_hub import (
     effort_stages,
     handoff,
     local_tools,
+    offer_guard,
     project_changesets,
     project_issues,
     project_iterations,
@@ -1138,6 +1139,9 @@ class Turn:
     accepted_hint: str = ""
     # where the conversation was started (a desktop window, conversation_context.py)
     context: dict[str, Any] | None = None
+    # the state-changing actions this user may have proposed in this conversation's scope
+    # (ToolService.proposable_tools): an offer to change something stays only if one does it (#223)
+    actions: tuple[dict[str, Any], ...] = ()
     # the conversation as a check's task reads it (task_pairs): answers without report cards
     task_history: list[tuple[str, str]] = field(default_factory=list)
     # D125: the history with the images where they stand (only when a model that sees answers),
@@ -1685,6 +1689,22 @@ async def _answer(
                 sources = "\n".join(str(m.get("content") or "") for m in prompt.messages)
                 visible = "\n".join(str(m.get("content") or "") for m in prompt.messages[1:])
                 language = hub_language(turn.language, turn.last_user_text)
+                # #223: an offer to change something stays only if an available action does it
+                guarded = offer_guard.without_unbacked_offer(
+                    text,
+                    turn.actions,
+                    language,
+                    # a person with no tools at all has no system the answer could change:
+                    # "Shall I remove the second verse?" is about the conversation
+                    keep=not turn.decide_available
+                    or turn.application == "project"
+                    or (change_facts is not None and change_facts[0] > 0),
+                )
+                if guarded != text:
+                    log.info("chat: an offer no action backs was cut from the answer")
+                    yield chat.sse("discard", {})
+                    yield chat.sse("delta", {"text": guarded})
+                    text = guarded
                 note = chat.source_notes(
                     language,
                     chat.unsupported_backrefs(text, visible),
@@ -3351,6 +3371,13 @@ async def _plan_check(
     available = tool_groups.apply_scope(everything, turn.scope)
     # the scope the fixed order is resolved against, also for a check the hub starts itself
     turn.decide_available = tuple(available)
+    # what the assistant may offer to change (D15/D83): the whitelisted actions a check of a chat
+    # may propose, run after the person's click; a project changes through its change sets
+    loop = getattr(state.agents, "loop", None)
+    if loop is not None:
+        turn.actions = tuple(
+            tool_groups.apply_scope(await loop.chat_actions(Caller.of(user, "agent")), turn.scope)
+        )
     turn.internet_node = tool_groups.pick_web_node(available)
     # the user may search the web but switched the internet off here: say so, so the assistant
     # does not claim it cannot, and can point to the switch
@@ -3373,6 +3400,7 @@ async def _plan_check(
     turn.capabilities = replace(
         turn.capabilities,
         tools=tool_groups.labels(keys),
+        actions=offer_guard.labels(turn.actions),
         knowledge="notes" in keys,
         web_search="web" in keys,
     )
