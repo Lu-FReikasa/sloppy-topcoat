@@ -458,6 +458,11 @@
   margin: 0.35rem 0 0;
 }
 
+/* "19.11.2026, 10:00" stays on one line on a phone (PR #242 review) */
+.sheet-version-when {
+  white-space: nowrap;
+}
+
 .sheet-sources ul {
   list-style: none;
   padding: 0;

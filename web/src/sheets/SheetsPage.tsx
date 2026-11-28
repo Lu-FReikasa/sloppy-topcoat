@@ -905,7 +905,7 @@ function Versions({ api, id, versions }: { api: ApiClient; id: string; versions:
                 {t("sheets.compare")}
               </button>
             )}{" "}
-            <span>{when(s)}</span>
+            <span className="sheet-version-when">{when(s)}</span>
             {s.key && <span className="muted small"> · {[s.key, s.capo ? t("sheets.capoN", { n: s.capo }) : ""].filter(Boolean).join(" · ")}</span>}
             {s.version_note && <span className="muted small"> · {s.version_note}</span>}
             {s.id === inUseId && (
