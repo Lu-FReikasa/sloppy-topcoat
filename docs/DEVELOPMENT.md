@@ -410,19 +410,23 @@ There are two ways to a hub image and node binaries (ARCHITECTURE D123):
 ```sh
 scripts/dev/release.sh --dry-run --image ghcr.io/lu-freikasa/sloppy-topcoat-hub:sha-<commit>   # CI image
 scripts/dev/release.sh --dry-run                                                             # local build
+scripts/dev/release.sh --dry-run --image ghcr.io/lu-freikasa/sloppy-topcoat-hub@sha256:<digest>  # by digest
 ```
 
 One command, one question per step, `--dry-run` prints everything and changes nothing:
 backup tag (on `origin/main`, or on the local `main` while there is no remote; you push it) →
 `make check` → `docker build`, or `docker pull` when `--image` names a registry image (its first
 part is a host such as `ghcr.io`; it says so when the image's `sha-<commit>` is not the checkout
-the checks ran on) → smoke test → the running production image is saved on the server
+the checks ran on) → smoke test (a pulled image by its digest, `<repo>@sha256:…`; the transfer
+refuses if the tag has meanwhile moved to another image ID) → the running production image is saved on the server
 (the way back) → the new image is sent (`docker save | gzip | ssh`) → production through
 `deploy/update-hub.sh` (revision check, database dump, health check, automatic rollback; a dry run
 of it comes first and production is always asked, `--yes` or not). The servers come from
 `TOPCOAT_PROD_SSH`, `TOPCOAT_PROD_DIR`, `TOPCOAT_BACKUP_REMOTE` (see the header of the script);
-nothing real is in the repository. It needs bash with `docker`, `ssh` and `make` (WSL or Git Bash
-on Windows). The test only checks the order of the steps, build or pull, and that a dry run
+nothing real is in the repository. An image given by digest (e.g. the digest from the `publish`
+run log) is rolled out under the tag `<repo>:digest-<12 hex>`, because `docker save | docker load`
+keeps tags but no digests and `TOPCOAT_IMAGE` in `hub.env` needs a name the server knows. It needs bash with `docker`, `ssh` and `make` (WSL or Git Bash
+on Windows). The test checks the order of the steps, build or pull, the digest pinning, and that a dry run
 changes nothing.
 
 `make check` needs Go, Node.js with npm, `uv` and a PostgreSQL 16 with pgvector (see
